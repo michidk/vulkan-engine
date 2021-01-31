@@ -20,14 +20,6 @@ struct AppInfo {
 }
 
 impl AppInfo {
-    pub fn new(width: u32, height: u32, title: &'static str) -> Self {
-        Self {
-            width,
-            height,
-            title,
-        }
-    }
-
     fn into_window<T: 'static>(
         self,
         window_target: &EventLoopWindowTarget<T>,
@@ -137,9 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, ash::InstanceError> {
-    let app_name = CString::new("VulkanTriangle").unwrap();
-    let width = 1920;
-    let height = 1080;
+    let app_name = CString::new(DEFAULT_WINDOW_INFO.title).unwrap();
     // // https://hoj-senna.github.io/ashen-engine/text/002_Beginnings.html
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
@@ -200,7 +190,7 @@ struct DebugMessenger {
 impl DebugMessenger {
     fn init(entry: &ash::Entry, instance: &ash::Instance) -> Result<DebugMessenger, vk::Result> {
         // debug config
-        let mut debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+        let debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(
                 vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
                     | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
@@ -262,15 +252,15 @@ impl SurfaceWrapper {
         }
     }
 
-    fn get_present_modes(
-        &self,
-        physical_device: vk::PhysicalDevice,
-    ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
-        unsafe {
-            self.surface_loader
-                .get_physical_device_surface_present_modes(physical_device, self.surface)
-        }
-    }
+    // fn get_present_modes(
+    //     &self,
+    //     physical_device: vk::PhysicalDevice,
+    // ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
+    //     unsafe {
+    //         self.surface_loader
+    //             .get_physical_device_surface_present_modes(physical_device, self.surface)
+    //     }
+    // }
 
     fn get_formats(
         &self,
@@ -414,6 +404,7 @@ fn init_device_and_queues(
     ))
 }
 
+#[allow(dead_code)]
 struct SwapchainWrapper {
     swapchain_loader: ash::extensions::khr::Swapchain,
     swapchain: vk::SwapchainKHR,
@@ -436,7 +427,6 @@ impl SwapchainWrapper {
         logical_device: &ash::Device,
         surfaces: &SurfaceWrapper,
         queue_families: &QueueFamilies,
-        queues: &Queues,
     ) -> Result<SwapchainWrapper, vk::Result> {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
@@ -800,6 +790,7 @@ fn fill_commandbuffers(
     Ok(())
 }
 
+#[allow(dead_code)]
 struct Engine {
     window: winit::window::Window,
     entry: ash::Entry,
@@ -840,7 +831,6 @@ impl Engine {
             &logical_device,
             &surfaces,
             &queue_families,
-            &queues,
         )?;
         let renderpass = init_renderpass(&logical_device, physical_device, &surfaces)?;
         swapchain.create_framebuffers(&logical_device, renderpass)?;

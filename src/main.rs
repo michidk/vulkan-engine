@@ -1,15 +1,9 @@
 use std::ffi::{c_void, CStr, CString};
 
 use ash::{
-    extensions::{
-        ext::DebugUtils,
-        khr::{self, Surface},
-    },
-    vk, Device,
-};
-use ash::{
+    extensions::{ext::DebugUtils, khr},
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
-    Entry,
+    vk,
 };
 
 use winit::{
@@ -198,13 +192,13 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
     unsafe { entry.create_instance(&instance_create_info, None) }
 }
 
-struct DebugSys {
+struct DebugMessenger {
     loader: DebugUtils,
     messenger: vk::DebugUtilsMessengerEXT,
 }
 
-impl DebugSys {
-    fn init(entry: &ash::Entry, instance: &ash::Instance) -> Result<DebugSys, vk::Result> {
+impl DebugMessenger {
+    fn init(entry: &ash::Entry, instance: &ash::Instance) -> Result<DebugMessenger, vk::Result> {
         // debug config
         let mut debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(
@@ -223,11 +217,11 @@ impl DebugSys {
         let loader = DebugUtils::new(entry, instance);
         let messenger = unsafe { loader.create_debug_utils_messenger(&debugcreateinfo, None)? };
 
-        Ok(DebugSys { loader, messenger })
+        Ok(DebugMessenger { loader, messenger })
     }
 }
 
-impl Drop for DebugSys {
+impl Drop for DebugMessenger {
     fn drop(&mut self) {
         unsafe {
             self.loader
@@ -236,23 +230,23 @@ impl Drop for DebugSys {
     }
 }
 
-struct SurfaceSys {
+struct SurfaceWrapper {
     surface: vk::SurfaceKHR,
-    surface_loader: ash::extensions::khr::Surface,
+    surface_loader: khr::Surface,
 }
 
-impl SurfaceSys {
+impl SurfaceWrapper {
     fn init(
         window: &Window,
         entry: &ash::Entry,
         instance: &ash::Instance,
-    ) -> Result<SurfaceSys, vk::Result> {
+    ) -> Result<SurfaceWrapper, vk::Result> {
         // load the surface
         // handles x11 or whatever OS specific drivers
         // this shit is terrible and nobody wants to do it, so lets use ash-window
         let surface = unsafe { ash_window::create_surface(entry, instance, window, None).unwrap() };
-        let surface_loader = Surface::new(entry, instance);
-        Ok(SurfaceSys {
+        let surface_loader = khr::Surface::new(entry, instance);
+        Ok(SurfaceWrapper {
             surface,
             surface_loader,
         })
@@ -303,7 +297,7 @@ impl SurfaceSys {
     }
 }
 
-impl Drop for SurfaceSys {
+impl Drop for SurfaceWrapper {
     fn drop(&mut self) {
         unsafe {
             self.surface_loader.destroy_surface(self.surface, None);
@@ -353,7 +347,7 @@ impl QueueFamilies {
     fn init(
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
-        surfaces: &SurfaceSys,
+        surfaces: &SurfaceWrapper,
     ) -> Result<QueueFamilies, vk::Result> {
         let queuefamilyproperties =
             unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
@@ -404,7 +398,7 @@ fn init_device_and_queues(
         .enabled_extension_names(&device_extension_names_raw)
         .enabled_features(&features);
 
-    let logical_device: Device = unsafe {
+    let logical_device: ash::Device = unsafe {
         instance
             .create_device(physical_device, &device_create_info, None)
             .unwrap()
@@ -420,7 +414,7 @@ fn init_device_and_queues(
     ))
 }
 
-struct Swapchain {
+struct SwapchainWrapper {
     swapchain_loader: ash::extensions::khr::Swapchain,
     swapchain: vk::SwapchainKHR,
     images: Vec<vk::Image>,
@@ -435,15 +429,15 @@ struct Swapchain {
     current_image: usize,
 }
 
-impl Swapchain {
+impl SwapchainWrapper {
     fn init(
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         logical_device: &ash::Device,
-        surfaces: &SurfaceSys,
+        surfaces: &SurfaceWrapper,
         queue_families: &QueueFamilies,
         queues: &Queues,
-    ) -> Result<Swapchain, vk::Result> {
+    ) -> Result<SwapchainWrapper, vk::Result> {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
         let surface_format = *surfaces.get_formats(physical_device)?.first().unwrap();
@@ -500,7 +494,7 @@ impl Swapchain {
             let fence = unsafe { logical_device.create_fence(&fenceinfo, None) }?;
             may_begin_drawing.push(fence);
         }
-        Ok(Swapchain {
+        Ok(SwapchainWrapper {
             swapchain_loader,
             swapchain,
             images: swapchain_images,
@@ -556,7 +550,7 @@ impl Swapchain {
     }
 }
 
-impl Drop for Swapchain {
+impl Drop for SwapchainWrapper {
     fn drop(&mut self) {
         unsafe {
             // needs to be seperate function, because we depend on logical_device
@@ -569,7 +563,7 @@ impl Drop for Swapchain {
 fn init_renderpass(
     logical_device: &ash::Device,
     physical_device: vk::PhysicalDevice,
-    surfaces: &SurfaceSys,
+    surfaces: &SurfaceWrapper,
 ) -> Result<vk::RenderPass, vk::Result> {
     let attachments = [vk::AttachmentDescription::builder()
         .format(
@@ -627,7 +621,7 @@ impl Pipeline {
 
     fn init(
         logical_device: &ash::Device,
-        swapchain: &Swapchain,
+        swapchain: &SwapchainWrapper,
         renderpass: &vk::RenderPass,
     ) -> Result<Pipeline, vk::Result> {
         let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder().code(
@@ -766,7 +760,7 @@ fn fill_commandbuffers(
     commandbuffers: &[vk::CommandBuffer],
     logical_device: &ash::Device,
     renderpass: &vk::RenderPass,
-    swapchain: &Swapchain,
+    swapchain: &SwapchainWrapper,
     pipeline: &Pipeline,
 ) -> Result<(), vk::Result> {
     for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
@@ -810,14 +804,14 @@ struct Engine {
     window: winit::window::Window,
     entry: ash::Entry,
     instance: ash::Instance,
-    debug: std::mem::ManuallyDrop<DebugSys>,
-    surfaces: std::mem::ManuallyDrop<SurfaceSys>,
+    debug: std::mem::ManuallyDrop<DebugMessenger>,
+    surfaces: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
     queues: Queues,
     device: ash::Device,
-    swapchain: Swapchain,
+    swapchain: SwapchainWrapper,
     renderpass: vk::RenderPass,
     pipeline: Pipeline,
     pools: Pools,
@@ -829,8 +823,8 @@ impl Engine {
         let entry = ash::Entry::new()?;
 
         let instance = init_instance(&window, &entry)?;
-        let debug = DebugSys::init(&entry, &instance)?;
-        let surfaces = SurfaceSys::init(&window, &entry, &instance)?;
+        let debug = DebugMessenger::init(&entry, &instance)?;
+        let surfaces = SurfaceWrapper::init(&window, &entry, &instance)?;
 
         let (physical_device, physical_device_properties) =
             init_physical_device_and_properties(&instance)?;
@@ -840,7 +834,7 @@ impl Engine {
         let (logical_device, queues) =
             init_device_and_queues(&instance, physical_device, &queue_families)?;
 
-        let mut swapchain = Swapchain::init(
+        let mut swapchain = SwapchainWrapper::init(
             &instance,
             physical_device,
             &logical_device,

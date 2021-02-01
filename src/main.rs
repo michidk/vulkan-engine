@@ -41,6 +41,12 @@ const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // setting up logger
+    env_logger::Builder::from_env(
+        env_logger::Env::default()
+            .default_filter_or("trace")
+    ).init();
+
     // https://hoj-senna.github.io/ashen-engine/text/008_Cleanup.html
     let eventloop = EventLoop::new();
     let window = DEFAULT_WINDOW_INFO.clone().into_window(&eventloop).unwrap();
@@ -633,7 +639,22 @@ impl Pipeline {
             .module(fragmentshader_module)
             .name(&mainfunctionname);
         let shader_stages = vec![vertexshader_stage.build(), fragmentshader_stage.build()];
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder();
+
+        let vertex_attrib_descs = [vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 0,
+            offset: 0,
+            format: vk::Format::R32G32B32A32_SFLOAT,
+        }];
+        let vertex_binding_descs = [vk::VertexInputBindingDescription {
+            binding: 0,
+            stride: 16,
+            input_rate: vk::VertexInputRate::VERTEX,
+        }];
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_attribute_descriptions(&vertex_attrib_descs)
+            .vertex_binding_descriptions(&vertex_binding_descs);
+
         let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::POINT_LIST);
         let viewports = [vk::Viewport {
@@ -752,6 +773,7 @@ fn fill_commandbuffers(
     renderpass: &vk::RenderPass,
     swapchain: &SwapchainWrapper,
     pipeline: &Pipeline,
+    vb: &vk::Buffer,
 ) -> Result<(), vk::Result> {
     for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -782,6 +804,7 @@ fn fill_commandbuffers(
                 vk::PipelineBindPoint::GRAPHICS,
                 pipeline.pipeline,
             );
+            logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[*vb], &[0]);
             logical_device.cmd_draw(commandbuffer, 1, 1, 0, 0);
             logical_device.cmd_end_render_pass(commandbuffer);
             logical_device.end_command_buffer(commandbuffer)?;
@@ -807,6 +830,10 @@ struct Engine {
     pipeline: Pipeline,
     pools: Pools,
     commandbuffers: Vec<vk::CommandBuffer>,
+    allocator: vk_mem::Allocator,
+    buffer: vk::Buffer,
+    allocation: vk_mem::Allocation,
+    allocation_info: vk_mem::AllocationInfo,
 }
 
 impl Engine {
@@ -836,6 +863,33 @@ impl Engine {
         swapchain.create_framebuffers(&logical_device, renderpass)?;
         let pipeline = Pipeline::init(&logical_device, &swapchain, &renderpass)?;
         let pools = Pools::init(&logical_device, &queue_families)?;
+
+        let allocator_create_info = vk_mem::AllocatorCreateInfo {
+            physical_device,
+            device: logical_device.clone(),
+            instance: instance.clone(),
+            ..Default::default()
+        };
+        let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
+        let allocation_create_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::CpuToGpu,
+            ..Default::default()
+        };
+
+        let data = [0.0f32, 0.0f32, 0.0f32, 0.0f32];
+
+        let (buffer, allocation, allocation_info) = allocator.create_buffer(
+            &vk::BufferCreateInfo::builder()
+                .size((data.len() * std::mem::size_of::<f32>()) as u64)
+                .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
+                .build(),
+            &allocation_create_info,
+        )?;
+        let data_ptr = allocator.map_memory(&allocation)? as *mut f32;
+        // TODO: make struct for vertex data
+        unsafe { data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len()) };
+        allocator.unmap_memory(&allocation)?;
+
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
 
@@ -845,6 +899,7 @@ impl Engine {
             &renderpass,
             &swapchain,
             &pipeline,
+            &buffer,
         )?;
 
         Ok(Engine {
@@ -863,6 +918,10 @@ impl Engine {
             pipeline,
             pools,
             commandbuffers,
+            allocator,
+            buffer,
+            allocation,
+            allocation_info,
         })
     }
 }
@@ -873,6 +932,10 @@ impl Drop for Engine {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+            // if we fail to destroy the buffer continue to destory as many things
+            // as possible
+            let _ = self.allocator.destroy_buffer(self.buffer, &self.allocation);
+            self.allocator.destroy();
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
@@ -894,6 +957,14 @@ unsafe extern "system" fn vulkan_debug_utils_callback(
     let message = CStr::from_ptr((*p_callback_data).p_message);
     let severity = format!("{:?}", message_severity).to_lowercase();
     let ty = format!("{:?}", message_type).to_lowercase();
-    println!("[Debug][{}][{}] {:?}", severity, ty, message);
+
+    match severity.as_str() {
+        "error" => log::error!("[{}] {:?}", ty, message),
+        "warn" => log::warn!("[{}] {:?}", ty, message),
+        "info" => log::info!("[{}] {:?}", ty, message),
+        "verbose" => log::trace!("[{}] {:?}", ty, message),
+        _ => log::error!("Unknown severity ({}; message: {:?})", severity, message),
+    };
+
     vk::FALSE
 }

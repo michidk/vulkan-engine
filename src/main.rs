@@ -42,10 +42,7 @@ const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setting up logger
-    env_logger::Builder::from_env(
-        env_logger::Env::default()
-            .default_filter_or("trace")
-    ).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // https://hoj-senna.github.io/ashen-engine/text/008_Cleanup.html
     let eventloop = EventLoop::new();
@@ -888,7 +885,7 @@ impl Engine {
         let data_ptr = allocator.map_memory(&allocation)? as *mut f32;
         // TODO: make struct for vertex data
         unsafe { data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len()) };
-        allocator.unmap_memory(&allocation)?;
+        allocator.unmap_memory(&allocation);
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;

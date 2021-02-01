@@ -637,17 +637,32 @@ impl Pipeline {
             .name(&mainfunctionname);
         let shader_stages = vec![vertexshader_stage.build(), fragmentshader_stage.build()];
 
-        let vertex_attrib_descs = [vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 0,
-            offset: 0,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        }];
-        let vertex_binding_descs = [vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: 16,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }];
+        let vertex_attrib_descs = [
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 0,
+                offset: 0,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 1,
+                offset: 0,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+        ];
+        let vertex_binding_descs = [
+            vk::VertexInputBindingDescription {
+                binding: 0,
+                stride: 16,
+                input_rate: vk::VertexInputRate::VERTEX,
+            },
+            vk::VertexInputBindingDescription {
+                binding: 1,
+                stride: 16,
+                input_rate: vk::VertexInputRate::VERTEX,
+            },
+        ];
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_attribute_descriptions(&vertex_attrib_descs)
             .vertex_binding_descriptions(&vertex_binding_descs);
@@ -770,7 +785,8 @@ fn fill_commandbuffers(
     renderpass: &vk::RenderPass,
     swapchain: &SwapchainWrapper,
     pipeline: &Pipeline,
-    vb: &vk::Buffer,
+    vb1: &vk::Buffer,
+    vb2: &vk::Buffer,
 ) -> Result<(), vk::Result> {
     for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -801,13 +817,65 @@ fn fill_commandbuffers(
                 vk::PipelineBindPoint::GRAPHICS,
                 pipeline.pipeline,
             );
-            logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[*vb], &[0]);
-            logical_device.cmd_draw(commandbuffer, 1, 1, 0, 0);
+            logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[*vb1], &[0]);
+            logical_device.cmd_bind_vertex_buffers(commandbuffer, 1, &[*vb2], &[0]);
+            logical_device.cmd_draw(commandbuffer, 6, 1, 0, 0);
             logical_device.cmd_end_render_pass(commandbuffer);
             logical_device.end_command_buffer(commandbuffer)?;
         }
     }
     Ok(())
+}
+
+struct BufferWrapper {
+    buffer: vk::Buffer,
+    allocation: vk_mem::Allocation,
+    allocation_info: vk_mem::AllocationInfo,
+}
+
+impl BufferWrapper {
+    fn new(
+        allocator: &vk_mem::Allocator,
+        size_in_bytes: u64,
+        usage: vk::BufferUsageFlags,
+        memory_usage: vk_mem::MemoryUsage,
+    ) -> Result<Self, vk_mem::error::Error> {
+        let allocation_create_info = vk_mem::AllocationCreateInfo {
+            usage: memory_usage,
+            ..Default::default()
+        };
+        let (buffer, allocation, allocation_info) = allocator.create_buffer(
+            &vk::BufferCreateInfo::builder()
+                .size(size_in_bytes)
+                .usage(usage)
+                .build(),
+            &allocation_create_info,
+        )?;
+
+        Ok(Self {
+            buffer,
+            allocation,
+            allocation_info,
+        })
+    }
+
+    fn fill<T: Sized>(
+        &self,
+        allocator: &vk_mem::Allocator,
+        data: &[T],
+    ) -> Result<(), vk_mem::error::Error> {
+        let data_size = std::mem::size_of::<T>() * data.len();
+        if data_size > self.allocation_info.get_size() {
+            panic!("Not enough memory allocated in buffer");
+        }
+
+        let data_ptr = allocator.map_memory(&self.allocation)? as *mut T;
+        unsafe {
+            data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+        };
+        allocator.unmap_memory(&self.allocation)?;
+        Ok(())
+    }
 }
 
 #[allow(dead_code)]
@@ -828,9 +896,7 @@ struct Engine {
     pools: Pools,
     commandbuffers: Vec<vk::CommandBuffer>,
     allocator: vk_mem::Allocator,
-    buffer: vk::Buffer,
-    allocation: vk_mem::Allocation,
-    allocation_info: vk_mem::AllocationInfo,
+    buffers: Vec<BufferWrapper>,
 }
 
 impl Engine {
@@ -868,24 +934,45 @@ impl Engine {
             ..Default::default()
         };
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
-        let allocation_create_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::CpuToGpu,
-            ..Default::default()
-        };
 
-        let data = [0.0f32, 0.0f32, 0.0f32, 0.0f32];
-
-        let (buffer, allocation, allocation_info) = allocator.create_buffer(
-            &vk::BufferCreateInfo::builder()
-                .size((data.len() * std::mem::size_of::<f32>()) as u64)
-                .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
-                .build(),
-            &allocation_create_info,
+        let vertex_data = [
+            0.4f32, -0.2f32, 0.0f32, 1.0f32,
+            0.2f32, 0.0f32, 0.0f32, 1.0f32,
+            -0.4f32, 0.2f32, 0.0f32, 1.0f32,
+            0.5f32, 0.0f32, 0.0f32, 1.0f32,
+            0.0f32, 0.2f32, 0.0f32, 1.0f32,
+            -0.5f32, 0.0f32, 0.0f32, 1.0f32,
+        ];
+        let vertex_buffer = BufferWrapper::new(
+            &allocator,
+            (vertex_data.len() * std::mem::size_of::<f32>()) as u64,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
         )?;
+<<<<<<< HEAD
         let data_ptr = allocator.map_memory(&allocation)? as *mut f32;
         // TODO: make struct for vertex data
         unsafe { data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len()) };
         allocator.unmap_memory(&allocation);
+=======
+        vertex_buffer.fill(&allocator, &vertex_data)?;
+
+        let color_data = [
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+        ];
+        let color_buffer = BufferWrapper::new(
+            &allocator,
+            (color_data.len() * std::mem::size_of::<f32>()) as u64,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
+        )?;
+        color_buffer.fill(&allocator, &color_data)?;
+>>>>>>> 5823392 (Added pass-through of color vecs to the fragment shader and added BufferWrapper struct)
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
@@ -896,7 +983,8 @@ impl Engine {
             &renderpass,
             &swapchain,
             &pipeline,
-            &buffer,
+            &vertex_buffer.buffer,
+            &color_buffer.buffer,
         )?;
 
         Ok(Engine {
@@ -916,9 +1004,7 @@ impl Engine {
             pools,
             commandbuffers,
             allocator,
-            buffer,
-            allocation,
-            allocation_info,
+            buffers: vec![vertex_buffer, color_buffer],
         })
     }
 }
@@ -931,7 +1017,12 @@ impl Drop for Engine {
                 .expect("something wrong while waiting");
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
-            let _ = self.allocator.destroy_buffer(self.buffer, &self.allocation);
+            for b in &self.buffers {
+                self.allocator
+                    .destroy_buffer(b.buffer, &b.allocation)
+                    .expect("problem with buffer destruction");
+            }
+
             self.allocator.destroy();
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);

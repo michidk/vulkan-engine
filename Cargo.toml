@@ -7,6 +7,8 @@ edition = "2018"
 [dependencies]
 ash = "0.31.0"
 ash-window = "0.5.0"
+env_logger = "0.8.2"
+log = "0.4.14"
 vk-mem = "0.2.2"
 vk-shader-macros = "0.2.6"
 winit = "0.24.0"

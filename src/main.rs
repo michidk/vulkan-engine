@@ -41,6 +41,12 @@ const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // setting up logger
+    env_logger::Builder::from_env(
+        env_logger::Env::default()
+            .default_filter_or("trace")
+    ).init();
+
     // https://hoj-senna.github.io/ashen-engine/text/008_Cleanup.html
     let eventloop = EventLoop::new();
     let window = DEFAULT_WINDOW_INFO.clone().into_window(&eventloop).unwrap();
@@ -951,6 +957,14 @@ unsafe extern "system" fn vulkan_debug_utils_callback(
     let message = CStr::from_ptr((*p_callback_data).p_message);
     let severity = format!("{:?}", message_severity).to_lowercase();
     let ty = format!("{:?}", message_type).to_lowercase();
-    println!("[Debug][{}][{}] {:?}", severity, ty, message);
+
+    match severity.as_str() {
+        "error" => log::error!("[{}] {:?}", ty, message),
+        "warn" => log::warn!("[{}] {:?}", ty, message),
+        "info" => log::info!("[{}] {:?}", ty, message),
+        "verbose" => log::trace!("[{}] {:?}", ty, message),
+        _ => log::error!("Unknown severity ({}; message: {:?})", severity, message),
+    };
+
     vk::FALSE
 }

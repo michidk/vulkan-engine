@@ -873,7 +873,7 @@ impl BufferWrapper {
         unsafe {
             data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
         };
-        allocator.unmap_memory(&self.allocation)?;
+        allocator.unmap_memory(&self.allocation);
         Ok(())
     }
 }
@@ -949,12 +949,6 @@ impl Engine {
             vk::BufferUsageFlags::VERTEX_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
         )?;
-<<<<<<< HEAD
-        let data_ptr = allocator.map_memory(&allocation)? as *mut f32;
-        // TODO: make struct for vertex data
-        unsafe { data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len()) };
-        allocator.unmap_memory(&allocation);
-=======
         vertex_buffer.fill(&allocator, &vertex_data)?;
 
         let color_data = [
@@ -972,7 +966,6 @@ impl Engine {
             vk_mem::MemoryUsage::CpuToGpu,
         )?;
         color_buffer.fill(&allocator, &color_data)?;
->>>>>>> 5823392 (Added pass-through of color vecs to the fragment shader and added BufferWrapper struct)
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
@@ -1019,8 +1012,7 @@ impl Drop for Engine {
             // as possible
             for b in &self.buffers {
                 self.allocator
-                    .destroy_buffer(b.buffer, &b.allocation)
-                    .expect("problem with buffer destruction");
+                    .destroy_buffer(b.buffer, &b.allocation);
             }
 
             self.allocator.destroy();

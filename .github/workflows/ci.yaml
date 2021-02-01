@@ -68,35 +68,35 @@ jobs:
           command: clippy
           args: -- -D warnings
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-pc-windows-gnu
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@master
-        with:
-          python-version: 3.8
-      - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@master
-        with:
-          version: 1.10.0
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.7
-        with:
-          cmake-version: '3.16.x'
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          target: ${{ matrix.target }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target=${{ matrix.target }}
+  # build:
+  #   name: Build
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       target:
+  #         - x86_64-unknown-linux-gnu
+  #         - x86_64-pc-windows-gnu
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Set up Python
+  #       uses: actions/setup-python@master
+  #       with:
+  #         python-version: 3.8
+  #     - name: Setup Ninja
+  #       uses: ashutoshvarma/setup-ninja@master
+  #       with:
+  #         version: 1.10.0
+  #     - name: Setup cmake
+  #       uses: jwlawson/actions-setup-cmake@v1.7
+  #       with:
+  #         cmake-version: '3.16.x'
+  #     - uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         target: ${{ matrix.target }}
+  #         override: true
+  #     - uses: actions-rs/cargo@v1
+  #       with:
+  #         use-cross: true
+  #         command: build
+  #         args: --release --target=${{ matrix.target }}

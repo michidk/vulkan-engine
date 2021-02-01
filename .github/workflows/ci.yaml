@@ -78,6 +78,10 @@ jobs:
           - x86_64-pc-windows-gnu
     steps:
       - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@master
+        with:
+          python-version: 3.8
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable

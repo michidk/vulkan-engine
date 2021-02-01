@@ -3,63 +3,64 @@ on: [push, pull_request]
 name: Continuous Integration
 
 jobs:
-  # check:
-  #   name: Check
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v2
-  #     - name: Install nightly toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: nightly
-  #         override: true
-  #     - name: Run cargo check
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: check
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
 
-  # test:
-  #   name: Test Suite
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v2
-  #     - name: Install nightly toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: nightly
-  #         override: true
-  #     - name: Run cargo test
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: test
+  build-linux:
+    name: Linux Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: x86_64-unknown-linux-gnu
+          override: true
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          name: executable
+          path: ./target/x86_64-unknown-linux-gnu/release/vulkan_renderer
 
-  # lints:
-  #   name: Lints
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v2
-  #     - name: Install nightly toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: nightly
-  #         override: true
-  #         components: rustfmt, clippy
-  #     - name: Run cargo fmt
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: fmt
-  #         args: --all -- --check
-  #     - name: Run cargo clippy
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: clippy
-  #         args: -- -D warnings
+  build-windows:
+    name: Windows Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: x86_64-pc-windows-gnu
+          override: true
+          components: rustfmt, clippy
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
 
   build-linux:
     name: Linux Build
@@ -87,22 +88,19 @@ jobs:
 
   build-windows:
     name: Windows Build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Update package index
-        run: sudo apt-get update -y
-      - name: Install build dependencies
-        run: sudo apt-get install -y cmake git ninja-build python python-pip g++-mingw-w64-x86-64 wine-stable wine64 libz-mingw-w64-dev
-      - run: export HOME=/tmp/home
-      - run: mkdir -p "${HOME}"
-      - run: export WINEPREFIX=/tmp/wine
-      - run: mkdir -p "${WINEPREFIX}"
-      - run: wineboot &> /dev/null
-      - run: P1="$(dirname "$(find /usr -name libwinpthread-1.dll)")"
-      - run: WINEPATH="$(ls -d /usr/lib/gcc/*-w64-mingw32/*posix);${P1}"
-      - run: export WINEPATH
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "2.x"
+          architecture: "x64"
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+          architecture: "x64"
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -110,14 +108,9 @@ jobs:
           target: x86_64-pc-windows-gnu
           override: true
       - name: Build
-        run: cargo build --release --target=x86_64-pc-windows-gnu
-        env:
-          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
-          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER: wine
-          CC_x86_64_pc_windows_gnu: x86_64-w64-mingw32-gcc-posix
-          CXX_x86_64_pc_windows_gnu: x86_64-w64-mingw32-g++-posix
+        run: cargo build --release
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
           name: executable
-          path: ./target/x86_64-pc-windows-gnu/release/
+          path: ./target/release/vulkan_renderer.exe

@@ -9,7 +9,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // https://hoj-senna.github.io/ashen-engine/text/008_Cleanup.html
     let eventloop = EventLoop::new();
-    let window = engine::DEFAULT_WINDOW_INFO.clone().into_window(&eventloop).unwrap();
+    let window = engine::DEFAULT_WINDOW_INFO
+        .clone()
+        .into_window(&eventloop)
+        .unwrap();
     let mut engine = engine::Engine::init(window)?;
     use winit::event::{Event, WindowEvent};
     eventloop.run(move |event, _, controlflow| match event {

@@ -161,7 +161,7 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
         )
         .pfn_user_callback(Some(vulkan_debug_utils_callback));
 
-    // sooo, we need to use display exteions as well
+    // sooo, we need to use display extensions as well
     // let extension_name_pointers: Vec<*const i8> =
     //     vec![ash::extensions::ext::DebugUtils::name().as_ptr()];
     // so lets do it the cool way

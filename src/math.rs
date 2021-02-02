@@ -13,10 +13,6 @@ impl Vec3 {
             z,
         }
     }
-
-    fn to_array(&self) -> [f32; 3] {
-        [self.x, self.y, self.z]
-    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -35,9 +31,5 @@ impl Vec4 {
             z,
             w,
         }
-    }
-
-    fn to_array(self) -> [f32; 4] {
-        [self.x, self.y, self.z, self.w]
     }
 }

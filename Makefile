@@ -1,16 +1,17 @@
 .PHONY: all
 
 run:
-	cargo run +nightly
+	cargo +nightly run
 
 check:
-	cargo check +nightly
+	cargo +nightly check
 
 test:
-	cargo test +nightly
+	cargo +nightly test
 
 lint:
-	cargo fmt +nightly --all -- --check
+	cargo +nightly fmt --all -- --check
+	cargo +nightly clippy -- -D warnings
 
 clean:
 	cargo clean

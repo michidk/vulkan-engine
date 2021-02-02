@@ -153,11 +153,7 @@ struct SurfaceWrapper {
 }
 
 impl SurfaceWrapper {
-    fn init(
-        window: &Window,
-        entry: &ash::Entry,
-        instance: &ash::Instance,
-    ) -> SurfaceWrapper {
+    fn init(window: &Window, entry: &ash::Entry, instance: &ash::Instance) -> SurfaceWrapper {
         // load the surface
         // handles x11 or whatever OS specific drivers
         // this shit is terrible and nobody wants to do it, so lets use ash-window
@@ -235,10 +231,7 @@ fn init_physical_device_and_properties(
     ),
     vk::Result,
 > {
-    let phys_devs = unsafe {
-        instance
-            .enumerate_physical_devices()
-    }?;
+    let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
 
     let mut chosen = None;
     for p in phys_devs {
@@ -319,10 +312,8 @@ fn init_device_and_queues(
         .enabled_extension_names(&device_extension_names_raw)
         .enabled_features(&features);
 
-    let logical_device: ash::Device = unsafe {
-        instance
-            .create_device(physical_device, &device_create_info, None)
-    }?;
+    let logical_device: ash::Device =
+        unsafe { instance.create_device(physical_device, &device_create_info, None) }?;
 
     let present_queue = unsafe { logical_device.get_device_queue(queue_family_index as u32, 0) };
 

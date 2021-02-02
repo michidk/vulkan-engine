@@ -9,5 +9,9 @@ check:
 test:
 	cargo test +nightly
 
+lint:
+	cargo fmt +nightly --all -- --check
+
 clean:
 	cargo clean
+

@@ -12,6 +12,8 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+use crate::{color::Color, math::Vec4};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppInfo {
     width: u32,
@@ -224,7 +226,14 @@ impl Drop for SurfaceWrapper {
 // https://hoj-senna.github.io/ashen-engine/text/004_Physical_device.html
 fn init_physical_device_and_properties(
     instance: &ash::Instance,
-) -> Result<(vk::PhysicalDevice, vk::PhysicalDeviceProperties), vk::Result> {
+) -> Result<
+    (
+        vk::PhysicalDevice,
+        vk::PhysicalDeviceProperties,
+        vk::PhysicalDeviceFeatures,
+    ),
+    vk::Result,
+> {
     let phys_devs = unsafe {
         instance
             .enumerate_physical_devices()
@@ -234,9 +243,11 @@ fn init_physical_device_and_properties(
     let mut chosen = None;
     for p in phys_devs {
         let properties = unsafe { instance.get_physical_device_properties(p) };
-        // select ANY gpu, not only deticated ones
-        // if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
-        chosen = Some((p, properties));
+        let features = unsafe { instance.get_physical_device_features(p) };
+
+        if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
+            chosen = Some((p, properties, features));
+        }
 
         #[cfg(debug_assertions)]
         {
@@ -247,8 +258,6 @@ fn init_physical_device_and_properties(
             );
             println!("Gpu: {}", name);
         }
-
-        // }
     }
 
     Ok(chosen.unwrap())
@@ -297,10 +306,7 @@ fn init_device_and_queues(
     // in this case we only want one queue for now
     let queue_family_index = queue_families.graphics_q_index.unwrap();
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
-    let features = vk::PhysicalDeviceFeatures {
-        shader_clip_distance: 1,
-        ..Default::default()
-    };
+    let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true);
     let priorities = [1.0];
 
     let queue_info = [vk::DeviceQueueCreateInfo::builder()
@@ -590,7 +596,7 @@ impl Pipeline {
             .vertex_binding_descriptions(&vertex_binding_descs);
 
         let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
-            .topology(vk::PrimitiveTopology::POINT_LIST);
+            .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
         let viewports = [vk::Viewport {
             x: 0.,
             y: 0.,
@@ -829,7 +835,7 @@ impl Engine {
         let debug = DebugMessenger::init(&entry, &instance)?;
         let surfaces = SurfaceWrapper::init(&window, &entry, &instance)?;
 
-        let (physical_device, physical_device_properties) =
+        let (physical_device, physical_device_properties, _physical_device_features) =
             init_physical_device_and_properties(&instance)?;
 
         let queue_families = QueueFamilies::init(&instance, physical_device, &surfaces)?;
@@ -857,27 +863,35 @@ impl Engine {
         };
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
 
+        #[rustfmt::skip]
         let vertex_data = [
-            0.4f32, -0.2f32, 0.0f32, 1.0f32, 0.2f32, 0.0f32, 0.0f32, 1.0f32, -0.4f32, 0.2f32,
-            0.0f32, 1.0f32, 0.5f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 0.2f32, 0.0f32, 1.0f32,
-            -0.5f32, 0.0f32, 0.0f32, 1.0f32,
+            Vec4::new(0.5, 0.0, 0.0, 1.0),
+            Vec4::new(0.0, 0.2, 0.0, 1.0),
+            Vec4::new(-0.5, 0.0, 0.0, 1.0),
+            Vec4::new(-0.9, -0.9, 0.0, 1.0),
+            Vec4::new(0.3, -0.8, 0.0, 1.0),
+            Vec4::new(0.0, -0.6, 0.0, 1.0),
         ];
         let vertex_buffer = BufferWrapper::new(
             &allocator,
-            (vertex_data.len() * std::mem::size_of::<f32>()) as u64,
+            (vertex_data.len() * std::mem::size_of::<Vec4>()) as u64,
             vk::BufferUsageFlags::VERTEX_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
         )?;
         vertex_buffer.fill(&allocator, &vertex_data)?;
 
+        #[rustfmt::skip]
         let color_data = [
-            1.0f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 0.0f32, 1.0f32,
-            1.0f32, 1.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 1.0f32, 1.0f32, 1.0f32, 0.0f32,
-            1.0f32, 1.0f32,
+            Color::RED,
+            Color::RED,
+            Color::RED,
+            Color::RED,
+            Color::GREEN,
+            Color::BLUE,
         ];
         let color_buffer = BufferWrapper::new(
             &allocator,
-            (color_data.len() * std::mem::size_of::<f32>()) as u64,
+            (color_data.len() * std::mem::size_of::<Color>()) as u64,
             vk::BufferUsageFlags::VERTEX_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
         )?;

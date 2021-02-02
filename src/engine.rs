@@ -40,7 +40,6 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     title: "VulkanTriangle",
 };
 
-
 fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, ash::InstanceError> {
     let app_name = CString::new(DEFAULT_WINDOW_INFO.title).unwrap();
     // // https://hoj-senna.github.io/ashen-engine/text/002_Beginnings.html
@@ -100,9 +99,9 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
 
     #[cfg(not(debug_assertions))]
     {
-    let instance_create_info = vk::InstanceCreateInfo::builder()
-        .application_info(&app_info)
-        .enabled_extension_names(&extension_names_raw);
+        let instance_create_info = vk::InstanceCreateInfo::builder()
+            .application_info(&app_info)
+            .enabled_extension_names(&extension_names_raw);
 
         unsafe { entry.create_instance(&instance_create_info, None) }
     }
@@ -859,11 +858,8 @@ impl Engine {
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
 
         let vertex_data = [
-            0.4f32, -0.2f32, 0.0f32, 1.0f32,
-            0.2f32, 0.0f32, 0.0f32, 1.0f32,
-            -0.4f32, 0.2f32, 0.0f32, 1.0f32,
-            0.5f32, 0.0f32, 0.0f32, 1.0f32,
-            0.0f32, 0.2f32, 0.0f32, 1.0f32,
+            0.4f32, -0.2f32, 0.0f32, 1.0f32, 0.2f32, 0.0f32, 0.0f32, 1.0f32, -0.4f32, 0.2f32,
+            0.0f32, 1.0f32, 0.5f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 0.2f32, 0.0f32, 1.0f32,
             -0.5f32, 0.0f32, 0.0f32, 1.0f32,
         ];
         let vertex_buffer = BufferWrapper::new(
@@ -875,12 +871,9 @@ impl Engine {
         vertex_buffer.fill(&allocator, &vertex_data)?;
 
         let color_data = [
-            1.0f32, 0.0f32, 0.0f32, 1.0f32,
-            0.0f32, 1.0f32, 0.0f32, 1.0f32,
-            0.0f32, 0.0f32, 1.0f32, 1.0f32,
-            1.0f32, 1.0f32, 0.0f32, 1.0f32,
-            0.0f32, 1.0f32, 1.0f32, 1.0f32,
-            1.0f32, 0.0f32, 1.0f32, 1.0f32,
+            1.0f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 0.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 1.0f32, 1.0f32, 1.0f32, 0.0f32,
+            1.0f32, 1.0f32,
         ];
         let color_buffer = BufferWrapper::new(
             &allocator,
@@ -934,8 +927,7 @@ impl Drop for Engine {
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
             for b in &self.buffers {
-                self.allocator
-                    .destroy_buffer(b.buffer, &b.allocation);
+                self.allocator.destroy_buffer(b.buffer, &b.allocation);
             }
 
             self.allocator.destroy();

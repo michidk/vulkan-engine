@@ -936,11 +936,8 @@ impl Engine {
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
 
         let vertex_data = [
-            0.4f32, -0.2f32, 0.0f32, 1.0f32,
-            0.2f32, 0.0f32, 0.0f32, 1.0f32,
-            -0.4f32, 0.2f32, 0.0f32, 1.0f32,
-            0.5f32, 0.0f32, 0.0f32, 1.0f32,
-            0.0f32, 0.2f32, 0.0f32, 1.0f32,
+            0.4f32, -0.2f32, 0.0f32, 1.0f32, 0.2f32, 0.0f32, 0.0f32, 1.0f32, -0.4f32, 0.2f32,
+            0.0f32, 1.0f32, 0.5f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 0.2f32, 0.0f32, 1.0f32,
             -0.5f32, 0.0f32, 0.0f32, 1.0f32,
         ];
         let vertex_buffer = BufferWrapper::new(
@@ -952,12 +949,9 @@ impl Engine {
         vertex_buffer.fill(&allocator, &vertex_data)?;
 
         let color_data = [
-            1.0f32, 0.0f32, 0.0f32, 1.0f32,
-            0.0f32, 1.0f32, 0.0f32, 1.0f32,
-            0.0f32, 0.0f32, 1.0f32, 1.0f32,
-            1.0f32, 1.0f32, 0.0f32, 1.0f32,
-            0.0f32, 1.0f32, 1.0f32, 1.0f32,
-            1.0f32, 0.0f32, 1.0f32, 1.0f32,
+            1.0f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 0.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 0.0f32, 1.0f32, 0.0f32, 1.0f32, 1.0f32, 1.0f32, 1.0f32, 0.0f32,
+            1.0f32, 1.0f32,
         ];
         let color_buffer = BufferWrapper::new(
             &allocator,
@@ -1011,8 +1005,7 @@ impl Drop for Engine {
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
             for b in &self.buffers {
-                self.allocator
-                    .destroy_buffer(b.buffer, &b.allocation);
+                self.allocator.destroy_buffer(b.buffer, &b.allocation);
             }
 
             self.allocator.destroy();

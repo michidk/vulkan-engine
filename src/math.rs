@@ -11,6 +11,7 @@ impl Vec3 {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<[f32; 3]> for Vec3 {
     fn into(self) -> [f32; 3] {
         self.to_array()
@@ -31,6 +32,7 @@ impl Vec4 {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<[f32; 4]> for Vec4 {
     fn into(self) -> [f32; 4] {
         self.to_array()

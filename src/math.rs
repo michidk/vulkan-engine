@@ -6,15 +6,16 @@ pub struct Vec3 {
 }
 
 impl Vec3 {
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self {
+            x,
+            y,
+            z,
+        }
+    }
+
     fn to_array(&self) -> [f32; 3] {
         [self.x, self.y, self.z]
-    }
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<[f32; 3]> for Vec3 {
-    fn into(self) -> [f32; 3] {
-        self.to_array()
     }
 }
 
@@ -27,14 +28,16 @@ pub struct Vec4 {
 }
 
 impl Vec4 {
+    pub const fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
+        Self {
+            x,
+            y,
+            z,
+            w,
+        }
+    }
+
     fn to_array(self) -> [f32; 4] {
         [self.x, self.y, self.z, self.w]
-    }
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<[f32; 4]> for Vec4 {
-    fn into(self) -> [f32; 4] {
-        self.to_array()
     }
 }

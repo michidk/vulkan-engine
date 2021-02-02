@@ -51,29 +51,6 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
         .engine_version(vk::make_version(0, 42, 0))
         .api_version(vk::make_version(1, 0, 106));
 
-    // debug stuff
-    // https://hoj-senna.github.io/ashen-engine/text/003_Validation_layers.html
-    let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
-    let layers_names_raw: Vec<*const i8> = layer_names
-        .iter()
-        .map(|raw_name| raw_name.as_ptr())
-        .collect();
-
-    // debug config during creation
-    let mut debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-        .message_severity(
-            // vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-            //     | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE |
-            // vk::DebugUtilsMessageSeverityFlagsEXT::INFO |
-            vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-        )
-        .message_type(
-            vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-                | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
-                | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
-        )
-        .pfn_user_callback(Some(vulkan_debug_utils_callback));
-
     // sooo, we need to use display extensions as well
     // let extension_name_pointers: Vec<*const i8> =
     //     vec![ash::extensions::ext::DebugUtils::name().as_ptr()];
@@ -87,12 +64,48 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
         .collect::<Vec<_>>();
     extension_names_raw.push(DebugUtils::name().as_ptr()); // still wanna use the debug extensions
 
+    #[cfg(debug_assertions)]
+    {
+        // debug stuff
+        // https://hoj-senna.github.io/ashen-engine/text/003_Validation_layers.html
+        let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
+        let layers_names_raw: Vec<*const i8> = layer_names
+            .iter()
+            .map(|raw_name| raw_name.as_ptr())
+            .collect();
+
+        // debug config during creation
+        let mut debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(
+                // vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                //     | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE |
+                // vk::DebugUtilsMessageSeverityFlagsEXT::INFO |
+                vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+            )
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+            )
+            .pfn_user_callback(Some(vulkan_debug_utils_callback));
+
+        let instance_create_info = vk::InstanceCreateInfo::builder()
+            .push_next(&mut debugcreateinfo)
+            .application_info(&app_info)
+            .enabled_layer_names(&layers_names_raw)
+            .enabled_extension_names(&extension_names_raw);
+
+        unsafe { entry.create_instance(&instance_create_info, None) }
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
     let instance_create_info = vk::InstanceCreateInfo::builder()
-        .push_next(&mut debugcreateinfo)
         .application_info(&app_info)
-        .enabled_layer_names(&layers_names_raw)
         .enabled_extension_names(&extension_names_raw);
-    unsafe { entry.create_instance(&instance_create_info, None) }
+
+        unsafe { entry.create_instance(&instance_create_info, None) }
+    }
 }
 
 struct DebugMessenger {

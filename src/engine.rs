@@ -157,16 +157,17 @@ impl SurfaceWrapper {
         window: &Window,
         entry: &ash::Entry,
         instance: &ash::Instance,
-    ) -> Result<SurfaceWrapper, vk::Result> {
+    ) -> SurfaceWrapper {
         // load the surface
         // handles x11 or whatever OS specific drivers
         // this shit is terrible and nobody wants to do it, so lets use ash-window
         let surface = unsafe { ash_window::create_surface(entry, instance, window, None).unwrap() };
         let surface_loader = khr::Surface::new(entry, instance);
-        Ok(SurfaceWrapper {
+
+        SurfaceWrapper {
             surface,
             surface_loader,
-        })
+        }
     }
 
     fn get_capabilities(
@@ -237,8 +238,7 @@ fn init_physical_device_and_properties(
     let phys_devs = unsafe {
         instance
             .enumerate_physical_devices()
-            .expect("Physical device error")
-    };
+    }?;
 
     let mut chosen = None;
     for p in phys_devs {
@@ -322,8 +322,7 @@ fn init_device_and_queues(
     let logical_device: ash::Device = unsafe {
         instance
             .create_device(physical_device, &device_create_info, None)
-            .unwrap()
-    };
+    }?;
 
     let present_queue = unsafe { logical_device.get_device_queue(queue_family_index as u32, 0) };
 
@@ -833,7 +832,7 @@ impl Engine {
 
         let instance = init_instance(&window, &entry)?;
         let debug = DebugMessenger::init(&entry, &instance)?;
-        let surfaces = SurfaceWrapper::init(&window, &entry, &instance)?;
+        let surfaces = SurfaceWrapper::init(&window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
             init_physical_device_and_properties(&instance)?;

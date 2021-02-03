@@ -1,6 +1,9 @@
 # TODO's
 
-- [ ] Only print debug information for debug builds
-- [ ] @Jonas add to list of authors in Cargo.toml
+- @Jonas add to list of authors in Cargo.toml
+- implement window resizing
+- change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
+- check if debug layers are installed
+- write githook to execute lint and test
 
-https://hoj-senna.github.io/ashen-aetna/text/018_Vertexshader.html
+https://hoj-senna.github.io/ashen-aetna/text/021_Boxes.html

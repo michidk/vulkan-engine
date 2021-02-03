@@ -14,7 +14,7 @@ use winit::{
 
 use crate::debug::{
     get_debug_create_info, get_layer_names, has_validation_layers_support, startup_debug_severity,
-    startup_debug_type, DebugMessenger,
+    startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
 };
 use crate::{color::Color, math::Vec4};
 
@@ -78,7 +78,7 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
     let debug_create_info = &mut get_debug_create_info(startup_debug_severity, startup_debug_type);
     let (_layer_names, layer_names_pointer) = get_layer_names();
 
-    if has_validation_layers_support(&entry) {
+    if ENABLE_VALIDATION_LAYERS && has_validation_layers_support(&entry) {
         instance_create_info = instance_create_info
             .push_next(debug_create_info)
             .enabled_layer_names(&layer_names_pointer);

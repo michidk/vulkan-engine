@@ -3,9 +3,9 @@ use std::ffi::{CStr, CString};
 use std::{ffi::c_void, os::raw::c_char};
 
 #[cfg(debug_assertions)]
-const ENABLE_VALIDATION_LAYERS: bool = true;
+pub const ENABLE_VALIDATION_LAYERS: bool = true;
 #[cfg(not(debug_assertions))]
-const ENABLE_VALIDATION_LAYERS: bool = false;
+pub const ENABLE_VALIDATION_LAYERS: bool = false;
 
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 

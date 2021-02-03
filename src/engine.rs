@@ -1,4 +1,4 @@
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString};
 
 use ash::{
     extensions::{ext::DebugUtils, khr},
@@ -12,6 +12,10 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+use crate::debug::{
+    get_debug_create_info, get_layer_names, has_validation_layers_support, startup_debug_severity,
+    startup_debug_type, DebugMessenger,
+};
 use crate::{color::Color, math::Vec4};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,86 +69,22 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
         .collect::<Vec<_>>();
     extension_names_raw.push(DebugUtils::name().as_ptr()); // still wanna use the debug extensions
 
-    #[cfg(debug_assertions)]
-    {
-        // debug stuff
-        // https://hoj-senna.github.io/ashen-engine/text/003_Validation_layers.html
-        let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
-        let layers_names_raw: Vec<*const i8> = layer_names
-            .iter()
-            .map(|raw_name| raw_name.as_ptr())
-            .collect();
+    let mut instance_create_info = vk::InstanceCreateInfo::builder()
+        .application_info(&app_info)
+        .enabled_extension_names(&extension_names_raw);
 
-        // debug config during creation
-        let mut debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(
-                // vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-                //     | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE |
-                // vk::DebugUtilsMessageSeverityFlagsEXT::INFO |
-                vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            )
-            .message_type(
-                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
-                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
-            )
-            .pfn_user_callback(Some(vulkan_debug_utils_callback));
+    let startup_debug_severity = startup_debug_severity();
+    let startup_debug_type = startup_debug_type();
+    let debug_create_info = &mut get_debug_create_info(startup_debug_severity, startup_debug_type);
+    let (_layer_names, layer_names_pointer) = get_layer_names();
 
-        let instance_create_info = vk::InstanceCreateInfo::builder()
-            .push_next(&mut debugcreateinfo)
-            .application_info(&app_info)
-            .enabled_layer_names(&layers_names_raw)
-            .enabled_extension_names(&extension_names_raw);
-
-        unsafe { entry.create_instance(&instance_create_info, None) }
+    if has_validation_layers_support(&entry) {
+        instance_create_info = instance_create_info
+            .push_next(debug_create_info)
+            .enabled_layer_names(&layer_names_pointer);
     }
 
-    #[cfg(not(debug_assertions))]
-    {
-        let instance_create_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&extension_names_raw);
-
-        unsafe { entry.create_instance(&instance_create_info, None) }
-    }
-}
-
-struct DebugMessenger {
-    loader: DebugUtils,
-    messenger: vk::DebugUtilsMessengerEXT,
-}
-
-impl DebugMessenger {
-    fn init(entry: &ash::Entry, instance: &ash::Instance) -> Result<DebugMessenger, vk::Result> {
-        // debug config
-        let debugcreateinfo = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(
-                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::INFO
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            )
-            .message_type(
-                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
-                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
-            )
-            .pfn_user_callback(Some(vulkan_debug_utils_callback));
-
-        let loader = DebugUtils::new(entry, instance);
-        let messenger = unsafe { loader.create_debug_utils_messenger(&debugcreateinfo, None)? };
-
-        Ok(DebugMessenger { loader, messenger })
-    }
-}
-
-impl Drop for DebugMessenger {
-    fn drop(&mut self) {
-        unsafe {
-            self.loader
-                .destroy_debug_utils_messenger(self.messenger, None)
-        };
-    }
+    unsafe { entry.create_instance(&instance_create_info, None) }
 }
 
 struct SurfaceWrapper {
@@ -945,25 +885,4 @@ impl Drop for Engine {
             self.instance.destroy_instance(None)
         };
     }
-}
-
-unsafe extern "system" fn vulkan_debug_utils_callback(
-    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
-    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
-    _p_user_data: *mut c_void,
-) -> vk::Bool32 {
-    let message = CStr::from_ptr((*p_callback_data).p_message);
-    let severity = format!("{:?}", message_severity).to_lowercase();
-    let ty = format!("{:?}", message_type).to_lowercase();
-
-    match severity.as_str() {
-        "error" => log::error!("[{}] {:?}", ty, message),
-        "warn" => log::warn!("[{}] {:?}", ty, message),
-        "info" => log::info!("[{}] {:?}", ty, message),
-        "verbose" => log::trace!("[{}] {:?}", ty, message),
-        _ => log::error!("Unknown severity ({}; message: {:?})", severity, message),
-    };
-
-    vk::FALSE
 }

@@ -244,7 +244,7 @@ fn init_physical_device_and_properties(
         }
     }
 
-    if candidates.len() <= 0 {
+    if candidates.is_empty() {
         return Err(EngineError::NoSuitableGpu);
     }
 

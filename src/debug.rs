@@ -37,7 +37,6 @@ pub fn debug_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
         | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
 }
 
-// borrowed from pub fn get_layer_names_and_pointers() -> (Vec<CString>, Vec<*const c_char>) {
 // make sure you dont discard the layer_names or memory will be lost
 pub fn get_layer_names() -> Vec<*const c_char> {
     VALIDATION_LAYERS
@@ -86,11 +85,11 @@ unsafe extern "system" fn vulkan_debug_utils_callback(
     let severity = format!("{:?}", message_severity).to_lowercase();
     let ty = format!("{:?}", message_type).to_lowercase();
 
-    match severity.as_str() {
-        "error" => log::error!("[{}] {:?}", ty, message),
-        "warn" => log::warn!("[{}] {:?}", ty, message),
-        "info" => log::info!("[{}] {:?}", ty, message),
-        "verbose" => log::trace!("[{}] {:?}", ty, message),
+    match message_severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => log::error!("[{}] {:?}", ty, message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => log::warn!("[{}] {:?}", ty, message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => log::info!("[{}] {:?}", ty, message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => log::trace!("[{}] {:?}", ty, message),
         _ => log::error!("Unknown severity ({}; message: {:?})", severity, message),
     };
 

@@ -1,4 +1,5 @@
 #![feature(str_split_once)]
+#![feature(map_first_last)]
 
 pub mod color;
 pub mod debug;

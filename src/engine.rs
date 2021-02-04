@@ -1,4 +1,7 @@
-use std::ffi::{CStr, CString};
+use std::{
+    collections::BTreeMap,
+    ffi::{CStr, CString},
+};
 
 use ash::{
     extensions::{ext::DebugUtils, khr},
@@ -17,6 +20,31 @@ use crate::debug::{
     startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
 };
 use crate::{color::Color, math::Vec4};
+
+#[derive(Debug, Clone)]
+pub enum EngineError {
+    Unknown,
+    VkError(vk::Result),
+    NoSuitableGpu,
+}
+
+impl From<vk::Result> for EngineError {
+    fn from(vk_result: vk::Result) -> Self {
+        EngineError::VkError(vk_result)
+    }
+}
+
+impl std::fmt::Display for EngineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EngineError::Unknown => f.write_str("Unkown Error"),
+            EngineError::VkError(error) => write!(f, "{}", error),
+            EngineError::NoSuitableGpu => f.write_str("No suitable GPU found."),
+        }
+    }
+}
+
+impl std::error::Error for EngineError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppInfo {
@@ -48,6 +76,7 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
 
 fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, ash::InstanceError> {
     let app_name = CString::new(DEFAULT_WINDOW_INFO.title).unwrap();
+
     // // https://hoj-senna.github.io/ashen-engine/text/002_Beginnings.html
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
@@ -59,7 +88,7 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
     // sooo, we need to use display extensions as well
     // let extension_name_pointers: Vec<*const i8> =
     //     vec![ash::extensions::ext::DebugUtils::name().as_ptr()];
-    // so lets do it the cool way
+    // but let's do it the cool way
     // https://hoj-senna.github.io/ashen-engine/text/006_Window.html
 
     let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
@@ -73,6 +102,7 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
         .application_info(&app_info)
         .enabled_extension_names(&extension_names_raw);
 
+    // handle validation layers
     let startup_debug_severity = startup_debug_severity();
     let startup_debug_type = startup_debug_type();
     let debug_create_info = &mut get_debug_create_info(startup_debug_severity, startup_debug_type);
@@ -161,6 +191,7 @@ impl Drop for SurfaceWrapper {
 
 // choose gpu
 // https://hoj-senna.github.io/ashen-engine/text/004_Physical_device.html
+// https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Physical_devices_and_queue_families
 fn init_physical_device_and_properties(
     instance: &ash::Instance,
 ) -> Result<
@@ -169,18 +200,38 @@ fn init_physical_device_and_properties(
         vk::PhysicalDeviceProperties,
         vk::PhysicalDeviceFeatures,
     ),
-    vk::Result,
+    EngineError,
 > {
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
+    let mut candidates: BTreeMap<
+        u32,
+        (
+            vk::PhysicalDevice,
+            vk::PhysicalDeviceProperties,
+            vk::PhysicalDeviceFeatures,
+        ),
+    > = BTreeMap::new();
 
-    let mut chosen = None;
-    for p in phys_devs {
-        let properties = unsafe { instance.get_physical_device_properties(p) };
-        let features = unsafe { instance.get_physical_device_features(p) };
+    for device in phys_devs {
+        let properties = unsafe { instance.get_physical_device_properties(device) };
+        let features = unsafe { instance.get_physical_device_features(device) };
 
+        let mut score: u32 = 0;
+
+        // prefere discret gpu
         if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
-            chosen = Some((p, properties, features));
+            score += 1000;
         }
+
+        // possible texture size affects graphics quality
+        score += properties.limits.max_image_dimension2_d;
+
+        // require geometry shader
+        if features.geometry_shader == vk::FALSE {
+            score = 0;
+        }
+
+        candidates.insert(score, (device, properties, features));
 
         #[cfg(debug_assertions)]
         {
@@ -189,11 +240,15 @@ fn init_physical_device_and_properties(
                     .to_str()
                     .unwrap(),
             );
-            println!("Gpu: {}", name);
+            println!("GPU detected: {}", name);
         }
     }
 
-    Ok(chosen.unwrap())
+    if candidates.len() <= 0 {
+        return Err(EngineError::NoSuitableGpu);
+    }
+
+    Ok(candidates.pop_first().unwrap().1)
 }
 
 struct QueueFamilies {

@@ -1,13 +1,18 @@
 use ash::{extensions::ext, version::EntryV1_0, vk};
-use std::ffi::{CStr, CString};
 use std::{ffi::c_void, os::raw::c_char};
+use std::{
+    ffi::{CStr, CString},
+    lazy::SyncLazy,
+};
 
 #[cfg(debug_assertions)]
 pub const ENABLE_VALIDATION_LAYERS: bool = true;
 #[cfg(not(debug_assertions))]
 pub const ENABLE_VALIDATION_LAYERS: bool = false;
 
-const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
+//const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
+pub static VALIDATION_LAYERS: SyncLazy<[CString; 1]> =
+    SyncLazy::new(|| [CString::new("VK_LAYER_KHRONOS_validation").unwrap()]);
 
 pub fn startup_debug_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT {
     vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
@@ -33,16 +38,11 @@ pub fn debug_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
 }
 
 // make sure you dont discard the layer_names or memory will be lost
-pub fn get_layer_names() -> (Vec<CString>, Vec<*const c_char>) {
-    let layer_names = VALIDATION_LAYERS
-        .iter()
-        .map(|name| CString::new(*name).unwrap())
-        .collect::<Vec<_>>();
-    let layer_names_ptrs = layer_names
+pub fn get_layer_names() -> Vec<*const c_char> {
+    VALIDATION_LAYERS
         .iter()
         .map(|name| name.as_ptr())
-        .collect::<Vec<_>>();
-    (layer_names, layer_names_ptrs)
+        .collect::<Vec<_>>()
 }
 
 pub fn get_debug_create_info<'a>(
@@ -63,8 +63,7 @@ pub fn has_validation_layers_support(entry: &ash::Entry) -> bool {
             .iter()
             .any(|layer| {
                 let name = unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) };
-                let name = name.to_str().expect("Failed to get layer name pointer");
-                required == &name
+                required.as_c_str() == name
             });
 
         if !found {

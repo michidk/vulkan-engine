@@ -456,16 +456,6 @@ impl SwapchainWrapper {
     }
 }
 
-impl Drop for SwapchainWrapper {
-    fn drop(&mut self) {
-        unsafe {
-            // needs to be seperate function, because we depend on logical_device
-            self.swapchain_loader
-                .destroy_swapchain(self.swapchain, None)
-        };
-    }
-}
-
 fn init_renderpass(
     logical_device: &ash::Device,
     physical_device: vk::PhysicalDevice,
@@ -928,6 +918,7 @@ impl Drop for Renderer {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
             for b in &mut self.buffers {

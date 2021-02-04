@@ -1,4 +1,5 @@
 #![feature(str_split_once)]
+#![feature(once_cell)]
 
 pub mod color;
 pub mod debug;

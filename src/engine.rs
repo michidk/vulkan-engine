@@ -76,12 +76,12 @@ fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, a
     let startup_debug_severity = startup_debug_severity();
     let startup_debug_type = startup_debug_type();
     let debug_create_info = &mut get_debug_create_info(startup_debug_severity, startup_debug_type);
-    let (_layer_names, layer_names_pointer) = get_layer_names();
 
+    let layer_names = get_layer_names();
     if ENABLE_VALIDATION_LAYERS && has_validation_layers_support(&entry) {
         instance_create_info = instance_create_info
             .push_next(debug_create_info)
-            .enabled_layer_names(&layer_names_pointer);
+            .enabled_layer_names(&layer_names);
     }
 
     unsafe { entry.create_instance(&instance_create_info, None) }
@@ -619,6 +619,7 @@ impl Pools {
             commandpool_graphics,
         })
     }
+
     fn cleanup(&self, logical_device: &ash::Device) {
         unsafe {
             logical_device.destroy_command_pool(self.commandpool_graphics, None);
@@ -733,6 +734,10 @@ impl BufferWrapper {
         };
         allocator.unmap_memory(&self.allocation);
         Ok(())
+    }
+
+    fn cleanup(&mut self, allocator: &vk_mem::Allocator) {
+        allocator.destroy_buffer(self.buffer, &self.allocation)
     }
 }
 
@@ -870,16 +875,18 @@ impl Drop for Engine {
                 .expect("something wrong while waiting");
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
-            for b in &self.buffers {
-                self.allocator.destroy_buffer(b.buffer, &b.allocation);
+            for b in &mut self.buffers {
+                b.cleanup(&self.allocator);
             }
 
             self.allocator.destroy();
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
+            // --segfault
             self.swapchain.cleanup(&self.device);
             self.device.destroy_device(None);
+            // --segfault
             std::mem::ManuallyDrop::drop(&mut self.surfaces);
             std::mem::ManuallyDrop::drop(&mut self.debug);
             self.instance.destroy_instance(None)

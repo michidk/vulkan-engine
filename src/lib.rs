@@ -4,7 +4,7 @@
 
 pub mod color;
 pub mod debug;
-pub mod engine;
+pub mod renderer;
 pub mod math;
 pub mod mesh;
 pub mod parser;

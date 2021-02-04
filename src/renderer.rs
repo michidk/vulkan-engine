@@ -797,7 +797,7 @@ impl BufferWrapper {
 }
 
 #[allow(dead_code)]
-pub struct Engine {
+pub struct Renderer {
     pub window: winit::window::Window,
     entry: ash::Entry,
     instance: ash::Instance,
@@ -817,8 +817,8 @@ pub struct Engine {
     buffers: Vec<BufferWrapper>,
 }
 
-impl Engine {
-    pub fn init(window: winit::window::Window) -> Result<Engine, Box<dyn std::error::Error>> {
+impl Renderer {
+    pub fn init(window: winit::window::Window) -> Result<Renderer, Box<dyn std::error::Error>> {
         let entry = ash::Entry::new()?;
 
         let instance = init_instance(&window, &entry)?;
@@ -900,7 +900,7 @@ impl Engine {
             &color_buffer.buffer,
         )?;
 
-        Ok(Engine {
+        Ok(Renderer {
             window,
             entry,
             instance,
@@ -922,7 +922,7 @@ impl Engine {
     }
 }
 
-impl Drop for Engine {
+impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
             self.device

@@ -1,6 +1,7 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     ffi::{CStr, CString},
+    ops::Deref,
 };
 
 use ash::{
@@ -15,20 +16,25 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use crate::debug::{
-    get_debug_create_info, get_layer_names, has_validation_layers_support, startup_debug_severity,
-    startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
+use crate::{
+    color::Color,
+    debug::{
+        get_debug_create_info, get_layer_names, has_validation_layers_support,
+        startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
+    },
+    math::Vec3,
 };
-use crate::{color::Color, math::Vec4};
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum RendererError {
-    #[error("Unkown rrror.")]
+    #[error("Unknown error")]
     Unknown,
-    #[error("{0}")]
+    #[error("Vulkan error: {0}")]
     VkError(#[from] vk::Result),
-    #[error("No suitable GPU found.")]
+    #[error("No suitable gpu found")]
     NoSuitableGpu,
+    #[error("Invalid handle")]
+    InvalidHandle,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +64,251 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     height: 1080,
     title: "VulkanTriangle",
 };
+
+struct Model<V, I> {
+    vertices: Vec<V>,
+    handle_to_index: HashMap<usize, usize>,
+    handles: Vec<usize>,
+    instances: Vec<I>,
+    fist_invisible: usize,
+    next_handle: usize,
+    vertex_buffer: Option<BufferWrapper>,
+    instance_buffer: Option<BufferWrapper>,
+}
+
+#[allow(dead_code)]
+impl<V, I> Model<V, I> {
+    fn get(&self, handle: usize) -> Option<&I> {
+        self.instances.get(*self.handle_to_index.get(&handle)?)
+    }
+
+    fn get_mut(&mut self, handle: usize) -> Option<&mut I> {
+        self.instances.get_mut(*self.handle_to_index.get(&handle)?)
+    }
+
+    fn swap_by_handle(&mut self, handle1: usize, handle2: usize) -> Result<(), RendererError> {
+        if handle1 == handle2 {
+            return Ok(());
+        }
+
+        if let (Some(&index1), Some(&index2)) = (
+            self.handle_to_index.get(&handle1),
+            self.handle_to_index.get(&handle2),
+        ) {
+            self.handles.swap(index1, index2);
+            self.instances.swap(index1, index2);
+            self.handle_to_index.insert(index1, handle2);
+            self.handle_to_index.insert(index2, handle1);
+            Ok(())
+        } else {
+            Err(RendererError::InvalidHandle)
+        }
+    }
+
+    fn swap_by_index(&mut self, index1: usize, index2: usize) {
+        if index1 == index2 {
+            return;
+        }
+        let handle1 = self.handles[index1];
+        let handle2 = self.handles[index2];
+        self.handles.swap(index1, index2);
+        self.instances.swap(index1, index2);
+        self.handle_to_index.insert(index1, handle2);
+        self.handle_to_index.insert(index2, handle1);
+    }
+
+    fn is_visible(&self, handle: usize) -> Result<bool, RendererError> {
+        Ok(self
+            .handle_to_index
+            .get(&handle)
+            .ok_or(RendererError::InvalidHandle)?
+            < &self.fist_invisible)
+    }
+
+    fn make_visible(&mut self, handle: usize) -> Result<(), RendererError> {
+        if let Some(&index) = self.handle_to_index.get(&handle) {
+            // if already visible to nothing
+            if index < self.fist_invisible {
+                return Ok(());
+            }
+            // else: move to position first_invisible and increase value of first_invisible
+            self.swap_by_index(index, self.fist_invisible);
+            self.fist_invisible += 1;
+            Ok(())
+        } else {
+            Err(RendererError::InvalidHandle)
+        }
+    }
+
+    fn make_invisible(&mut self, handle: usize) -> Result<(), RendererError> {
+        if let Some(&index) = self.handle_to_index.get(&handle) {
+            // if already invisible to nothing
+            if index >= self.fist_invisible {
+                return Ok(());
+            }
+            // else: move to position first_invisible and increase value of first_invisible
+            self.swap_by_index(index, self.fist_invisible - 1);
+            self.fist_invisible -= 1;
+            Ok(())
+        } else {
+            Err(RendererError::InvalidHandle)
+        }
+    }
+
+    fn insert(&mut self, element: I) -> usize {
+        let handle = self.next_handle;
+        self.next_handle += 1;
+        let index = self.instances.len();
+        self.instances.push(element);
+        self.handles.push(handle);
+        self.handle_to_index.insert(handle, index);
+        handle
+    }
+
+    fn insert_visibly(&mut self, element: I) -> usize {
+        let new_handle = self.insert(element);
+        self.make_visible(new_handle)
+            .expect("Failed to make newly inserted handle visible");
+        new_handle
+    }
+
+    fn remove(&mut self, handle: usize) -> Result<I, RendererError> {
+        if let Some(&index) = self.handle_to_index.get(&handle) {
+            if index < self.fist_invisible {
+                self.swap_by_index(index, self.fist_invisible - 1);
+                self.fist_invisible -= 1;
+            }
+            self.swap_by_index(self.fist_invisible, self.instances.len() - 1);
+            self.handles.pop();
+            self.handle_to_index.remove(&handle);
+            Ok(self.instances.pop().expect("Failed to pop instance"))
+        } else {
+            Err(RendererError::InvalidHandle)
+        }
+    }
+
+    fn update_vertex_buffer(
+        &mut self,
+        allocator: &vk_mem::Allocator,
+    ) -> Result<(), vk_mem::error::Error> {
+        if let Some(buffer) = &mut self.vertex_buffer {
+            buffer.fill(allocator, &self.vertices)?;
+            Ok(())
+        } else {
+            let bytes = (self.vertices.len() * std::mem::size_of::<V>()) as u64;
+            let mut buffer = BufferWrapper::new(
+                &allocator,
+                bytes,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                vk_mem::MemoryUsage::CpuToGpu,
+            )?;
+            buffer.fill(allocator, &self.vertices)?;
+            self.vertex_buffer = Some(buffer);
+            Ok(())
+        }
+    }
+
+    fn update_instance_buffer(
+        &mut self,
+        allocator: &vk_mem::Allocator,
+    ) -> Result<(), vk_mem::error::Error> {
+        if let Some(buffer) = &mut self.instance_buffer {
+            buffer.fill(allocator, &self.instances[0..self.fist_invisible])?;
+            Ok(())
+        } else {
+            let bytes = (self.fist_invisible * std::mem::size_of::<I>()) as u64;
+            let mut buffer = BufferWrapper::new(
+                &allocator,
+                bytes,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                vk_mem::MemoryUsage::CpuToGpu,
+            )?;
+            buffer.fill(allocator, &self.instances[0..self.fist_invisible])?;
+            self.instance_buffer = Some(buffer);
+            Ok(())
+        }
+    }
+
+    fn draw(&self, logical_device: &ash::Device, command_buffer: vk::CommandBuffer) {
+        if let Some(vertex_buffer) = &self.vertex_buffer {
+            if let Some(instance_buffer) = &self.instance_buffer {
+                if self.fist_invisible > 0 {
+                    unsafe {
+                        logical_device.cmd_bind_vertex_buffers(
+                            command_buffer,
+                            0,
+                            &[vertex_buffer.buffer],
+                            &[0],
+                        );
+                        logical_device.cmd_bind_vertex_buffers(
+                            command_buffer,
+                            1,
+                            &[instance_buffer.buffer],
+                            &[0],
+                        );
+                        logical_device.cmd_draw(
+                            command_buffer,
+                            self.vertices.len() as u32,
+                            self.fist_invisible as u32,
+                            0,
+                            0,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self, allocator: &vk_mem::Allocator) {
+        if let Some(buffer) = &mut self.vertex_buffer {
+            buffer.cleanup(allocator)
+        }
+
+        if let Some(buffer) = &mut self.instance_buffer {
+            buffer.cleanup(allocator)
+        }
+    }
+}
+
+#[repr(C)]
+struct InstanceData {
+    position: Vec3,
+    color: Color,
+}
+
+type DefaultModel = Model<Vec3, InstanceData>;
+
+impl DefaultModel {
+    fn cube() -> Self {
+        // lbf: left bottom front
+        let lbf = Vec3::new(-0.1, 0.1, 0.0);
+        let lbb = Vec3::new(-0.1, 0.1, 0.1);
+        let ltf = Vec3::new(-0.1, -0.1, 0.0);
+        let ltb = Vec3::new(-0.1, -0.1, 0.1);
+        let rbf = Vec3::new(0.1, 0.1, 0.0);
+        let rbb = Vec3::new(0.1, 0.1, 0.1);
+        let rtf = Vec3::new(0.1, -0.1, 0.0);
+        let rtb = Vec3::new(0.1, -0.1, 0.1);
+
+        Model {
+            vertices: vec![
+                lbf, lbb, rbb, lbf, rbb, rbf, //bottom
+                ltf, rtb, ltb, ltf, rtf, rtb, //top
+                lbf, rtf, ltf, lbf, rbf, rtf, //front
+                lbb, ltb, rtb, lbb, rtb, rbb, //back
+                lbf, ltf, lbb, lbb, ltf, ltb, //left
+                rbf, rbb, rtf, rbb, rtb, rtf, //right
+            ],
+            handle_to_index: HashMap::new(),
+            handles: Vec::new(),
+            instances: Vec::new(),
+            fist_invisible: 0,
+            next_handle: 0,
+            vertex_buffer: None,
+            instance_buffer: None,
+        }
+    }
+}
 
 fn init_instance(window: &Window, entry: &ash::Entry) -> Result<ash::Instance, ash::InstanceError> {
     let app_name = CString::new(DEFAULT_WINDOW_INFO.title).unwrap();
@@ -229,7 +480,7 @@ fn init_physical_device_and_properties(
         }
     }
 
-    if candidates.len() <= 0 {
+    if candidates.is_empty() {
         return Err(RendererError::NoSuitableGpu);
     }
 
@@ -443,16 +694,6 @@ impl SwapchainWrapper {
     }
 }
 
-impl Drop for SwapchainWrapper {
-    fn drop(&mut self) {
-        unsafe {
-            // needs to be seperate function, because we depend on logical_device
-            self.swapchain_loader
-                .destroy_swapchain(self.swapchain, None)
-        };
-    }
-}
-
 fn init_renderpass(
     logical_device: &ash::Device,
     physical_device: vk::PhysicalDevice,
@@ -542,25 +783,31 @@ impl Pipeline {
                 binding: 0,
                 location: 0,
                 offset: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
+                format: vk::Format::R32G32B32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
                 location: 1,
                 offset: 0,
+                format: vk::Format::R32G32B32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 2,
+                offset: 12,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
         ];
         let vertex_binding_descs = [
             vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: 16,
+                stride: 12,
                 input_rate: vk::VertexInputRate::VERTEX,
             },
             vk::VertexInputBindingDescription {
                 binding: 1,
-                stride: 16,
-                input_rate: vk::VertexInputRate::VERTEX,
+                stride: 28,
+                input_rate: vk::VertexInputRate::INSTANCE,
             },
         ];
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
@@ -686,8 +933,7 @@ fn fill_commandbuffers(
     renderpass: &vk::RenderPass,
     swapchain: &SwapchainWrapper,
     pipeline: &Pipeline,
-    vb1: &vk::Buffer,
-    vb2: &vk::Buffer,
+    models: &[DefaultModel],
 ) -> Result<(), vk::Result> {
     for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -718,9 +964,9 @@ fn fill_commandbuffers(
                 vk::PipelineBindPoint::GRAPHICS,
                 pipeline.pipeline,
             );
-            logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[*vb1], &[0]);
-            logical_device.cmd_bind_vertex_buffers(commandbuffer, 1, &[*vb2], &[0]);
-            logical_device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+            for m in models {
+                m.draw(logical_device, commandbuffer);
+            }
             logical_device.cmd_end_render_pass(commandbuffer);
             logical_device.end_command_buffer(commandbuffer)?;
         }
@@ -728,27 +974,32 @@ fn fill_commandbuffers(
     Ok(())
 }
 
+#[allow(dead_code)]
 struct BufferWrapper {
     buffer: vk::Buffer,
     allocation: vk_mem::Allocation,
     allocation_info: vk_mem::AllocationInfo,
+    size_in_bytes: u64,
+    buffer_usage: vk::BufferUsageFlags,
+    memory_usage: vk_mem::MemoryUsage,
 }
 
 impl BufferWrapper {
     fn new(
         allocator: &vk_mem::Allocator,
         size_in_bytes: u64,
-        usage: vk::BufferUsageFlags,
+        buffer_usage: vk::BufferUsageFlags,
         memory_usage: vk_mem::MemoryUsage,
     ) -> Result<Self, vk_mem::error::Error> {
         let allocation_create_info = vk_mem::AllocationCreateInfo {
             usage: memory_usage,
             ..Default::default()
         };
+
         let (buffer, allocation, allocation_info) = allocator.create_buffer(
             &vk::BufferCreateInfo::builder()
                 .size(size_in_bytes)
-                .usage(usage)
+                .usage(buffer_usage)
                 .build(),
             &allocation_create_info,
         )?;
@@ -757,17 +1008,21 @@ impl BufferWrapper {
             buffer,
             allocation,
             allocation_info,
+            size_in_bytes,
+            buffer_usage,
+            memory_usage,
         })
     }
 
     fn fill<T: Sized>(
-        &self,
+        &mut self,
         allocator: &vk_mem::Allocator,
         data: &[T],
     ) -> Result<(), vk_mem::error::Error> {
-        let data_size = std::mem::size_of::<T>() * data.len();
-        if data_size > self.allocation_info.get_size() {
-            panic!("Not enough memory allocated in buffer");
+        let bytes_to_write = (data.len() * std::mem::size_of::<T>()) as u64;
+        if bytes_to_write > self.size_in_bytes {
+            log::warn!("Not enough memory allocated in buffer; Resizing");
+            self.resize(allocator, bytes_to_write)?;
         }
 
         let data_ptr = allocator.map_memory(&self.allocation)? as *mut T;
@@ -778,8 +1033,32 @@ impl BufferWrapper {
         Ok(())
     }
 
+    fn resize(
+        &mut self,
+        allocator: &vk_mem::Allocator,
+        bytes_to_write: u64,
+    ) -> Result<(), vk_mem::error::Error> {
+        allocator.destroy_buffer(self.buffer, &self.allocation);
+        let new_buffer = BufferWrapper::new(
+            allocator,
+            bytes_to_write,
+            self.buffer_usage,
+            self.memory_usage,
+        )?;
+        *self = new_buffer;
+        Ok(())
+    }
+
     fn cleanup(&mut self, allocator: &vk_mem::Allocator) {
         allocator.destroy_buffer(self.buffer, &self.allocation)
+    }
+}
+
+impl Deref for BufferWrapper {
+    type Target = vk::Buffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
     }
 }
 
@@ -801,7 +1080,7 @@ pub struct Renderer {
     pools: Pools,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     allocator: vk_mem::Allocator,
-    buffers: Vec<BufferWrapper>,
+    models: Vec<DefaultModel>,
 }
 
 impl Renderer {
@@ -840,39 +1119,23 @@ impl Renderer {
         };
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
 
-        #[rustfmt::skip]
-        let vertex_data = [
-            Vec4::new(0.5, 0.0, 0.0, 1.0),
-            Vec4::new(0.0, 0.2, 0.0, 1.0),
-            Vec4::new(-0.5, 0.0, 0.0, 1.0),
-            Vec4::new(-0.9, -0.9, 0.0, 1.0),
-            Vec4::new(0.3, -0.8, 0.0, 1.0),
-            Vec4::new(0.0, -0.6, 0.0, 1.0),
-        ];
-        let vertex_buffer = BufferWrapper::new(
-            &allocator,
-            (vertex_data.len() * std::mem::size_of::<Vec4>()) as u64,
-            vk::BufferUsageFlags::VERTEX_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-        )?;
-        vertex_buffer.fill(&allocator, &vertex_data)?;
-
-        #[rustfmt::skip]
-        let color_data = [
-            Color::RED,
-            Color::RED,
-            Color::RED,
-            Color::RED,
-            Color::GREEN,
-            Color::BLUE,
-        ];
-        let color_buffer = BufferWrapper::new(
-            &allocator,
-            (color_data.len() * std::mem::size_of::<Color>()) as u64,
-            vk::BufferUsageFlags::VERTEX_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-        )?;
-        color_buffer.fill(&allocator, &color_data)?;
+        // models
+        let mut cube = DefaultModel::cube();
+        cube.insert_visibly(InstanceData {
+            position: Vec3::new(0.0, 0.0, 0.0),
+            color: Color::RED,
+        });
+        cube.insert_visibly(InstanceData {
+            position: Vec3::new(0.5, 0.5, 0.0),
+            color: Color::GREEN,
+        });
+        cube.insert_visibly(InstanceData {
+            position: Vec3::new(-0.5, -0.5, 0.0),
+            color: Color::BLUE,
+        });
+        cube.update_vertex_buffer(&allocator).unwrap();
+        cube.update_instance_buffer(&allocator).unwrap();
+        let models = vec![cube];
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
@@ -883,8 +1146,7 @@ impl Renderer {
             &renderpass,
             &swapchain,
             &pipeline,
-            &vertex_buffer.buffer,
-            &color_buffer.buffer,
+            &models,
         )?;
 
         Ok(Renderer {
@@ -904,7 +1166,7 @@ impl Renderer {
             pools,
             commandbuffers,
             allocator,
-            buffers: vec![vertex_buffer, color_buffer],
+            models,
         })
     }
 }
@@ -915,10 +1177,11 @@ impl Drop for Renderer {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
-            for b in &mut self.buffers {
-                b.cleanup(&self.allocator);
+            for m in &mut self.models {
+                m.cleanup(&self.allocator);
             }
 
             self.allocator.destroy();

@@ -21,30 +21,15 @@ use crate::debug::{
 };
 use crate::{color::Color, math::Vec4};
 
-#[derive(Debug, Clone)]
-pub enum EngineError {
+#[derive(thiserror::Error, Debug)]
+pub enum RendererError {
+    #[error("Unkown rrror.")]
     Unknown,
-    VkError(vk::Result),
+    #[error("{0}")]
+    VkError(#[from] vk::Result),
+    #[error("No suitable GPU found.")]
     NoSuitableGpu,
 }
-
-impl From<vk::Result> for EngineError {
-    fn from(vk_result: vk::Result) -> Self {
-        EngineError::VkError(vk_result)
-    }
-}
-
-impl std::fmt::Display for EngineError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EngineError::Unknown => f.write_str("Unkown Error"),
-            EngineError::VkError(error) => write!(f, "{}", error),
-            EngineError::NoSuitableGpu => f.write_str("No suitable GPU found."),
-        }
-    }
-}
-
-impl std::error::Error for EngineError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppInfo {
@@ -200,7 +185,7 @@ fn init_physical_device_and_properties(
         vk::PhysicalDeviceProperties,
         vk::PhysicalDeviceFeatures,
     ),
-    EngineError,
+    RendererError,
 > {
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
     let mut candidates: BTreeMap<
@@ -245,7 +230,7 @@ fn init_physical_device_and_properties(
     }
 
     if candidates.len() <= 0 {
-        return Err(EngineError::NoSuitableGpu);
+        return Err(RendererError::NoSuitableGpu);
     }
 
     Ok(candidates.pop_first().unwrap().1)
@@ -294,6 +279,8 @@ fn init_device_and_queues(
     // in this case we only want one queue for now
     let queue_family_index = queue_families.graphics_q_index.unwrap();
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
+    // required for wireframe fill mode
     let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true);
     let priorities = [1.0];
 

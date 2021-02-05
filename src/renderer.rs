@@ -22,7 +22,7 @@ use crate::{
         get_debug_create_info, get_layer_names, has_validation_layers_support,
         startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
     },
-    math::Vec3,
+    math::{Mat4, Vec3, Vec4},
 };
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -274,7 +274,7 @@ impl<V, I> Model<V, I> {
 
 #[repr(C)]
 struct InstanceData {
-    position: Vec3,
+    position: Mat4,
     color: Color,
 }
 
@@ -283,14 +283,14 @@ type DefaultModel = Model<Vec3, InstanceData>;
 impl DefaultModel {
     fn cube() -> Self {
         // lbf: left bottom front
-        let lbf = Vec3::new(-0.1, 0.1, 0.0);
-        let lbb = Vec3::new(-0.1, 0.1, 0.1);
-        let ltf = Vec3::new(-0.1, -0.1, 0.0);
-        let ltb = Vec3::new(-0.1, -0.1, 0.1);
-        let rbf = Vec3::new(0.1, 0.1, 0.0);
-        let rbb = Vec3::new(0.1, 0.1, 0.1);
-        let rtf = Vec3::new(0.1, -0.1, 0.0);
-        let rtb = Vec3::new(0.1, -0.1, 0.1);
+        let lbf = Vec3::new(-1.0, 1.0, 0.0);
+        let lbb = Vec3::new(-1.0, 1.0, 1.0);
+        let ltf = Vec3::new(-1.0, -1.0, 0.0);
+        let ltb = Vec3::new(-1.0, -1.0, 1.0);
+        let rbf = Vec3::new(1.0, 1.0, 0.0);
+        let rbb = Vec3::new(1.0, 1.0, 1.0);
+        let rtf = Vec3::new(1.0, -1.0, 0.0);
+        let rtb = Vec3::new(1.0, -1.0, 1.0);
 
         Model {
             vertices: vec![
@@ -620,7 +620,7 @@ impl SwapchainWrapper {
             .queue_family_indices(&queuefamilies)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::FIFO);
+            .present_mode(vk::PresentModeKHR::IMMEDIATE);
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(swapchain)? };
@@ -808,12 +808,30 @@ impl Pipeline {
                 binding: 1,
                 location: 1,
                 offset: 0,
-                format: vk::Format::R32G32B32_SFLOAT,
+                format: vk::Format::R32G32B32A32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
                 location: 2,
-                offset: 12,
+                offset: 16,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 3,
+                offset: 32,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 4,
+                offset: 48,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 5,
+                offset: 64,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
         ];
@@ -825,7 +843,7 @@ impl Pipeline {
             },
             vk::VertexInputBindingDescription {
                 binding: 1,
-                stride: 28,
+                stride: 80,
                 input_rate: vk::VertexInputRate::INSTANCE,
             },
         ];
@@ -1141,17 +1159,18 @@ impl Renderer {
         // models
         let mut cube = DefaultModel::cube();
         cube.insert_visibly(InstanceData {
-            position: Vec3::new(0.0, 0.0, 0.0),
+            position: dbg!(Mat4::translation(Vec3::new(0.5, 0.5, 0.0)) * Mat4::scaling(0.2)),
             color: Color::RED,
         });
-        cube.insert_visibly(InstanceData {
-            position: Vec3::new(0.5, 0.5, 0.0),
-            color: Color::GREEN,
-        });
-        cube.insert_visibly(InstanceData {
-            position: Vec3::new(-0.5, -0.5, 0.0),
-            color: Color::BLUE,
-        });
+
+        //cube.insert_visibly(InstanceData {
+        //    position: Mat4::scaling(2.0),
+        //    color: Color::GREEN,
+        //});
+        //cube.insert_visibly(InstanceData {
+        //    position: Mat4::translating(Vec3::new(2.0, 0.0, 0.0)),
+        //    color: Color::BLUE,
+        //});
         cube.update_vertex_buffer(&allocator).unwrap();
         cube.update_instance_buffer(&allocator).unwrap();
         let models = vec![cube];

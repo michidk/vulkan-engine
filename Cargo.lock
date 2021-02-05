@@ -962,6 +962,7 @@ dependencies = [
  "ash-window",
  "env_logger",
  "log",
+ "thiserror",
  "vk-mem",
  "vk-shader-macros",
  "winit",

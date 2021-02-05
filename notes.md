@@ -1,16 +1,17 @@
-# TODO's
+# Notes
+
+## TODO's
 
 - @Jonas add to list of authors in `Cargo.toml`
 - implement window resizing
 - change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
 
 - rename vulkan-renderer to vulkan-engine
-- move QueueFamilies::init to Queuefamilies::findSuitableQueueFamily
-- put flags to consts
+
 - create graphics and separate present queue, since they might not overlap: https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
 
 
-# Resources:
+## Resources:
 
 https://vulkan-tutorial.com/
 https://hoj-senna.github.io/ashen-aetna/text/021_Boxes.html

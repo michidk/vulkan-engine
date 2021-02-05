@@ -33,6 +33,8 @@ pub enum RendererError {
     VkError(#[from] vk::Result),
     #[error("No suitable gpu found")]
     NoSuitableGpu,
+    #[error("No suitable queue family found")]
+    NoSuitableQueueFamily,
     #[error("Invalid handle")]
     InvalidHandle,
 }
@@ -454,7 +456,7 @@ fn init_physical_device_and_properties(
 
         let mut score: u32 = 0;
 
-        // prefere discret gpu
+        // prefere discrete gpu
         if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
             score += 1000;
         }
@@ -488,7 +490,7 @@ fn init_physical_device_and_properties(
 }
 
 struct QueueFamilies {
-    graphics_q_index: Option<u32>,
+    graphics_q_index: u32,
 }
 
 impl QueueFamilies {
@@ -496,10 +498,24 @@ impl QueueFamilies {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         surfaces: &SurfaceWrapper,
-    ) -> Result<QueueFamilies, vk::Result> {
+    ) -> Result<QueueFamilies, RendererError> {
+        Ok(QueueFamilies {
+            graphics_q_index: QueueFamilies::find_suiltable_queue_family(
+                instance,
+                physical_device,
+                surfaces,
+            )?,
+        })
+    }
+
+    fn find_suiltable_queue_family(
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        surfaces: &SurfaceWrapper,
+    ) -> Result<u32, RendererError> {
         let queuefamilyproperties =
             unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
-        // TODO: refactor
+
         let mut found_graphics_q_index = None;
         for (index, qfam) in queuefamilyproperties.iter().enumerate() {
             if qfam.queue_count > 0
@@ -510,9 +526,12 @@ impl QueueFamilies {
                 break;
             }
         }
-        Ok(QueueFamilies {
-            graphics_q_index: found_graphics_q_index,
-        })
+
+        if found_graphics_q_index.is_none() {
+            return Err(RendererError::NoSuitableQueueFamily);
+        }
+
+        Ok(found_graphics_q_index.unwrap())
     }
 }
 
@@ -528,7 +547,7 @@ fn init_device_and_queues(
     // select queues
     // https://hoj-senna.github.io/ashen-engine/text/005_Queues.html
     // in this case we only want one queue for now
-    let queue_family_index = queue_families.graphics_q_index.unwrap();
+    let queue_family_index = queue_families.graphics_q_index;
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode
@@ -585,7 +604,7 @@ impl SwapchainWrapper {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
         let surface_format = *surfaces.get_formats(physical_device)?.first().unwrap();
-        let queuefamilies = [queue_families.graphics_q_index.unwrap()];
+        let queuefamilies = [queue_families.graphics_q_index];
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surfaces.surface)
             .min_image_count(
@@ -900,7 +919,7 @@ impl Pools {
         queue_families: &QueueFamilies,
     ) -> Result<Pools, vk::Result> {
         let graphics_commandpool_info = vk::CommandPoolCreateInfo::builder()
-            .queue_family_index(queue_families.graphics_q_index.unwrap())
+            .queue_family_index(queue_families.graphics_q_index)
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
         let commandpool_graphics =
             unsafe { logical_device.create_command_pool(&graphics_commandpool_info, None) }?;

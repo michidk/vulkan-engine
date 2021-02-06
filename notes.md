@@ -6,8 +6,6 @@
 - implement window resizing
 - change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
 
-- rename vulkan-renderer to vulkan-engine
-
 - create graphics and separate present queue, since they might not overlap: https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
 
 

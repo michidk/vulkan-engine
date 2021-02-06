@@ -527,11 +527,7 @@ impl QueueFamilies {
             }
         }
 
-        if found_graphics_q_index.is_none() {
-            return Err(RendererError::NoSuitableQueueFamily);
-        }
-
-        Ok(found_graphics_q_index.unwrap())
+        found_graphics_q_index.ok_or(RendererError::NoSuitableQueueFamily)
     }
 }
 

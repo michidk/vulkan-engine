@@ -3,13 +3,13 @@ use crate::math::Vec3;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mesh {
     pub name: Option<String>,
+    pub vertices: Vec<Vertex>,
     pub submeshes: Vec<Submesh>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Submesh {
     pub name: Option<String>,
-    pub vertices: Vec<Vertex>,
     pub faces: Vec<Face>,
 }
 

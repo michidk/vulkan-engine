@@ -25,9 +25,6 @@ pub struct Face {
 #[derive(Debug, Default)]
 pub struct Submesh {
     name: Option<String>,
-    vertices: Vec<Vertex>,
-    uvs: Vec<[f32; 2]>,
-    normals: Vec<[f32; 3]>,
     faces: Vec<Face>,
 }
 
@@ -35,6 +32,9 @@ pub struct Submesh {
 pub struct Mesh {
     name: Option<String>,
     submeshes: Vec<Submesh>,
+    vertices: Vec<Vertex>,
+    uvs: Vec<[f32; 2]>,
+    normals: Vec<[f32; 3]>,
 }
 
 #[derive(Debug, Default)]
@@ -66,15 +66,15 @@ impl MeshBuilder {
     }
 
     fn push_vertex(&mut self, vertex: Vertex) {
-        self.curr_submesh.vertices.push(vertex);
+        self.mesh.vertices.push(vertex);
     }
 
     fn push_uv(&mut self, uv: [f32; 2]) {
-        self.curr_submesh.uvs.push(uv);
+        self.mesh.uvs.push(uv);
     }
 
     fn push_normal(&mut self, normal: [f32; 3]) {
-        self.curr_submesh.normals.push(normal);
+        self.mesh.normals.push(normal);
     }
 
     fn push_face(&mut self, face: Face) {
@@ -84,18 +84,18 @@ impl MeshBuilder {
     pub fn build_mesh(mut self) -> Result<mesh::Mesh, ParserError> {
         self.mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
 
+        let mut vertices: Vec<mesh::Vertex> = Vec::new();
+        for vertex in self.mesh.vertices {
+            vertices.push(mesh::Vertex {
+                position: vertex.position.into(),
+                color: vertex.color.map(Into::into),
+                uv: None,
+                normal: None,
+            })
+        }
+
         let mut submeshes: Vec<mesh::Submesh> = Vec::new();
         for submesh in self.mesh.submeshes {
-            let mut vertices: Vec<mesh::Vertex> = Vec::new();
-            for vertex in submesh.vertices {
-                vertices.push(mesh::Vertex {
-                    position: vertex.position.into(),
-                    color: vertex.color.map(Into::into),
-                    uv: None,
-                    normal: None,
-                })
-            }
-
             let mut faces: Vec<mesh::Face> = Vec::new();
             for mut face in submesh.faces {
                 // set uv and normal if they appear on a face
@@ -106,14 +106,14 @@ impl MeshBuilder {
 
                     // get uv values from current face index
                     let uv = if let Some(x) = face.face_i[i].uv_i {
-                        Some(submesh.uvs[x - 1].into())
+                        Some(self.mesh.uvs[x - 1].into())
                     } else {
                         None
                     };
 
                     // get normal values from current face index
                     let normal = if let Some(x) = face.face_i[i].normal_i {
-                        Some(submesh.normals[x - 1].into())
+                        Some(self.mesh.normals[x - 1].into())
                     } else {
                         None
                     };
@@ -151,13 +151,13 @@ impl MeshBuilder {
             }
             submeshes.push(mesh::Submesh {
                 name: submesh.name,
-                vertices,
                 faces,
             })
         }
 
         Ok(mesh::Mesh {
             name: self.mesh.name,
+            vertices,
             submeshes,
         })
     }
@@ -335,7 +335,7 @@ mod test {
 
         assert_eq!(builder.mesh.name, Some("foo bar".into()));
         assert_eq!(
-            builder.mesh.submeshes[0].vertices,
+            builder.mesh.vertices,
             vec![
                 Vertex {
                     position: [1.0, 2.0, 3.0],

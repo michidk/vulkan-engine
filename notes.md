@@ -24,3 +24,6 @@ https://github.com/adrien-ben/vulkan-tutorial-rs
 https://www.khronos.org/registry/vulkan/specs/1.0/html/
 https://vulkan-tutorial.com/Introduction
 https://docs.rs/ash/0.31.0/ash/
+
+
+https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html

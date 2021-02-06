@@ -1155,7 +1155,7 @@ impl Renderer {
         // models
         let mut cube = DefaultModel::cube();
         cube.insert_visibly(InstanceData {
-            position: dbg!(Mat4::translation(Vec3::new(0.5, 0.5, 0.0)) * Mat4::scaling(0.2)),
+            position: dbg!(Mat4::translate(Vec3::new(0.5, 0.5, 0.0)) * Mat4::scaling(0.2)),
             color: Color::RED,
         });
 

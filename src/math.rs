@@ -137,12 +137,11 @@ impl Mat4 {
 
     pub fn scaling(factor: f32) -> Self {
         let mut scaling = Self::IDENTITY * factor;
-        // set [3, 3] to one
-        scaling.w.w = 1.0;
+        scaling.w.w = 1.0; // set [3, 3] to one
         scaling
     }
 
-    pub fn translation(direction: Vec3) -> Self {
+    pub fn translate(direction: Vec3) -> Self {
         let mut translating = Self::IDENTITY;
         translating.w.x = direction.x;
         translating.w.y = direction.y;
@@ -272,7 +271,7 @@ mod tests {
                 Vec4::new(2.1, 0.0, 0.0, 0.0),
                 Vec4::new(0.0, 2.1, 0.0, 0.0),
                 Vec4::new(0.0, 0.0, 2.1, 0.0),
-                Vec4::new(0.0, 0.0, 0.0, 2.1),
+                Vec4::new(0.0, 0.0, 0.0, 1.0),
             )
         )
     }

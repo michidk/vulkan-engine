@@ -11,8 +11,13 @@
 - create graphics and separate present queue, since they might not overlap: https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
 
 
-## Resources:
+## FPS
 
+| Chapter | FPS   |
+| ------- | ----- |
+| 22      | ~5800 |
+
+## Resources:
 https://vulkan-tutorial.com/
 https://hoj-senna.github.io/ashen-aetna/text/021_Boxes.html
 https://github.com/JHorace/ForgeEngine/

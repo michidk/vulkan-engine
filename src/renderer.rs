@@ -22,7 +22,7 @@ use crate::{
         get_debug_create_info, get_layer_names, has_validation_layers_support,
         startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
     },
-    math::{Mat4, Vec3, Vec4},
+    math::{Mat4, Vec3},
 };
 
 #[derive(thiserror::Error, Debug, Clone)]

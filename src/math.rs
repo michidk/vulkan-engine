@@ -66,10 +66,7 @@ impl Vec4 {
     }
 
     pub fn dot_product(self, other: Self) -> f32 {
-        (self.x * other.x)
-            + (self.y * other.y)
-            + (self.z * other.z)
-            + (self.w * other.w)
+        (self.x * other.x) + (self.y * other.y) + (self.z * other.z) + (self.w * other.w)
     }
 }
 
@@ -125,12 +122,7 @@ pub struct Mat4 {
 }
 
 impl Mat4 {
-    pub const ZERO: Mat4 = Self::new(
-        Vec4::ZERO,
-        Vec4::ZERO,
-        Vec4::ZERO,
-        Vec4::ZERO,
-    );
+    pub const ZERO: Mat4 = Self::new(Vec4::ZERO, Vec4::ZERO, Vec4::ZERO, Vec4::ZERO);
 
     pub const IDENTITY: Mat4 = Self::new(
         Vec4::new(1.0, 0.0, 0.0, 0.0),

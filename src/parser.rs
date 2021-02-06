@@ -81,7 +81,7 @@ impl MeshBuilder {
         self.curr_submesh.faces.push(face);
     }
 
-    pub fn to_mesh(mut self) -> Result<mesh::Mesh, ParserError> {
+    pub fn build_mesh(mut self) -> Result<mesh::Mesh, ParserError> {
         self.mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
 
         let mut submeshes: Vec<mesh::Submesh> = Vec::new();
@@ -102,7 +102,7 @@ impl MeshBuilder {
                 // also duplicate the vertex if it was already defined with another uv or normal
                 for i in 0..=2 {
                     // let vertex = &self.mesh.vertices[face.face_i[i].vert_i];
-                    let mut vertex = &mut vertices[face.face_i[i].vert_i - 1];
+                    let vertex = &mut vertices[face.face_i[i].vert_i - 1];
 
                     // get uv values from current face index
                     let uv = if let Some(x) = face.face_i[i].uv_i {
@@ -151,14 +151,14 @@ impl MeshBuilder {
             }
             submeshes.push(mesh::Submesh {
                 name: submesh.name,
-                vertices: vertices,
-                faces: faces,
+                vertices,
+                faces,
             })
         }
 
         Ok(mesh::Mesh {
             name: self.mesh.name,
-            submeshes: submeshes,
+            submeshes,
         })
     }
 }
@@ -248,7 +248,7 @@ fn parse_vertex(value: &str) -> Result<Vertex, num::ParseFloatError> {
 
     Ok(Vertex {
         position: [vec[0], vec[1], vec[2]],
-        color: color,
+        color,
     })
 }
 

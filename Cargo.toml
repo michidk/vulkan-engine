@@ -1,11 +1,16 @@
 [package]
 name = "vulkan_renderer"
 version = "0.1.0"
-authors = ["Michael Lohr <michael@lohr-ffb.de>"]
+authors = ["Michael Lohr <michael@lohr-ffb.de>", "Shemnei <Shemnei@users.noreply.github.com>"]
 edition = "2018"
 
 [lib]
-name = "vulkan_renderer"
+name = "vulkan_engine"
+
+[workspace]
+members = [
+    "math",
+]
 
 [dependencies]
 ash = "0.31.0"
@@ -16,3 +21,4 @@ thiserror = "1.0.23"
 vk-mem = { git = "https://github.com/matthewjberger/vk-mem-rs", version = "0.2.3" }
 vk-shader-macros = "0.2.6"
 winit = "0.24.0"
+math = { path = "math" }

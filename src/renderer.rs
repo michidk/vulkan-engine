@@ -16,13 +16,13 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+use math::prelude::*;
 use crate::{
     color::Color,
     debug::{
         get_debug_create_info, get_layer_names, has_validation_layers_support,
         startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
     },
-    math::{Mat4, Vec3},
 };
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -274,11 +274,11 @@ impl<V, I> Model<V, I> {
 
 #[repr(C)]
 struct InstanceData {
-    position: Mat4,
+    position: Mat4<f32>,
     color: Color,
 }
 
-type DefaultModel = Model<Vec3, InstanceData>;
+type DefaultModel = Model<Vec3<f32>, InstanceData>;
 
 impl DefaultModel {
     fn cube() -> Self {
@@ -1155,7 +1155,7 @@ impl Renderer {
         // models
         let mut cube = DefaultModel::cube();
         cube.insert_visibly(InstanceData {
-            position: dbg!(Mat4::translate(Vec3::new(0.5, 0.5, 0.0)) * Mat4::scaling(0.2)),
+            position: dbg!(&Mat4::new_translate(Vec3::new(0.5, 0.5, 0.0)) * &Mat4::new_scaling(0.2)),
             color: Color::RED,
         });
 

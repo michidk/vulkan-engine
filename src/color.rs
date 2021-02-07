@@ -1,8 +1,8 @@
-use crate::math::Vec4;
+use math::prelude::*;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Color {
-    color: Vec4,
+    color: Vec4<f32>,
 }
 
 impl Color {
@@ -26,12 +26,12 @@ impl Color {
 
     pub fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self {
-            color: Vec4 {
-                x: (f32::from(r) / Color::CLAMP_MAX),
-                y: (f32::from(g) / Color::CLAMP_MAX),
-                z: (f32::from(b) / Color::CLAMP_MAX),
-                w: (f32::from(a) / Color::CLAMP_MAX),
-            },
+            color: Vec4::new(
+                f32::from(r) / Color::CLAMP_MAX,
+                f32::from(g) / Color::CLAMP_MAX,
+                f32::from(b) / Color::CLAMP_MAX,
+                f32::from(a) / Color::CLAMP_MAX,
+            ),
         }
     }
 

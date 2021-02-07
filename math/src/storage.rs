@@ -27,11 +27,7 @@ pub struct ArrayStorage<T, const R: usize, const C: usize> {
     pub(crate) data: [[T; R]; C],
 }
 
-impl<T, const R: usize, const C: usize> Copy for ArrayStorage<T, R, C>
-where
-    T: Copy,
-{
-}
+impl<T, const R: usize, const C: usize> Copy for ArrayStorage<T, R, C> where T: Copy {}
 
 impl<T, const R: usize, const C: usize> Clone for ArrayStorage<T, R, C>
 where

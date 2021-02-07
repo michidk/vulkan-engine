@@ -27,3 +27,6 @@ https://docs.rs/ash/0.31.0/ash/
 
 
 https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
+http://www.realtimerendering.com/udacity/?load=demo/unit7-view-pipeline.js
+http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/
+http://www.opengl-tutorial.org/beginners-tutorials/tutorial-3-matrices/

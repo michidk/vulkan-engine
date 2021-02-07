@@ -16,7 +16,6 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use math::prelude::*;
 use crate::{
     color::Color,
     debug::{
@@ -24,6 +23,7 @@ use crate::{
         startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
     },
 };
+use math::prelude::*;
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum RendererError {
@@ -1154,9 +1154,14 @@ impl Renderer {
 
         // models
         let mut cube = DefaultModel::cube();
+        //cube.insert_visibly(InstanceData {
+        //    position: dbg!(Mat4::new_scaling(0.2)),
+        //    color: Color::RED,
+        //});
+
         cube.insert_visibly(InstanceData {
-            position: dbg!(&Mat4::new_translate(Vec3::new(0.5, 0.5, 0.0)) * &Mat4::new_scaling(0.2)),
-            color: Color::RED,
+            position: dbg!(&Mat4::new_rotation_z(45.0.deg()) * &Mat4::new_scaling(0.2)),
+            color: Color::BLUE,
         });
 
         //cube.insert_visibly(InstanceData {

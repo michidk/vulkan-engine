@@ -1,3 +1,5 @@
+use crate::angle::Angle;
+
 use std::ops::Mul;
 
 use crate::{
@@ -32,6 +34,53 @@ impl<T> Mat4<T> {
         };
 
         matrix
+    }
+}
+
+impl Mat4<f32> {
+    pub fn new_rotation_x(angle: Angle<f32>) -> Self {
+        let rad = angle.to_rad();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_storage(ArrayStorage {
+            data: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, cos, -sin, 0.0],
+                [0.0, sin, cos, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+        })
+    }
+
+    pub fn new_rotation_y(angle: Angle<f32>) -> Self {
+        let rad = angle.to_rad();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_storage(ArrayStorage {
+            data: [
+                [cos, 0.0, sin, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [-sin, 0.0, cos, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+        })
+    }
+
+    pub fn new_rotation_z(angle: Angle<f32>) -> Self {
+        let rad = angle.to_rad();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_storage(ArrayStorage {
+            data: [
+                [cos, sin, 0.0, 0.0],
+                [-sin, cos, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+        })
     }
 }
 

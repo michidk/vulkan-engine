@@ -52,11 +52,7 @@ where
     }
 }
 
-impl<S, T, const R: usize, const C: usize> Copy for Matrix<S, T, R, C>
-where
-    S: Copy,
-{
-}
+impl<S, T, const R: usize, const C: usize> Copy for Matrix<S, T, R, C> where S: Copy {}
 
 impl<S, T, const R: usize, const C: usize> fmt::Debug for Matrix<S, T, R, C>
 where
@@ -97,7 +93,9 @@ where
     }
 }
 
-impl<T, const R: usize, const C: usize> From<[[T; R]; C]> for Matrix<ArrayStorage<T, R, C>, T, R, C> {
+impl<T, const R: usize, const C: usize> From<[[T; R]; C]>
+    for Matrix<ArrayStorage<T, R, C>, T, R, C>
+{
     fn from(data: [[T; R]; C]) -> Self {
         Self {
             storage: ArrayStorage { data },

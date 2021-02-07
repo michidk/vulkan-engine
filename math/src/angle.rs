@@ -32,7 +32,7 @@ impl Angle<f32> {
         self.radians
     }
 
-    pub fn to_deg(self) -> f32 {
+    pub fn to_deg(&self) -> f32 {
         self.radians / Self::PI_180
     }
 }

@@ -17,7 +17,8 @@ lint:
 	cargo +nightly fmt -p math --all -- --check
 	cargo +nightly clippy -p math -- -D warnings
 
-canICommit:
+# can i commit
+cic:
 	make check
 	make test
 	make lint

@@ -95,6 +95,38 @@ impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
         };
         zero
     }
+
+    pub fn x(&self) -> &T
+    where
+        Self: VecLenCmp<VecLen0, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        unsafe { self.storage.get_unchecked(0, 0) }
+    }
+
+    pub fn y(&self) -> &T
+    where
+        Self: VecLenCmp<VecLen1, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        unsafe { self.storage.get_unchecked(1, 0) }
+    }
+
+    pub fn z(&self) -> &T
+    where
+        Self: VecLenCmp<VecLen2, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        unsafe { self.storage.get_unchecked(2, 0) }
+    }
+
+    pub fn w(&self) -> &T
+    where
+        Self: VecLenCmp<VecLen3, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        unsafe { self.storage.get_unchecked(3, 0) }
+    }
 }
 
 impl<S, T, const R: usize> ColVector<S, T, R> {

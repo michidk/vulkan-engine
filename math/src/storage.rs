@@ -23,6 +23,7 @@ pub trait StorageMut<T, const R: usize, const C: usize> {
     unsafe fn get_unchecked_mut(&mut self, row_idx: usize, col_idx: usize) -> &mut T;
 }
 
+#[repr(C)]
 pub struct ArrayStorage<T, const R: usize, const C: usize> {
     pub(crate) data: [[T; R]; C],
 }
@@ -62,6 +63,21 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         self.data.eq(&other.data)
+    }
+}
+
+impl<T, const R: usize, const C: usize> From<ArrayStorage<T, R, C>> for [[T; R]; C] {
+    fn from(value: ArrayStorage<T, R, C>) -> Self {
+        value.data
+    }
+}
+
+impl<T, const R: usize> From<ArrayStorage<T, R, 1>> for [T; R]
+where
+    T: Copy,
+{
+    fn from(value: ArrayStorage<T, R, 1>) -> Self {
+        value.data[0]
     }
 }
 

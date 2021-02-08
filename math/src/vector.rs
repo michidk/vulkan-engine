@@ -20,6 +20,83 @@ pub type Vec2<T, S = Owned<T, 2, 1>> = ColVector<S, T, 2>;
 pub type Vec3<T, S = Owned<T, 3, 1>> = ColVector<S, T, 3>;
 pub type Vec4<T, S = Owned<T, 4, 1>> = ColVector<S, T, 4>;
 
+pub struct VecLen0 {}
+pub struct VecLen1 {}
+pub struct VecLen2 {}
+pub struct VecLen3 {}
+pub struct VecLen4 {}
+
+pub struct Greater;
+pub trait VecLenCmp<T> {
+    type Cmp;
+}
+
+macro_rules! impl_vec_len_gt {
+    ( $($vec:ty => $( $len:ty )+  ;)+ ) => {
+        $($(
+            impl<T, S> VecLenCmp<$len> for $vec {
+                type Cmp = Greater;
+            }
+        )+)+
+    };
+}
+
+impl_vec_len_gt! {
+    Vec2<T, S> => VecLen0 VecLen1;
+    Vec3<T, S> => VecLen0 VecLen1 VecLen2;
+    Vec4<T, S> => VecLen0 VecLen1 VecLen2 VecLen3;
+}
+
+impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
+    pub fn unit_x() -> Self
+    where
+        Self: VecLenCmp<VecLen0, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        let mut zero = Matrix::zero();
+        unsafe {
+            *zero.storage.get_unchecked_mut(0, 0) = T::one();
+        };
+        zero
+    }
+
+    pub fn unit_y() -> Self
+    where
+        Self: VecLenCmp<VecLen1, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        let mut zero = Matrix::zero();
+        unsafe {
+            *zero.storage.get_unchecked_mut(1, 0) = T::one();
+        };
+        zero
+    }
+
+    pub fn unit_z() -> Self
+    where
+        Self: VecLenCmp<VecLen2, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        let mut zero = Matrix::zero();
+        unsafe {
+            *zero.storage.get_unchecked_mut(2, 0) = T::one();
+        };
+        zero
+    }
+
+    pub fn unit_w() -> Self
+    where
+        Self: VecLenCmp<VecLen3, Cmp = Greater>,
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        let mut zero = Matrix::zero();
+        unsafe {
+            *zero.storage.get_unchecked_mut(3, 0) = T::one();
+        };
+        zero
+    }
+}
+
 impl<S, T, const R: usize> ColVector<S, T, R> {
     pub fn dot_product<RS, RT>(&self, rhs: &ColVector<RS, RT, R>) -> T
     where
@@ -38,87 +115,6 @@ impl<S, T, const R: usize> ColVector<S, T, R> {
         }
 
         value
-    }
-}
-
-impl<T> Vec3<T> {
-    pub fn unit_x() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(0, 0) = T::one();
-        };
-        zero
-    }
-
-    pub fn unit_y() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(1, 0) = T::one();
-        };
-        zero
-    }
-
-    pub fn unit_z() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(2, 0) = T::one();
-        };
-        zero
-    }
-}
-
-impl<T> Vec4<T> {
-    pub fn unit_x() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(0, 0) = T::one();
-        };
-        zero
-    }
-
-    pub fn unit_y() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(1, 0) = T::one();
-        };
-        zero
-    }
-
-    pub fn unit_z() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(2, 0) = T::one();
-        };
-        zero
-    }
-
-    pub fn unit_w() -> Self
-    where
-        T: Clone + Zero + One + Mul<T, Output = T>,
-    {
-        let mut zero = Matrix::zero();
-        unsafe {
-            *zero.storage.get_unchecked_mut(3, 0) = T::one();
-        };
-        zero
     }
 }
 
@@ -161,5 +157,22 @@ mod tests {
         let cv2: Vec3<f32> = [1.0, 1.0, 1.0].into();
 
         assert_eq!(cv1.dot_product(&cv2), 3.0);
+    }
+
+    #[test]
+    fn vec_check_unit_impls() {
+        // Test if all units are implemented for the types.
+        // The test is considered as "ok" if it compiles.
+        let _: Vec2<f32> = Vec2::unit_x();
+        let _: Vec2<f32> = Vec2::unit_y();
+
+        let _: Vec3<f32> = Vec3::unit_x();
+        let _: Vec3<f32> = Vec3::unit_y();
+        let _: Vec3<f32> = Vec3::unit_z();
+
+        let _: Vec4<f32> = Vec4::unit_x();
+        let _: Vec4<f32> = Vec4::unit_y();
+        let _: Vec4<f32> = Vec4::unit_z();
+        let _: Vec4<f32> = Vec4::unit_w();
     }
 }

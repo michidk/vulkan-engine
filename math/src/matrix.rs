@@ -12,6 +12,7 @@ use crate::{
 pub type Owned<T, const R: usize, const C: usize> =
     <DefaultAllocator as Allocator<T, R, C>>::Buffer;
 
+#[repr(C)]
 pub struct Matrix<S, T: Scalar, const R: usize, const C: usize> {
     pub(crate) storage: S,
     pub(crate) _marker: PhantomData<T>,
@@ -34,6 +35,13 @@ impl<S, T, const R: usize, const C: usize> Matrix<S, T, R, C> {
 
     pub const fn shape(&self) -> (usize, usize) {
         (R, C)
+    }
+
+    pub fn into_col_arr(self) -> [[T; R]; C]
+    where
+        S: Into<[[T; R]; C]>,
+    {
+        self.into()
     }
 }
 
@@ -104,15 +112,30 @@ impl<T, const R: usize, const C: usize> From<[[T; R]; C]>
     }
 }
 
-impl<T, const R: usize> From<[T; R]> for Matrix<ArrayStorage<T, R, 1>, T, R, 1>
-where
-    T: Scalar,
-{
+impl<T, const R: usize> From<[T; R]> for Matrix<ArrayStorage<T, R, 1>, T, R, 1> {
     fn from(data: [T; R]) -> Self {
         Self {
             storage: ArrayStorage { data: [data] },
             _marker: PhantomData,
         }
+    }
+}
+
+impl<S, T, const R: usize, const C: usize> From<Matrix<S, T, R, C>> for [[T; R]; C]
+where
+    S: Into<[[T; R]; C]>,
+{
+    fn from(value: Matrix<S, T, R, C>) -> Self {
+        value.storage.into()
+    }
+}
+
+impl<S, T, const R: usize> From<Matrix<S, T, R, 1>> for [T; R]
+where
+    S: Into<[T; R]>,
+{
+    fn from(value: Matrix<S, T, R, 1>) -> Self {
+        value.storage.into()
     }
 }
 

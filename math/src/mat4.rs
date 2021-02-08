@@ -39,7 +39,7 @@ impl<T> Mat4<T> {
 
 impl Mat4<f32> {
     pub fn new_rotation_x(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad();
+        let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 
@@ -54,7 +54,7 @@ impl Mat4<f32> {
     }
 
     pub fn new_rotation_y(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad();
+        let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 
@@ -69,7 +69,7 @@ impl Mat4<f32> {
     }
 
     pub fn new_rotation_z(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad();
+        let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 

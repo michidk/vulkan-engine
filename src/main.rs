@@ -1,8 +1,12 @@
 use ash::{version::DeviceV1_0, vk};
+use math::prelude::*;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 
-use vulkan_engine::renderer;
+use vulkan_engine::{
+    color::Color,
+    renderer::{self, DefaultModel, InstanceData},
+};
 
 struct FpsTracker {
     median: f32,
@@ -53,6 +57,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_window(&eventloop)
         .unwrap();
     let mut renderer = renderer::Renderer::init(window)?;
+    let mut cube = DefaultModel::cube();
+
+    let mut angle = 7.0.deg();
+
+    let cube_x = cube.insert_visibly(InstanceData {
+        position: dbg!(
+            &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0)) * &Mat4::new_rotation_x(angle))
+                * &Mat4::new_scaling(0.1)
+        ),
+        color: Color::rgb_f32(1.0, 1.0, 0.2),
+    });
+
+    cube.update_vertex_buffer(&renderer.allocator).unwrap();
+    cube.update_instance_buffer(&renderer.allocator).unwrap();
+
+    renderer.models.push(cube);
 
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
@@ -66,6 +86,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::MainEventsCleared => {
                 // doing the work here (later)
+                angle = Angle::from_deg(angle.to_deg() + 0.01);
+                log::debug!("{:?}", renderer.models[0].get_mut(cube_x));
+                renderer.models[0].get_mut(cube_x).unwrap().position =
+                    &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0))
+                        * &Mat4::new_rotation_z(angle))
+                        * &Mat4::new_scaling(0.1);
                 renderer.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
@@ -98,6 +124,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ])
                         .expect("resetting fences");
                 }
+                for m in &mut renderer.models {
+                    m.update_instance_buffer(&renderer.allocator).unwrap();
+                }
+                renderer
+                    .update_commandbuffer(image_index as usize)
+                    .expect("updating the command buffer");
+
                 let semaphores_available =
                     [renderer.swapchain.image_available[renderer.swapchain.current_image]];
                 let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];

@@ -69,7 +69,7 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     title: "VulkanTriangle",
 };
 
-struct Model<V, I> {
+pub struct Model<V, I> {
     vertices: Vec<V>,
     handle_to_index: HashMap<usize, usize>,
     handles: Vec<usize>,
@@ -86,7 +86,7 @@ impl<V, I> Model<V, I> {
         self.instances.get(*self.handle_to_index.get(&handle)?)
     }
 
-    fn get_mut(&mut self, handle: usize) -> Option<&mut I> {
+    pub fn get_mut(&mut self, handle: usize) -> Option<&mut I> {
         self.instances.get_mut(*self.handle_to_index.get(&handle)?)
     }
 
@@ -169,7 +169,7 @@ impl<V, I> Model<V, I> {
         handle
     }
 
-    fn insert_visibly(&mut self, element: I) -> usize {
+    pub fn insert_visibly(&mut self, element: I) -> usize {
         let new_handle = self.insert(element);
         self.make_visible(new_handle)
             .expect("Failed to make newly inserted handle visible");
@@ -191,7 +191,7 @@ impl<V, I> Model<V, I> {
         }
     }
 
-    fn update_vertex_buffer(
+    pub fn update_vertex_buffer(
         &mut self,
         allocator: &vk_mem::Allocator,
     ) -> Result<(), vk_mem::error::Error> {
@@ -212,7 +212,7 @@ impl<V, I> Model<V, I> {
         }
     }
 
-    fn update_instance_buffer(
+    pub fn update_instance_buffer(
         &mut self,
         allocator: &vk_mem::Allocator,
     ) -> Result<(), vk_mem::error::Error> {
@@ -275,15 +275,16 @@ impl<V, I> Model<V, I> {
 }
 
 #[repr(C)]
-struct InstanceData {
-    position: Mat4<f32>,
-    color: Color,
+#[derive(Debug, Clone, Copy)]
+pub struct InstanceData {
+    pub position: Mat4<f32>,
+    pub color: Color,
 }
 
-type DefaultModel = Model<Vec3<f32>, InstanceData>;
+pub type DefaultModel = Model<Vec3<f32>, InstanceData>;
 
 impl DefaultModel {
-    fn cube() -> Self {
+    pub fn cube() -> Self {
         // lbf: left bottom front
         let lbf = Vec3::new(-1.0, 1.0, 0.0);
         let lbb = Vec3::new(-1.0, 1.0, 1.0);
@@ -1027,61 +1028,6 @@ fn create_commandbuffers(
     unsafe { logical_device.allocate_command_buffers(&commandbuf_allocate_info) }
 }
 
-fn fill_commandbuffers(
-    commandbuffers: &[vk::CommandBuffer],
-    logical_device: &ash::Device,
-    renderpass: &vk::RenderPass,
-    swapchain: &SwapchainWrapper,
-    pipeline: &Pipeline,
-    models: &[DefaultModel],
-) -> Result<(), vk::Result> {
-    for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
-        let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
-        unsafe {
-            logical_device.begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
-        }
-        let clearvalues = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.08, 1.0],
-                },
-            },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            },
-        ];
-        let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
-            .render_pass(*renderpass)
-            .framebuffer(swapchain.framebuffers[i])
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: swapchain.extent,
-            })
-            .clear_values(&clearvalues);
-        unsafe {
-            logical_device.cmd_begin_render_pass(
-                commandbuffer,
-                &renderpass_begininfo,
-                vk::SubpassContents::INLINE,
-            );
-            logical_device.cmd_bind_pipeline(
-                commandbuffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.pipeline,
-            );
-            for m in models {
-                m.draw(logical_device, commandbuffer);
-            }
-            logical_device.cmd_end_render_pass(commandbuffer);
-            logical_device.end_command_buffer(commandbuffer)?;
-        }
-    }
-    Ok(())
-}
-
 #[allow(dead_code)]
 struct BufferWrapper {
     buffer: vk::Buffer,
@@ -1187,8 +1133,8 @@ pub struct Renderer {
     pipeline: Pipeline,
     pools: Pools,
     pub commandbuffers: Vec<vk::CommandBuffer>,
-    allocator: vk_mem::Allocator,
-    models: Vec<DefaultModel>,
+    pub allocator: vk_mem::Allocator,
+    pub models: Vec<DefaultModel>,
 }
 
 impl Renderer {
@@ -1234,53 +1180,9 @@ impl Renderer {
         let pools = Pools::init(&logical_device, &queue_families)?;
 
         // models
-        let mut cube = DefaultModel::cube();
-        //cube.insert_visibly(InstanceData {
-        //    position: dbg!(Mat4::new_scaling(0.2)),
-        //    color: Color::RED,
-        //});
-
-        cube.insert_visibly(InstanceData {
-            position: dbg!(
-                &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0))
-                    * &Mat4::new_rotation_x((-7.0).deg()))
-                    * &Mat4::new_scaling(0.1)
-            ),
-            color: Color::rgb_f32(1.0, 1.0, 0.2),
-        });
-
-        cube.insert_visibly(InstanceData {
-            position: dbg!(
-                &(&Mat4::new_translate(Vec3::new(0.0, 0.0, 0.1))
-                    * &Mat4::new_rotation_x(7.0.deg()))
-                    * &Mat4::new_scaling(0.1)
-            ),
-            color: Color::rgb_f32(0.2, 0.4, 1.0),
-        });
-
-        //cube.insert_visibly(InstanceData {
-        //    position: Mat4::scaling(2.0),
-        //    color: Color::GREEN,
-        //});
-        //cube.insert_visibly(InstanceData {
-        //    position: Mat4::translating(Vec3::new(2.0, 0.0, 0.0)),
-        //    color: Color::BLUE,
-        //});
-        cube.update_vertex_buffer(&allocator).unwrap();
-        cube.update_instance_buffer(&allocator).unwrap();
-        let models = vec![cube];
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
-
-        fill_commandbuffers(
-            &commandbuffers,
-            &logical_device,
-            &renderpass,
-            &swapchain,
-            &pipeline,
-            &models,
-        )?;
 
         Ok(Renderer {
             window,
@@ -1299,8 +1201,57 @@ impl Renderer {
             pools,
             commandbuffers,
             allocator,
-            models,
+            models: Vec::new(),
         })
+    }
+
+    pub fn update_commandbuffer(&mut self, index: usize) -> Result<(), vk::Result> {
+        let commandbuffer = self.commandbuffers[index];
+        let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
+        unsafe {
+            self.device
+                .begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
+        }
+
+        let clearvalues = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.08, 1.0],
+                },
+            },
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
+        let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.renderpass)
+            .framebuffer(self.swapchain.framebuffers[index])
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain.extent,
+            })
+            .clear_values(&clearvalues);
+        unsafe {
+            self.device.cmd_begin_render_pass(
+                commandbuffer,
+                &renderpass_begininfo,
+                vk::SubpassContents::INLINE,
+            );
+            self.device.cmd_bind_pipeline(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline,
+            );
+            for m in &self.models {
+                m.draw(&self.device, commandbuffer);
+            }
+            self.device.cmd_end_render_pass(commandbuffer);
+            self.device.end_command_buffer(commandbuffer)?;
+        }
+        Ok(())
     }
 }
 

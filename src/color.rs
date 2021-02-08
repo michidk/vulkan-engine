@@ -1,6 +1,7 @@
 use math::prelude::*;
 
-#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color {
     color: Vec4<f32>,
 }

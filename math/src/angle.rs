@@ -21,9 +21,7 @@ pub struct Angle<T> {
 
 impl<T: fmt::Debug> fmt::Debug for Angle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Angle")
-            .field(&self.radians)
-            .finish()
+        f.debug_tuple("Angle").field(&self.radians).finish()
     }
 }
 
@@ -94,7 +92,6 @@ impl Angle<f32> {
         self.to_deg() % 360.0
     }
 }
-
 
 #[cfg(test)]
 mod tests {

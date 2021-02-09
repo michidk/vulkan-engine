@@ -134,14 +134,11 @@ impl Camera {
             0.0,
             1.0,
         );
-        log::debug!("C: {:#?}", m);
         self.view_matrix = m;
     }
 
     pub fn move_forward(&mut self, distance: f32) {
-        log::debug!("B: {:#?}", self.position);
         self.position += self.view_direction.as_ref() * distance;
-        log::debug!("A: {:#?}", self.position);
         self.update_view_matrix();
     }
 
@@ -216,7 +213,7 @@ impl CameraBuilder {
         const MAX: f32 = std::f32::consts::PI - 0.01;
 
         self.fovy = fovy.max(MIN).min(MAX);
-        if self.fovy != fovy {
+        if (self.fovy - fovy).abs() > 1e-6 {
             log::warn!("Fovy out of bounds: {} <= `{}` <= {}", MIN, fovy, MAX);
         }
         self
@@ -487,13 +484,13 @@ pub type DefaultModel = Model<Vec3<f32>, InstanceData>;
 impl DefaultModel {
     pub fn cube() -> Self {
         // lbf: left bottom front
-        let lbf = Vec3::new(-1.0, 1.0, 0.0);
+        let lbf = Vec3::new(-1.0, 1.0, -1.0);
         let lbb = Vec3::new(-1.0, 1.0, 1.0);
-        let ltf = Vec3::new(-1.0, -1.0, 0.0);
+        let ltf = Vec3::new(-1.0, -1.0, -1.0);
         let ltb = Vec3::new(-1.0, -1.0, 1.0);
-        let rbf = Vec3::new(1.0, 1.0, 0.0);
+        let rbf = Vec3::new(1.0, 1.0, -1.0);
         let rbb = Vec3::new(1.0, 1.0, 1.0);
-        let rtf = Vec3::new(1.0, -1.0, 0.0);
+        let rtf = Vec3::new(1.0, -1.0, -1.0);
         let rtb = Vec3::new(1.0, -1.0, 1.0);
 
         Model {
@@ -1126,7 +1123,7 @@ impl Pipeline {
         let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
             .line_width(1.0)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::FRONT)
+            .cull_mode(vk::CullModeFlags::BACK)
             .polygon_mode(vk::PolygonMode::FILL);
         let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);

@@ -236,6 +236,8 @@ impl<T> Vec4<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_util::MatrixCmp;
+
     use super::*;
 
     #[test]
@@ -284,5 +286,18 @@ mod tests {
         let b = Vec3::new(-6.0, 7.0, 0.2);
 
         assert_eq!(a.cross_product(&b), Vec3::new(21.4, 17.8, 19.0));
+    }
+
+    #[test]
+    fn vec3_unit() {
+        let vec3 = Vec3::new(12.1, 234.1, -1234.5);
+        let is = Unit::new_normalize(vec3);
+        let should = Vec3::new(
+            0.009633733931462902,
+            0.1839963563273617,
+            -0.9828797139166076,
+        );
+
+        MatrixCmp::<f32>::DEFAULT.eq(&is, &should);
     }
 }

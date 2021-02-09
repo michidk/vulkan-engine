@@ -6,6 +6,12 @@ pub trait One {
     fn one() -> Self;
 }
 
+pub trait Abs {
+    type Output;
+
+    fn abs(&self) -> Self::Output;
+}
+
 pub trait Sin {
     type Output;
 
@@ -44,6 +50,34 @@ macro_rules! impl_nums_one {
     };
 }
 
+macro_rules! impl_inums_abs {
+    ( $( $num:ty )+ ) => {
+        $(
+            impl Abs for $num {
+                type Output = Self;
+
+                fn abs(&self) -> Self::Output {
+                    (*self).abs()
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! impl_unums_abs {
+    ( $( $num:ty )+ ) => {
+        $(
+            impl Abs for $num {
+                type Output = Self;
+
+                fn abs(&self) -> Self::Output {
+                    *self
+                }
+            }
+        )+
+    };
+}
+
 macro_rules! impl_sin_cos_float {
     ( $( $float:ty )+ ) => {
         $(
@@ -73,6 +107,9 @@ impl_nums_zero! { f32 f64 }
 impl_nums_one! { u8 u16 u32 u64 u128 usize }
 impl_nums_one! { i8 i16 i32 i64 i128 isize }
 impl_nums_one! { f32 f64 }
+
+impl_inums_abs! { i8 i16 i32 i64 i128 isize f32 f64 }
+impl_unums_abs! { u8 u16 u32 u64 u128 usize }
 
 impl_sin_cos_float! { f32 f64 }
 

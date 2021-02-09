@@ -77,12 +77,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         color: Color::rgb_f32(0.6, 0.2, 0.2),
     });
 
+    cube.insert_visibly(InstanceData {
+        position: dbg!(
+            &(&Mat4::new_translate(Vec3::new(0.80, 1.0, -0.4)) * &Mat4::new_rotation_z(25.0.deg()))
+                * &Mat4::new_scaling(0.12)
+        ),
+        color: Color::rgb_f32(0.6, 0.2, 0.2),
+    });
+
+    cube.insert_visibly(InstanceData {
+        position: dbg!(
+            &(&Mat4::new_translate(Vec3::new(0.20, 0.20, 0.1)) * &Mat4::new_rotation_z(10.0.deg()))
+                * &Mat4::new_scaling(0.1)
+        ),
+        color: Color::rgb_f32(0.6, 0.2, 0.2),
+    });
+
     cube.update_vertex_buffer(&renderer.allocator).unwrap();
     cube.update_instance_buffer(&renderer.allocator).unwrap();
 
     renderer.models.push(cube);
 
-    let mut camera = Camera::builder().fovy(90.0.deg()).build();
+    let mut camera = Camera::builder()
+        .near(0.3)
+        .far(1000.0)
+        .fovy(30.0.deg())
+        .aspect(1920.0 / 1080.0)
+        .position(Vec3::new(0.0, 3.0, 0.0))
+        .view_direction(Vec3::new(0.0, -1.0, 0.0))
+        .build();
 
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
@@ -93,44 +116,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } => *controlflow = winit::event_loop::ControlFlow::Exit,
             Event::WindowEvent {
-                event: WindowEvent::KeyboardInput { input, .. },
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                state: winit::event::ElementState::Pressed,
+                                virtual_keycode: Some(keycode),
+                                ..
+                            },
+                        ..
+                    },
                 ..
-            } => {
-                if let winit::event::KeyboardInput {
-                    state: winit::event::ElementState::Pressed,
-                    virtual_keycode: Some(keycode),
-                    ..
-                } = input
-                {
-                    match keycode {
-                        winit::event::VirtualKeyCode::Up => {
-                            camera.move_forward(0.05);
-                            println!("forward");
-                        }
-                        winit::event::VirtualKeyCode::Down => {
-                            camera.move_backward(0.05);
-                            println!("backward");
-                        }
-                        winit::event::VirtualKeyCode::Left => {
-                            camera.turn_left(0.1.rad());
-                            println!("left");
-                        }
-                        winit::event::VirtualKeyCode::Right => {
-                            camera.turn_right(0.1.rad());
-                            println!("right");
-                        }
-                        winit::event::VirtualKeyCode::PageUp => {
-                            camera.turn_up(0.02.rad());
-                            println!("up");
-                        }
-                        winit::event::VirtualKeyCode::PageDown => {
-                            camera.turn_down(0.02.rad());
-                            println!("down");
-                        }
-                        _ => {}
-                    };
+            } => match keycode {
+                winit::event::VirtualKeyCode::Up | winit::event::VirtualKeyCode::W => {
+                    camera.move_forward(0.05);
                 }
-            }
+                winit::event::VirtualKeyCode::Down | winit::event::VirtualKeyCode::S => {
+                    camera.move_backward(0.05);
+                }
+                winit::event::VirtualKeyCode::Left | winit::event::VirtualKeyCode::A => {
+                    camera.turn_left(0.1.rad());
+                }
+                winit::event::VirtualKeyCode::Right | winit::event::VirtualKeyCode::D => {
+                    camera.turn_right(0.1.rad());
+                }
+                winit::event::VirtualKeyCode::PageUp => {
+                    camera.turn_up(0.02.rad());
+                }
+                winit::event::VirtualKeyCode::PageDown => {
+                    camera.turn_down(0.02.rad());
+                }
+                _ => {}
+            },
             Event::MainEventsCleared => {
                 // doing the work here (later)
                 angle = Angle::from_deg(angle.to_deg() + 0.01);

@@ -198,7 +198,7 @@ where
 impl<'a, 'b, SS, RS, ST, RT, const R: usize, const C: usize> Sub<&'a Matrix<RS, RT, R, C>>
     for &'b Matrix<SS, ST, R, C>
 where
-    ST: Clone + Add<RT, Output = ST>,
+    ST: Clone + Sub<RT, Output = ST>,
     SS: Storage<ST, R, C>,
     RT: Clone,
     RS: Storage<RT, R, C>,
@@ -214,7 +214,7 @@ where
                 unsafe {
                     *matrix.storage.get_unchecked_mut(row_idx, col_idx) =
                         self.storage.get_unchecked(row_idx, col_idx).clone()
-                            + rhs.storage.get_unchecked(row_idx, col_idx).clone();
+                            - rhs.storage.get_unchecked(row_idx, col_idx).clone();
                 };
             }
         }

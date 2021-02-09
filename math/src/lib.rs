@@ -11,6 +11,7 @@ mod matrix;
 mod norm;
 mod scalar;
 mod storage;
+mod test_util;
 mod unit;
 mod vector;
 

@@ -16,6 +16,7 @@ pub type Mat3<T, S = Owned<T, 3, 3>> = MatN<T, S, 3>;
 
 impl<T> Mat3<T> {
     #[rustfmt::skip]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         c0r0: T, c1r0: T, c2r0: T,
         c0r1: T, c1r1: T, c2r1: T,
@@ -61,11 +62,11 @@ impl<T> Mat3<T> {
             let one_m_cos = T::zero() - cos.clone();
 
             Self::new(
-                sqx.clone() + (T::one() - sqx.clone()) * cos.clone(),
+                sqx.clone() + (T::one() - sqx) * cos.clone(),
                 ux.clone() * uy.clone() * one_m_cos.clone() - uz.clone() * sin.clone(),
                 ux.clone() * uz.clone() * one_m_cos.clone() + uy.clone() * sin.clone(),
                 ux.clone() * uy.clone() * one_m_cos.clone() + uz.clone() * sin.clone(),
-                sqy.clone() + (T::one() - sqy.clone()) * cos.clone(),
+                sqy.clone() + (T::one() - sqy) * cos.clone(),
                 uy.clone() * uz.clone() * one_m_cos.clone() - ux.clone() * sin.clone(),
                 ux.clone() * uz.clone() * one_m_cos.clone() - uy.clone() * sin.clone(),
                 uy.clone() * uz.clone() * one_m_cos + ux.clone() * sin,

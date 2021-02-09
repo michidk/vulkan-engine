@@ -14,6 +14,7 @@ pub type Mat4<T, S = Owned<T, 4, 4>> = MatN<T, S, 4>;
 
 impl<T> Mat4<T> {
     #[rustfmt::skip]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         c0r0: T, c1r0: T, c2r0: T, c3r0: T,
         c0r1: T, c1r1: T, c2r1: T, c3r1: T,

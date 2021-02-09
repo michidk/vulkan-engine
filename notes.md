@@ -2,18 +2,19 @@
 
 ## TODO's
 
-- @Jonas add to list of authors in `Cargo.toml`
 - implement window resizing
 - change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
 
 - create graphics and separate present queue, since they might not overlap: https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
-- @Michi clean up shader compiler stuff (prerequiites, ci)
+- next chapter: 27
 
-## FPS
+## FPS (release build)
 
 | Chapter | FPS   |
 | ------- | ----- |
 | 22      | ~5800 |
+| 24      | ~5200 |
+| 26      | ~6700 |
 
 ## Resources
 
@@ -32,3 +33,7 @@ https://docs.rs/ash/0.31.0/ash/
 ### Misc
 
 Obj test files: https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
+
+https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
+http://www.realtimerendering.com/udacity/?load=demo/unit7-view-pipeline.js
+http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/

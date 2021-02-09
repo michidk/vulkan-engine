@@ -1,4 +1,4 @@
-use crate::math::Vec3;
+use math::prelude::*;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mesh {
@@ -13,12 +13,12 @@ pub struct Submesh {
     pub faces: Vec<Face>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Vertex {
-    pub position: Vec3,
-    pub color: Option<Vec3>,
-    pub normal: Option<Vec3>,
-    pub uv: Option<Vec3>,
+    pub position: Vec3<f32>,
+    pub color: Option<Vec3<f32>>,
+    pub normal: Option<Vec3<f32>>,
+    pub uv: Option<Vec2<f32>>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

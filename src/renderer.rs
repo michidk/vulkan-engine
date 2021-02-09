@@ -22,15 +22,17 @@ use crate::{
         get_debug_create_info, get_layer_names, has_validation_layers_support,
         startup_debug_severity, startup_debug_type, DebugMessenger, ENABLE_VALIDATION_LAYERS,
     },
-    math::{Mat4, Vec3},
 };
+use math::prelude::*;
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug)]
 pub enum RendererError {
     #[error("Unknown error")]
     Unknown,
     #[error("Vulkan error: {0}")]
     VkError(#[from] vk::Result),
+    #[error("VulkanMemory error: {0}")]
+    VkMemError(#[from] vk_mem::error::Error),
     #[error("No suitable gpu found")]
     NoSuitableGpu,
     #[error("No suitable queue family found")]
@@ -67,7 +69,208 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     title: "VulkanTriangle",
 };
 
-struct Model<V, I> {
+#[derive(Debug)]
+pub struct Camera {
+    view_matrix: Mat4<f32>,
+    position: Vec3<f32>,
+    view_direction: Unit<Vec3<f32>>,
+    down_direction: Unit<Vec3<f32>>,
+    fovy: f32,
+    aspect: f32,
+    near: f32,
+    far: f32,
+    projection_matrix: Mat4<f32>,
+}
+
+impl Camera {
+    pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut BufferWrapper) {
+        let data: [[[f32; 4]; 4]; 2] = [self.view_matrix.into(), self.projection_matrix.into()];
+        buffer.fill(allocator, &data).unwrap();
+    }
+
+    fn update_projection_matrix(&mut self) {
+        let d = 1.0 / (0.5 * self.fovy).tan();
+        self.projection_matrix = Mat4::new(
+            d / self.aspect,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            d,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            self.far / (self.far - self.near),
+            -self.near * self.far / (self.far - self.near),
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+        );
+    }
+
+    fn update_view_matrix(&mut self) {
+        // TODO: Unit
+        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
+        let m: Mat4<f32> = Mat4::new(
+            *right.x(),
+            *right.y(),
+            *right.z(),
+            -right.dot_product(&self.position),
+            //
+            *self.down_direction.x(),
+            *self.down_direction.y(),
+            *self.down_direction.z(),
+            -self.down_direction.dot_product(&self.position),
+            //
+            *self.view_direction.x(),
+            *self.view_direction.y(),
+            *self.view_direction.z(),
+            -self.view_direction.dot_product(&self.position),
+            //
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+        );
+        log::debug!("C: {:#?}", m);
+        self.view_matrix = m;
+    }
+
+    pub fn move_forward(&mut self, distance: f32) {
+        log::debug!("B: {:#?}", self.position);
+        self.position += self.view_direction.as_ref() * distance;
+        log::debug!("A: {:#?}", self.position);
+        self.update_view_matrix();
+    }
+
+    pub fn move_backward(&mut self, distance: f32) {
+        self.move_forward(-distance);
+    }
+
+    pub fn turn_right(&mut self, angle: Angle<f32>) {
+        let rotation = Mat3::from_axis_angle(&self.down_direction, angle);
+        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
+        self.update_view_matrix();
+    }
+
+    pub fn turn_left(&mut self, angle: Angle<f32>) {
+        self.turn_right(-angle);
+    }
+
+    pub fn turn_up(&mut self, angle: Angle<f32>) {
+        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
+        let rotation = Mat3::from_axis_angle(&right, angle);
+        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
+        self.down_direction = Unit::new_normalize(&rotation * self.down_direction.as_ref());
+        self.update_view_matrix();
+    }
+
+    pub fn turn_down(&mut self, angle: Angle<f32>) {
+        self.turn_up(-angle);
+    }
+
+    pub fn builder() -> CameraBuilder {
+        CameraBuilder {
+            position: Vec3::new(0.0, -3.0, -3.0),
+            view_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, 1.0)),
+            down_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, -1.0)),
+            fovy: std::f32::consts::FRAC_PI_3,
+            aspect: 800.0 / 600.0,
+            near: 0.1,
+            far: 100.0,
+        }
+    }
+}
+
+pub struct CameraBuilder {
+    position: Vec3<f32>,
+    view_direction: Unit<Vec3<f32>>,
+    down_direction: Unit<Vec3<f32>>,
+    fovy: f32,
+    aspect: f32,
+    near: f32,
+    far: f32,
+}
+
+impl CameraBuilder {
+    pub fn position(&mut self, pos: Vec3<f32>) -> &mut Self {
+        self.position = pos;
+        self
+    }
+
+    pub fn view_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
+        self.view_direction = Unit::new_normalize(direction);
+        self
+    }
+
+    pub fn down_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
+        self.down_direction = Unit::new_normalize(direction);
+        self
+    }
+
+    pub fn fovy(&mut self, fovy: Angle<f32>) -> &mut Self {
+        let fovy = fovy.to_rad();
+        const MIN: f32 = 0.01;
+        const MAX: f32 = std::f32::consts::PI - 0.01;
+
+        self.fovy = fovy.max(MIN).min(MAX);
+        if self.fovy != fovy {
+            log::warn!("Fovy out of bounds: {} <= `{}` <= {}", MIN, fovy, MAX);
+        }
+        self
+    }
+
+    pub fn aspect(&mut self, aspect: f32) -> &mut Self {
+        self.aspect = aspect;
+        self
+    }
+
+    pub fn near(&mut self, near: f32) -> &mut Self {
+        if near <= 0.0 {
+            log::warn!("Near is negative: `{}`", near);
+        }
+        self.near = near;
+        self
+    }
+
+    pub fn far(&mut self, far: f32) -> &mut Self {
+        if far <= 0.0 {
+            log::warn!("Far is negative: `{}`", far);
+        }
+        self.far = far;
+        self
+    }
+
+    pub fn build(&mut self) -> Camera {
+        if self.far < self.near {
+            log::warn!("Far is closer than near: `{}` `{}`", self.far, self.near);
+        }
+        let down = self.down_direction.as_ref();
+        let view = self.view_direction.as_ref();
+
+        let dv = view * down.dot_product(view);
+        let ds = down - &dv;
+
+        let mut cam = Camera {
+            position: self.position,
+            view_direction: self.view_direction,
+            down_direction: Unit::new_normalize(ds),
+            fovy: self.fovy,
+            aspect: self.aspect,
+            near: self.near,
+            far: self.far,
+            view_matrix: Mat4::identity(),
+            projection_matrix: Mat4::identity(),
+        };
+        cam.update_projection_matrix();
+        cam.update_view_matrix();
+        cam
+    }
+}
+
+pub struct Model<V, I> {
     vertices: Vec<V>,
     handle_to_index: HashMap<usize, usize>,
     handles: Vec<usize>,
@@ -84,7 +287,7 @@ impl<V, I> Model<V, I> {
         self.instances.get(*self.handle_to_index.get(&handle)?)
     }
 
-    fn get_mut(&mut self, handle: usize) -> Option<&mut I> {
+    pub fn get_mut(&mut self, handle: usize) -> Option<&mut I> {
         self.instances.get_mut(*self.handle_to_index.get(&handle)?)
     }
 
@@ -167,7 +370,7 @@ impl<V, I> Model<V, I> {
         handle
     }
 
-    fn insert_visibly(&mut self, element: I) -> usize {
+    pub fn insert_visibly(&mut self, element: I) -> usize {
         let new_handle = self.insert(element);
         self.make_visible(new_handle)
             .expect("Failed to make newly inserted handle visible");
@@ -189,7 +392,7 @@ impl<V, I> Model<V, I> {
         }
     }
 
-    fn update_vertex_buffer(
+    pub fn update_vertex_buffer(
         &mut self,
         allocator: &vk_mem::Allocator,
     ) -> Result<(), vk_mem::error::Error> {
@@ -210,7 +413,7 @@ impl<V, I> Model<V, I> {
         }
     }
 
-    fn update_instance_buffer(
+    pub fn update_instance_buffer(
         &mut self,
         allocator: &vk_mem::Allocator,
     ) -> Result<(), vk_mem::error::Error> {
@@ -273,15 +476,16 @@ impl<V, I> Model<V, I> {
 }
 
 #[repr(C)]
-struct InstanceData {
-    position: Mat4,
-    color: Color,
+#[derive(Debug, Clone, Copy)]
+pub struct InstanceData {
+    pub position: Mat4<f32>,
+    pub color: Color,
 }
 
-type DefaultModel = Model<Vec3, InstanceData>;
+pub type DefaultModel = Model<Vec3<f32>, InstanceData>;
 
 impl DefaultModel {
-    fn cube() -> Self {
+    pub fn cube() -> Self {
         // lbf: left bottom front
         let lbf = Vec3::new(-1.0, 1.0, 0.0);
         let lbb = Vec3::new(-1.0, 1.0, 1.0);
@@ -579,6 +783,10 @@ pub struct SwapchainWrapper {
     pub swapchain: vk::SwapchainKHR,
     pub images: Vec<vk::Image>,
     pub imageviews: Vec<vk::ImageView>,
+    pub depth_image: vk::Image,
+    pub depth_image_allocation: vk_mem::Allocation,
+    pub depth_image_allocation_info: vk_mem::AllocationInfo,
+    pub depth_imageview: vk::ImageView,
     pub framebuffers: Vec<vk::Framebuffer>,
     pub surface_format: vk::SurfaceFormatKHR,
     pub extent: vk::Extent2D,
@@ -596,7 +804,8 @@ impl SwapchainWrapper {
         logical_device: &ash::Device,
         surfaces: &SurfaceWrapper,
         queue_families: &QueueFamilies,
-    ) -> Result<SwapchainWrapper, vk::Result> {
+        allocator: &vk_mem::Allocator,
+    ) -> Result<SwapchainWrapper, RendererError> {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
         let surface_format = *surfaces.get_formats(physical_device)?.first().unwrap();
@@ -638,6 +847,43 @@ impl SwapchainWrapper {
                 unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
             swapchain_imageviews.push(imageview);
         }
+        let extend_3d = vk::Extent3D {
+            width: extent.width,
+            height: extent.height,
+            depth: 1,
+        };
+        let depth_image_info = vk::ImageCreateInfo::builder()
+            .image_type(vk::ImageType::TYPE_2D)
+            // TODO: maybe optimize wit D24 bit instead
+            .format(vk::Format::D32_SFLOAT)
+            .extent(extend_3d)
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .queue_family_indices(&queuefamilies);
+        let allocation_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::GpuOnly,
+            ..Default::default()
+        };
+        let (depth_image, depth_image_allocation, depth_image_allocation_info) =
+            allocator.create_image(&depth_image_info, &allocation_info)?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::DEPTH)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(depth_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            // TODO: maybe optimize wit D24 bit instead
+            .format(vk::Format::D32_SFLOAT)
+            .subresource_range(*subresource_range);
+        let depth_imageview =
+            unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
         let mut image_available = vec![];
         let mut rendering_finished = vec![];
         let mut may_begin_drawing = vec![];
@@ -653,11 +899,16 @@ impl SwapchainWrapper {
             let fence = unsafe { logical_device.create_fence(&fenceinfo, None) }?;
             may_begin_drawing.push(fence);
         }
+
         Ok(SwapchainWrapper {
             swapchain_loader,
             swapchain,
             images: swapchain_images,
             imageviews: swapchain_imageviews,
+            depth_image,
+            depth_image_allocation,
+            depth_image_allocation_info,
+            depth_imageview,
             framebuffers: vec![],
             surface_format,
             extent,
@@ -675,7 +926,7 @@ impl SwapchainWrapper {
         renderpass: vk::RenderPass,
     ) -> Result<(), vk::Result> {
         for iv in &self.imageviews {
-            let iview = [*iv];
+            let iview = [*iv, self.depth_imageview];
             let framebuffer_info = vk::FramebufferCreateInfo::builder()
                 .render_pass(renderpass)
                 .attachments(&iview)
@@ -688,7 +939,10 @@ impl SwapchainWrapper {
         Ok(())
     }
 
-    unsafe fn cleanup(&mut self, logical_device: &ash::Device) {
+    unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
+        logical_device.destroy_image_view(self.depth_imageview, None);
+        allocator.destroy_image(self.depth_image, &self.depth_image_allocation);
+
         for fence in &self.may_begin_drawing {
             logical_device.destroy_fence(*fence, None);
         }
@@ -711,31 +965,41 @@ impl SwapchainWrapper {
 
 fn init_renderpass(
     logical_device: &ash::Device,
-    physical_device: vk::PhysicalDevice,
-    surfaces: &SurfaceWrapper,
+    format: vk::Format,
 ) -> Result<vk::RenderPass, vk::Result> {
-    let attachments = [vk::AttachmentDescription::builder()
-        .format(
-            surfaces
-                .get_formats(physical_device)?
-                .first()
-                .unwrap()
-                .format,
-        )
-        .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::STORE)
-        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-        .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-        .samples(vk::SampleCountFlags::TYPE_1)
-        .build()];
+    let attachments = [
+        vk::AttachmentDescription::builder()
+            .format(format)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .build(),
+        vk::AttachmentDescription::builder()
+            .format(vk::Format::D32_SFLOAT)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .build(),
+    ];
     let color_attachment_references = [vk::AttachmentReference {
         attachment: 0,
         layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
     }];
+    let depth_attachment_references = vk::AttachmentReference {
+        attachment: 1,
+        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
     let subpasses = [vk::SubpassDescription::builder()
         .color_attachments(&color_attachment_references)
+        .depth_stencil_attachment(&depth_attachment_references)
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .build()];
     let subpass_dependencies = [vk::SubpassDependency::builder()
@@ -758,16 +1022,10 @@ fn init_renderpass(
 struct Pipeline {
     pipeline: vk::Pipeline,
     layout: vk::PipelineLayout,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
 impl Pipeline {
-    fn cleanup(&self, logical_device: &ash::Device) {
-        unsafe {
-            logical_device.destroy_pipeline(self.pipeline, None);
-            logical_device.destroy_pipeline_layout(self.layout, None);
-        }
-    }
-
     fn init(
         logical_device: &ash::Device,
         swapchain: &SwapchainWrapper,
@@ -868,7 +1126,7 @@ impl Pipeline {
         let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
             .line_width(1.0)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::NONE)
+            .cull_mode(vk::CullModeFlags::FRONT)
             .polygon_mode(vk::PolygonMode::FILL);
         let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
@@ -889,9 +1147,27 @@ impl Pipeline {
             .build()];
         let colourblend_info =
             vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
-        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder();
+
+        let descriptorset_layout_binding_descs = [vk::DescriptorSetLayoutBinding::builder()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .build()];
+        let descriptorset_layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&descriptorset_layout_binding_descs);
+        let descriptorset_layout = unsafe {
+            logical_device.create_descriptor_set_layout(&descriptorset_layout_info, None)
+        }?;
+        let desclayouts = vec![descriptorset_layout];
+
+        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(&desclayouts);
         let pipelinelayout =
             unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None) }?;
+        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(true)
+            .depth_write_enable(true)
+            .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL);
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(&shader_stages)
             .vertex_input_state(&vertex_input_info)
@@ -899,6 +1175,7 @@ impl Pipeline {
             .viewport_state(&viewport_info)
             .rasterization_state(&rasterizer_info)
             .multisample_state(&multisampler_info)
+            .depth_stencil_state(&depth_stencil_info)
             .color_blend_state(&colourblend_info)
             .layout(pipelinelayout)
             .render_pass(*renderpass)
@@ -919,7 +1196,18 @@ impl Pipeline {
         Ok(Pipeline {
             pipeline: graphicspipeline,
             layout: pipelinelayout,
+            descriptor_set_layouts: desclayouts,
         })
+    }
+
+    fn cleanup(&self, logical_device: &ash::Device) {
+        unsafe {
+            for dsl in &self.descriptor_set_layouts {
+                logical_device.destroy_descriptor_set_layout(*dsl, None);
+            }
+            logical_device.destroy_pipeline(self.pipeline, None);
+            logical_device.destroy_pipeline_layout(self.layout, None);
+        }
     }
 }
 
@@ -960,55 +1248,8 @@ fn create_commandbuffers(
     unsafe { logical_device.allocate_command_buffers(&commandbuf_allocate_info) }
 }
 
-fn fill_commandbuffers(
-    commandbuffers: &[vk::CommandBuffer],
-    logical_device: &ash::Device,
-    renderpass: &vk::RenderPass,
-    swapchain: &SwapchainWrapper,
-    pipeline: &Pipeline,
-    models: &[DefaultModel],
-) -> Result<(), vk::Result> {
-    for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
-        let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
-        unsafe {
-            logical_device.begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
-        }
-        let clearvalues = [vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.08, 1.0],
-            },
-        }];
-        let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
-            .render_pass(*renderpass)
-            .framebuffer(swapchain.framebuffers[i])
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: swapchain.extent,
-            })
-            .clear_values(&clearvalues);
-        unsafe {
-            logical_device.cmd_begin_render_pass(
-                commandbuffer,
-                &renderpass_begininfo,
-                vk::SubpassContents::INLINE,
-            );
-            logical_device.cmd_bind_pipeline(
-                commandbuffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.pipeline,
-            );
-            for m in models {
-                m.draw(logical_device, commandbuffer);
-            }
-            logical_device.cmd_end_render_pass(commandbuffer);
-            logical_device.end_command_buffer(commandbuffer)?;
-        }
-    }
-    Ok(())
-}
-
 #[allow(dead_code)]
-struct BufferWrapper {
+pub struct BufferWrapper {
     buffer: vk::Buffer,
     allocation: vk_mem::Allocation,
     allocation_info: vk_mem::AllocationInfo,
@@ -1112,8 +1353,11 @@ pub struct Renderer {
     pipeline: Pipeline,
     pools: Pools,
     pub commandbuffers: Vec<vk::CommandBuffer>,
-    allocator: vk_mem::Allocator,
-    models: Vec<DefaultModel>,
+    pub allocator: vk_mem::Allocator,
+    pub models: Vec<DefaultModel>,
+    pub uniform_buffer: BufferWrapper,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_sets: Vec<vk::DescriptorSet>,
 }
 
 impl Renderer {
@@ -1132,18 +1376,6 @@ impl Renderer {
         let (logical_device, queues) =
             init_device_and_queues(&instance, physical_device, &queue_families)?;
 
-        let mut swapchain = SwapchainWrapper::init(
-            &instance,
-            physical_device,
-            &logical_device,
-            &surfaces,
-            &queue_families,
-        )?;
-        let renderpass = init_renderpass(&logical_device, physical_device, &surfaces)?;
-        swapchain.create_framebuffers(&logical_device, renderpass)?;
-        let pipeline = Pipeline::init(&logical_device, &swapchain, &renderpass)?;
-        let pools = Pools::init(&logical_device, &queue_families)?;
-
         let allocator_create_info = vk_mem::AllocatorCreateInfo {
             physical_device,
             device: logical_device.clone(),
@@ -1152,36 +1384,67 @@ impl Renderer {
         };
         let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
 
-        // models
-        let mut cube = DefaultModel::cube();
-        cube.insert_visibly(InstanceData {
-            position: dbg!(Mat4::translate(Vec3::new(0.5, 0.5, 0.0)) * Mat4::scaling(0.2)),
-            color: Color::RED,
-        });
-
-        //cube.insert_visibly(InstanceData {
-        //    position: Mat4::scaling(2.0),
-        //    color: Color::GREEN,
-        //});
-        //cube.insert_visibly(InstanceData {
-        //    position: Mat4::translating(Vec3::new(2.0, 0.0, 0.0)),
-        //    color: Color::BLUE,
-        //});
-        cube.update_vertex_buffer(&allocator).unwrap();
-        cube.update_instance_buffer(&allocator).unwrap();
-        let models = vec![cube];
+        let mut swapchain = SwapchainWrapper::init(
+            &instance,
+            physical_device,
+            &logical_device,
+            &surfaces,
+            &queue_families,
+            &allocator,
+        )?;
+        let format = surfaces
+            .get_formats(physical_device)?
+            .first()
+            .unwrap()
+            .format;
+        let renderpass = init_renderpass(&logical_device, format)?;
+        swapchain.create_framebuffers(&logical_device, renderpass)?;
+        let pipeline = Pipeline::init(&logical_device, &swapchain, &renderpass)?;
+        let pools = Pools::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
 
-        fill_commandbuffers(
-            &commandbuffers,
-            &logical_device,
-            &renderpass,
-            &swapchain,
-            &pipeline,
-            &models,
+        let mut uniform_buffer = BufferWrapper::new(
+            &allocator,
+            128,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
         )?;
+        let camera_transform: [[[f32; 4]; 4]; 2] =
+            [Mat4::identity().into(), Mat4::identity().into()];
+        uniform_buffer.fill(&allocator, &camera_transform)?;
+
+        let pool_size = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_count: swapchain.amount_of_images,
+        }];
+        let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
+            .max_sets(swapchain.amount_of_images)
+            .pool_sizes(&pool_size);
+        let descriptor_pool =
+            unsafe { logical_device.create_descriptor_pool(&descriptor_pool_info, None) }?;
+        let desc_layouts =
+            vec![pipeline.descriptor_set_layouts[0]; swapchain.amount_of_images as usize];
+        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo::builder()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&desc_layouts);
+        let descriptor_sets =
+            unsafe { logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info) }?;
+        for descset in &descriptor_sets {
+            let buffer_infos = [vk::DescriptorBufferInfo {
+                buffer: uniform_buffer.buffer,
+                offset: 0,
+                range: 128,
+            }];
+            let desc_set_write = [vk::WriteDescriptorSet::builder()
+                .dst_set(*descset)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .buffer_info(&buffer_infos)
+                .build()];
+            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
+        }
 
         Ok(Renderer {
             window,
@@ -1200,8 +1463,68 @@ impl Renderer {
             pools,
             commandbuffers,
             allocator,
-            models,
+            models: Vec::new(),
+            uniform_buffer,
+            descriptor_pool,
+            descriptor_sets,
         })
+    }
+
+    pub fn update_commandbuffer(&mut self, index: usize) -> Result<(), vk::Result> {
+        let commandbuffer = self.commandbuffers[index];
+        let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
+        unsafe {
+            self.device
+                .begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
+        }
+
+        let clearvalues = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.08, 1.0],
+                },
+            },
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
+        let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.renderpass)
+            .framebuffer(self.swapchain.framebuffers[index])
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain.extent,
+            })
+            .clear_values(&clearvalues);
+        unsafe {
+            self.device.cmd_begin_render_pass(
+                commandbuffer,
+                &renderpass_begininfo,
+                vk::SubpassContents::INLINE,
+            );
+            self.device.cmd_bind_pipeline(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline,
+            );
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.layout,
+                0,
+                &[self.descriptor_sets[index]],
+                &[],
+            );
+            for m in &self.models {
+                m.draw(&self.device, commandbuffer);
+            }
+            self.device.cmd_end_render_pass(commandbuffer);
+            self.device.end_command_buffer(commandbuffer)?;
+        }
+        Ok(())
     }
 }
 
@@ -1212,18 +1535,22 @@ impl Drop for Renderer {
                 .device_wait_idle()
                 .expect("something wrong while waiting");
 
+            self.device
+                .destroy_descriptor_pool(self.descriptor_pool, None);
+            self.uniform_buffer.cleanup(&self.allocator);
+
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
             for m in &mut self.models {
                 m.cleanup(&self.allocator);
             }
 
-            self.allocator.destroy();
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
             // --segfault
-            self.swapchain.cleanup(&self.device);
+            self.swapchain.cleanup(&self.device, &self.allocator);
+            self.allocator.destroy();
             self.device.destroy_device(None);
             // --segfault
             std::mem::ManuallyDrop::drop(&mut self.surfaces);

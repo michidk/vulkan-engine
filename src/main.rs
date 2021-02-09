@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     renderer.models.push(cube);
 
-    let mut camera = Camera::default();
+    let mut camera = Camera::builder().fovy(90.0.deg()).build();
 
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;

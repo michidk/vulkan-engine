@@ -1,7 +1,7 @@
 use std::{
     fmt,
     marker::PhantomData,
-    ops::{Add, AddAssign, Mul},
+    ops::{Add, AddAssign, Mul, Sub},
 };
 
 use crate::{
@@ -192,6 +192,34 @@ where
                 };
             }
         }
+    }
+}
+
+impl<'a, 'b, SS, RS, ST, RT, const R: usize, const C: usize> Sub<&'a Matrix<RS, RT, R, C>>
+    for &'b Matrix<SS, ST, R, C>
+where
+    ST: Clone + Add<RT, Output = ST>,
+    SS: Storage<ST, R, C>,
+    RT: Clone,
+    RS: Storage<RT, R, C>,
+    DefaultAllocator: Allocator<ST, R, C>,
+{
+    type Output = Matrix<Owned<ST, R, C>, ST, R, C>;
+
+    fn sub(self, rhs: &'a Matrix<RS, RT, R, C>) -> Self::Output {
+        let mut matrix: Self::Output = unsafe { Self::Output::new_uninitialized_default() };
+
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *matrix.storage.get_unchecked_mut(row_idx, col_idx) =
+                        self.storage.get_unchecked(row_idx, col_idx).clone()
+                            + rhs.storage.get_unchecked(row_idx, col_idx).clone();
+                };
+            }
+        }
+
+        matrix
     }
 }
 

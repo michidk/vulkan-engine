@@ -71,19 +71,46 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
 
 #[derive(Debug)]
 pub struct Camera {
-    pub view_matrix: Mat4<f32>,
-    pub position: Vec3<f32>,
-    pub view_direction: Unit<Vec3<f32>>,
-    pub down_direction: Unit<Vec3<f32>>,
+    view_matrix: Mat4<f32>,
+    position: Vec3<f32>,
+    view_direction: Unit<Vec3<f32>>,
+    down_direction: Unit<Vec3<f32>>,
+    fovy: f32,
+    aspect: f32,
+    near: f32,
+    far: f32,
+    projection_matrix: Mat4<f32>,
 }
 
 impl Camera {
     pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut BufferWrapper) {
-        let data: [[f32; 4]; 4] = self.view_matrix.into();
+        let data: [[[f32; 4]; 4]; 2] = [self.view_matrix.into(), self.projection_matrix.into()];
         buffer.fill(allocator, &data).unwrap();
     }
 
-    pub fn update_view_matrix(&mut self) {
+    fn update_projection_matrix(&mut self) {
+        let d = 1.0 / (0.5 * self.fovy).tan();
+        self.projection_matrix = Mat4::new(
+            d / self.aspect,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            d,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            self.far / (self.far - self.near),
+            -self.near * self.far / (self.far - self.near),
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+        );
+    }
+
+    fn update_view_matrix(&mut self) {
         // TODO: Unit
         let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
         let m: Mat4<f32> = Mat4::new(
@@ -143,16 +170,103 @@ impl Camera {
     pub fn turn_down(&mut self, angle: Angle<f32>) {
         self.turn_up(-angle);
     }
+
+    pub fn builder() -> CameraBuilder {
+        CameraBuilder {
+            position: Vec3::new(0.0, -3.0, -3.0),
+            view_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, 1.0)),
+            down_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, -1.0)),
+            fovy: std::f32::consts::FRAC_PI_3,
+            aspect: 800.0 / 600.0,
+            near: 0.1,
+            far: 100.0,
+        }
+    }
 }
 
-impl Default for Camera {
-    fn default() -> Self {
-        Self {
-            view_matrix: Mat4::identity(),
-            position: Vec3::zero(),
-            view_direction: Unit::new_normalize(Vec3::unit_z()),
-            down_direction: Unit::new_normalize(Vec3::unit_y()),
+pub struct CameraBuilder {
+    position: Vec3<f32>,
+    view_direction: Unit<Vec3<f32>>,
+    down_direction: Unit<Vec3<f32>>,
+    fovy: f32,
+    aspect: f32,
+    near: f32,
+    far: f32,
+}
+
+impl CameraBuilder {
+    pub fn position(&mut self, pos: Vec3<f32>) -> &mut Self {
+        self.position = pos;
+        self
+    }
+
+    pub fn view_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
+        self.view_direction = Unit::new_normalize(direction);
+        self
+    }
+
+    pub fn down_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
+        self.down_direction = Unit::new_normalize(direction);
+        self
+    }
+
+    pub fn fovy(&mut self, fovy: Angle<f32>) -> &mut Self {
+        let fovy = fovy.to_rad();
+        const MIN: f32 = 0.01;
+        const MAX: f32 = std::f32::consts::PI - 0.01;
+
+        self.fovy = fovy.max(MIN).min(MAX);
+        if self.fovy != fovy {
+            log::warn!("Fovy out of bounds: {} <= `{}` <= {}", MIN, fovy, MAX);
         }
+        self
+    }
+
+    pub fn aspect(&mut self, aspect: f32) -> &mut Self {
+        self.aspect = aspect;
+        self
+    }
+
+    pub fn near(&mut self, near: f32) -> &mut Self {
+        if near <= 0.0 {
+            log::warn!("Near is negative: `{}`", near);
+        }
+        self.near = near;
+        self
+    }
+
+    pub fn far(&mut self, far: f32) -> &mut Self {
+        if far <= 0.0 {
+            log::warn!("Far is negative: `{}`", far);
+        }
+        self.far = far;
+        self
+    }
+
+    pub fn build(&mut self) -> Camera {
+        if self.far < self.near {
+            log::warn!("Far is closer than near: `{}` `{}`", self.far, self.near);
+        }
+        let down = self.down_direction.as_ref();
+        let view = self.view_direction.as_ref();
+
+        let dv = view * down.dot_product(view);
+        let ds = down - &dv;
+
+        let mut cam = Camera {
+            position: self.position,
+            view_direction: self.view_direction,
+            down_direction: Unit::new_normalize(ds),
+            fovy: self.fovy,
+            aspect: self.aspect,
+            near: self.near,
+            far: self.far,
+            view_matrix: Mat4::identity(),
+            projection_matrix: Mat4::identity(),
+        };
+        cam.update_projection_matrix();
+        cam.update_view_matrix();
+        cam
     }
 }
 
@@ -1012,7 +1126,7 @@ impl Pipeline {
         let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
             .line_width(1.0)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::NONE)
+            .cull_mode(vk::CullModeFlags::FRONT)
             .polygon_mode(vk::PolygonMode::FILL);
         let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
@@ -1293,11 +1407,12 @@ impl Renderer {
 
         let mut uniform_buffer = BufferWrapper::new(
             &allocator,
-            64,
+            128,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
         )?;
-        let camera_transform: [[f32; 4]; 4] = Mat4::identity().into();
+        let camera_transform: [[[f32; 4]; 4]; 2] =
+            [Mat4::identity().into(), Mat4::identity().into()];
         uniform_buffer.fill(&allocator, &camera_transform)?;
 
         let pool_size = [vk::DescriptorPoolSize {
@@ -1320,7 +1435,7 @@ impl Renderer {
             let buffer_infos = [vk::DescriptorBufferInfo {
                 buffer: uniform_buffer.buffer,
                 offset: 0,
-                range: 64,
+                range: 128,
             }];
             let desc_set_write = [vk::WriteDescriptorSet::builder()
                 .dst_set(*descset)

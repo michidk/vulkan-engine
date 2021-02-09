@@ -2,7 +2,7 @@ use ash::{version::DeviceV1_0, vk};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 
-use vulkan_renderer::renderer;
+use vulkan_engine::renderer;
 
 struct FpsTracker {
     median: f32,

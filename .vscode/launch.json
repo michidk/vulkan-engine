@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'vulkan_renderer'",
+            "name": "Debug executable 'vulkan_engine'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=vulkan_renderer",
-                    "--package=vulkan_renderer"
+                    "--bin=vulkan_engine",
+                    "--package=vulkan_engine"
                 ],
                 "filter": {
-                    "name": "vulkan_renderer",
+                    "name": "vulkan_engine",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'vulkan_renderer'",
+            "name": "Debug unit tests in executable 'vulkan_engine'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=vulkan_renderer",
-                    "--package=vulkan_renderer"
+                    "--bin=vulkan_engine",
+                    "--package=vulkan_engine"
                 ],
                 "filter": {
-                    "name": "vulkan_renderer",
+                    "name": "vulkan_engine",
                     "kind": "bin"
                 }
             },

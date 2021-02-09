@@ -1,11 +1,11 @@
 [package]
-name = "vulkan_renderer"
+name = "vulkan_engine"
 version = "0.1.0"
 authors = ["Michael Lohr <michael@lohr-ffb.de>"]
 edition = "2018"
 
 [lib]
-name = "vulkan_renderer"
+name = "vulkan_engine"
 
 [dependencies]
 ash = "0.31.0"

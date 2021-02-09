@@ -1,4 +1,4 @@
-.PHONY: all
+.PHONY: run check test lint cic clean
 
 run:
 	cargo +nightly run
@@ -17,11 +17,8 @@ lint:
 	cargo +nightly fmt -p math --all -- --check
 	cargo +nightly clippy -p math -- -D warnings
 
-# can i commit
-cic:
-	make check
-	make test
-	make lint
+# can i commit?
+cic: check test lint
 
 clean:
 	cargo clean

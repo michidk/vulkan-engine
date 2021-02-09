@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: executable
-          path: ./target/x86_64-unknown-linux-gnu/release/vulkan_renderer
+          path: ./target/x86_64-unknown-linux-gnu/release/vulkan_engine
 
   build-windows:
     name: Windows Build
@@ -112,4 +112,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: executable
-          path: ./target/release/vulkan_renderer.exe
+          path: ./target/release/vulkan_engine.exe

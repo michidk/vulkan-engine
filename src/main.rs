@@ -5,7 +5,7 @@ use winit::event_loop::EventLoop;
 
 use vulkan_engine::{
     color::Color,
-    renderer::{self, DefaultModel, InstanceData},
+    renderer::{self, Camera, DefaultModel, InstanceData},
 };
 
 struct FpsTracker {
@@ -69,10 +69,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         color: Color::rgb_f32(1.0, 1.0, 0.2),
     });
 
+    cube.insert_visibly(InstanceData {
+        position: dbg!(
+            &(&Mat4::new_translate(Vec3::new(0.20, 0.20, 0.1)) * &Mat4::new_rotation_z(10.0.deg()))
+                * &Mat4::new_scaling(0.1)
+        ),
+        color: Color::rgb_f32(0.6, 0.2, 0.2),
+    });
+
     cube.update_vertex_buffer(&renderer.allocator).unwrap();
     cube.update_instance_buffer(&renderer.allocator).unwrap();
 
     renderer.models.push(cube);
+
+    let mut camera = Camera::default();
 
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
@@ -81,13 +91,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
+            } => *controlflow = winit::event_loop::ControlFlow::Exit,
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
             } => {
-                *controlflow = winit::event_loop::ControlFlow::Exit;
+                if let winit::event::KeyboardInput {
+                    state: winit::event::ElementState::Pressed,
+                    virtual_keycode: Some(keycode),
+                    ..
+                } = input
+                {
+                    match keycode {
+                        winit::event::VirtualKeyCode::Up => {
+                            camera.move_forward(0.05);
+                            println!("forward");
+                        }
+                        winit::event::VirtualKeyCode::Down => {
+                            camera.move_backward(0.05);
+                            println!("backward");
+                        }
+                        winit::event::VirtualKeyCode::Left => {
+                            camera.turn_left(0.1.rad());
+                            println!("left");
+                        }
+                        winit::event::VirtualKeyCode::Right => {
+                            camera.turn_right(0.1.rad());
+                            println!("right");
+                        }
+                        winit::event::VirtualKeyCode::PageUp => {
+                            camera.turn_up(0.02.rad());
+                            println!("up");
+                        }
+                        winit::event::VirtualKeyCode::PageDown => {
+                            camera.turn_down(0.02.rad());
+                            println!("down");
+                        }
+                        _ => {}
+                    };
+                }
             }
             Event::MainEventsCleared => {
                 // doing the work here (later)
                 angle = Angle::from_deg(angle.to_deg() + 0.01);
-                log::debug!("{:?}", renderer.models[0].get_mut(cube_x));
                 renderer.models[0].get_mut(cube_x).unwrap().position =
                     &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0))
                         * &Mat4::new_rotation_z(angle))
@@ -124,6 +170,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ])
                         .expect("resetting fences");
                 }
+                camera.update_buffer(&renderer.allocator, &mut renderer.uniform_buffer);
                 for m in &mut renderer.models {
                     m.update_instance_buffer(&renderer.allocator).unwrap();
                 }

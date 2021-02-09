@@ -69,6 +69,93 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     title: "VulkanTriangle",
 };
 
+#[derive(Debug)]
+pub struct Camera {
+    pub view_matrix: Mat4<f32>,
+    pub position: Vec3<f32>,
+    pub view_direction: Unit<Vec3<f32>>,
+    pub down_direction: Unit<Vec3<f32>>,
+}
+
+impl Camera {
+    pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut BufferWrapper) {
+        let data: [[f32; 4]; 4] = self.view_matrix.into();
+        buffer.fill(allocator, &data).unwrap();
+    }
+
+    pub fn update_view_matrix(&mut self) {
+        // TODO: Unit
+        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
+        let m: Mat4<f32> = Mat4::new(
+            *right.x(),
+            *right.y(),
+            *right.z(),
+            -right.dot_product(&self.position),
+            //
+            *self.down_direction.x(),
+            *self.down_direction.y(),
+            *self.down_direction.z(),
+            -self.down_direction.dot_product(&self.position),
+            //
+            *self.view_direction.x(),
+            *self.view_direction.y(),
+            *self.view_direction.z(),
+            -self.view_direction.dot_product(&self.position),
+            //
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+        );
+        log::debug!("C: {:#?}", m);
+        self.view_matrix = m;
+    }
+
+    pub fn move_forward(&mut self, distance: f32) {
+        log::debug!("B: {:#?}", self.position);
+        self.position += self.view_direction.as_ref() * distance;
+        log::debug!("A: {:#?}", self.position);
+        self.update_view_matrix();
+    }
+
+    pub fn move_backward(&mut self, distance: f32) {
+        self.move_forward(-distance);
+    }
+
+    pub fn turn_right(&mut self, angle: Angle<f32>) {
+        let rotation = Mat3::from_axis_angle(&self.down_direction, angle);
+        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
+        self.update_view_matrix();
+    }
+
+    pub fn turn_left(&mut self, angle: Angle<f32>) {
+        self.turn_right(-angle);
+    }
+
+    pub fn turn_up(&mut self, angle: Angle<f32>) {
+        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
+        let rotation = Mat3::from_axis_angle(&right, angle);
+        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
+        self.down_direction = Unit::new_normalize(&rotation * self.down_direction.as_ref());
+        self.update_view_matrix();
+    }
+
+    pub fn turn_down(&mut self, angle: Angle<f32>) {
+        self.turn_up(-angle);
+    }
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self {
+            view_matrix: Mat4::identity(),
+            position: Vec3::zero(),
+            view_direction: Unit::new_normalize(Vec3::unit_z()),
+            down_direction: Unit::new_normalize(Vec3::unit_y()),
+        }
+    }
+}
+
 pub struct Model<V, I> {
     vertices: Vec<V>,
     handle_to_index: HashMap<usize, usize>,
@@ -821,16 +908,10 @@ fn init_renderpass(
 struct Pipeline {
     pipeline: vk::Pipeline,
     layout: vk::PipelineLayout,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
 impl Pipeline {
-    fn cleanup(&self, logical_device: &ash::Device) {
-        unsafe {
-            logical_device.destroy_pipeline(self.pipeline, None);
-            logical_device.destroy_pipeline_layout(self.layout, None);
-        }
-    }
-
     fn init(
         logical_device: &ash::Device,
         swapchain: &SwapchainWrapper,
@@ -952,7 +1033,21 @@ impl Pipeline {
             .build()];
         let colourblend_info =
             vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
-        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder();
+
+        let descriptorset_layout_binding_descs = [vk::DescriptorSetLayoutBinding::builder()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .build()];
+        let descriptorset_layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&descriptorset_layout_binding_descs);
+        let descriptorset_layout = unsafe {
+            logical_device.create_descriptor_set_layout(&descriptorset_layout_info, None)
+        }?;
+        let desclayouts = vec![descriptorset_layout];
+
+        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(&desclayouts);
         let pipelinelayout =
             unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None) }?;
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
@@ -987,7 +1082,18 @@ impl Pipeline {
         Ok(Pipeline {
             pipeline: graphicspipeline,
             layout: pipelinelayout,
+            descriptor_set_layouts: desclayouts,
         })
+    }
+
+    fn cleanup(&self, logical_device: &ash::Device) {
+        unsafe {
+            for dsl in &self.descriptor_set_layouts {
+                logical_device.destroy_descriptor_set_layout(*dsl, None);
+            }
+            logical_device.destroy_pipeline(self.pipeline, None);
+            logical_device.destroy_pipeline_layout(self.layout, None);
+        }
     }
 }
 
@@ -1029,7 +1135,7 @@ fn create_commandbuffers(
 }
 
 #[allow(dead_code)]
-struct BufferWrapper {
+pub struct BufferWrapper {
     buffer: vk::Buffer,
     allocation: vk_mem::Allocation,
     allocation_info: vk_mem::AllocationInfo,
@@ -1135,6 +1241,9 @@ pub struct Renderer {
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: vk_mem::Allocator,
     pub models: Vec<DefaultModel>,
+    pub uniform_buffer: BufferWrapper,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_sets: Vec<vk::DescriptorSet>,
 }
 
 impl Renderer {
@@ -1179,10 +1288,48 @@ impl Renderer {
         let pipeline = Pipeline::init(&logical_device, &swapchain, &renderpass)?;
         let pools = Pools::init(&logical_device, &queue_families)?;
 
-        // models
-
         let commandbuffers =
             create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
+
+        let mut uniform_buffer = BufferWrapper::new(
+            &allocator,
+            64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
+        )?;
+        let camera_transform: [[f32; 4]; 4] = Mat4::identity().into();
+        uniform_buffer.fill(&allocator, &camera_transform)?;
+
+        let pool_size = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_count: swapchain.amount_of_images,
+        }];
+        let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
+            .max_sets(swapchain.amount_of_images)
+            .pool_sizes(&pool_size);
+        let descriptor_pool =
+            unsafe { logical_device.create_descriptor_pool(&descriptor_pool_info, None) }?;
+        let desc_layouts =
+            vec![pipeline.descriptor_set_layouts[0]; swapchain.amount_of_images as usize];
+        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo::builder()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&desc_layouts);
+        let descriptor_sets =
+            unsafe { logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info) }?;
+        for descset in &descriptor_sets {
+            let buffer_infos = [vk::DescriptorBufferInfo {
+                buffer: uniform_buffer.buffer,
+                offset: 0,
+                range: 64,
+            }];
+            let desc_set_write = [vk::WriteDescriptorSet::builder()
+                .dst_set(*descset)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .buffer_info(&buffer_infos)
+                .build()];
+            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
+        }
 
         Ok(Renderer {
             window,
@@ -1202,6 +1349,9 @@ impl Renderer {
             commandbuffers,
             allocator,
             models: Vec::new(),
+            uniform_buffer,
+            descriptor_pool,
+            descriptor_sets,
         })
     }
 
@@ -1245,6 +1395,14 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline,
             );
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.layout,
+                0,
+                &[self.descriptor_sets[index]],
+                &[],
+            );
             for m in &self.models {
                 m.draw(&self.device, commandbuffer);
             }
@@ -1261,6 +1419,10 @@ impl Drop for Renderer {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
+            self.device
+                .destroy_descriptor_pool(self.descriptor_pool, None);
+            self.uniform_buffer.cleanup(&self.allocator);
 
             // if we fail to destroy the buffer continue to destory as many things
             // as possible

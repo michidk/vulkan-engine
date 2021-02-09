@@ -1,12 +1,15 @@
 use std::{
     marker::PhantomData,
-    ops::{Add, AddAssign, Mul},
+    ops::{Add, AddAssign, Div, Mul, Rem, Sub},
 };
 
 use crate::{
+    angle::{Angle, AngleConst},
     matrix::{Matrix, Owned},
+    norm::Normed,
     scalar::Zero,
     storage::{Storage, StorageMut},
+    unit::Unit,
 };
 use crate::{
     scalar::{One, Scalar},
@@ -95,7 +98,12 @@ impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
         };
         zero
     }
+}
 
+impl<T, S, const R: usize> ColVector<S, T, R>
+where
+    S: Storage<T, R, 1>,
+{
     pub fn x(&self) -> &T
     where
         Self: VecLenCmp<VecLen0, Cmp = Greater>,
@@ -150,9 +158,71 @@ impl<S, T, const R: usize> ColVector<S, T, R> {
     }
 }
 
+impl<S, const R: usize> Normed for ColVector<S, f32, R>
+where
+    S: Storage<f32, R, 1> + StorageMut<f32, R, 1>,
+{
+    type Norm = f32;
+
+    fn norm(&self) -> Self::Norm {
+        let mut value = 0.0;
+        for row_idx in 0..R {
+            value += unsafe { *self.storage.get_unchecked(row_idx, 0) }.powi(2);
+        }
+        value.sqrt()
+    }
+
+    fn norm_squared(&self) -> Self::Norm {
+        self.norm().powi(2)
+    }
+
+    fn scale_mut(&mut self, n: Self::Norm) {
+        for row_idx in 0..R {
+            unsafe { *self.storage.get_unchecked_mut(row_idx, 0) *= n };
+        }
+    }
+
+    fn unscale_mut(&mut self, n: Self::Norm) {
+        for row_idx in 0..R {
+            unsafe { *self.storage.get_unchecked_mut(row_idx, 0) /= n };
+        }
+    }
+}
+
 impl<T> Vec3<T> {
     pub const fn new(x: T, y: T, z: T) -> Self {
         Self::from_storage(ArrayStorage { data: [[x, y, z]] })
+    }
+}
+
+impl<T, S> Vec3<T, S> {
+    pub fn cross_product<RT, RS>(&self, rhs: &Vec3<RT, RS>) -> Vec3<T>
+    where
+        T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
+        S: Storage<T, 3, 1>,
+        RT: Clone,
+        RS: Storage<RT, 3, 1>,
+    {
+        let (a1, a2, a3) = unsafe {
+            (
+                self.storage.get_unchecked(0, 0),
+                self.storage.get_unchecked(1, 0),
+                self.storage.get_unchecked(2, 0),
+            )
+        };
+        let (b1, b2, b3) = unsafe {
+            (
+                rhs.storage.get_unchecked(0, 0),
+                rhs.storage.get_unchecked(1, 0),
+                rhs.storage.get_unchecked(2, 0),
+            )
+        };
+
+        let s1 = a2.clone() * b3.clone() - a3.clone() * b2.clone();
+        let s2 = a3.clone() * b1.clone() - a1.clone() * b3.clone();
+        let s3 = a1.clone() * b2.clone() - a2.clone() * b1.clone();
+
+        Vec3::new(s1, s2, s3)
     }
 }
 
@@ -206,5 +276,13 @@ mod tests {
         let _: Vec4<f32> = Vec4::unit_y();
         let _: Vec4<f32> = Vec4::unit_z();
         let _: Vec4<f32> = Vec4::unit_w();
+    }
+
+    #[test]
+    fn vec3_cross_product() {
+        let a = Vec3::new(1.0, 2.0, -3.0);
+        let b = Vec3::new(-6.0, 7.0, 0.2);
+
+        assert_eq!(a.cross_product(&b), Vec3::new(21.4, 17.8, 19.0));
     }
 }

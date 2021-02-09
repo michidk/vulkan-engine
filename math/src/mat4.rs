@@ -13,6 +13,23 @@ use crate::{
 pub type Mat4<T, S = Owned<T, 4, 4>> = MatN<T, S, 4>;
 
 impl<T> Mat4<T> {
+    #[rustfmt::skip]
+    pub fn new(
+        c0r0: T, c1r0: T, c2r0: T, c3r0: T,
+        c0r1: T, c1r1: T, c2r1: T, c3r1: T,
+        c0r2: T, c1r2: T, c2r2: T, c3r2: T,
+        c0r3: T, c1r3: T, c2r3: T, c3r3: T,
+    ) -> Self {
+        Self::from_storage(ArrayStorage {
+            data: [
+                [c0r0, c0r1, c0r2, c0r3],
+                [c1r0, c1r1, c1r2, c1r3],
+                [c2r0, c2r1, c2r2, c2r3],
+                [c3r0, c3r1, c3r2, c3r3],
+            ],
+        })
+    }
+
     pub fn new_scaling(factor: T) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,

@@ -175,6 +175,26 @@ where
     }
 }
 
+impl<SS, RS, ST, RT, const R: usize, const C: usize> AddAssign<Matrix<RS, RT, R, C>>
+    for Matrix<SS, ST, R, C>
+where
+    ST: AddAssign<RT>,
+    SS: StorageMut<ST, R, C>,
+    RT: Clone,
+    RS: Storage<RT, R, C>,
+{
+    fn add_assign(&mut self, rhs: Matrix<RS, RT, R, C>) {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.storage.get_unchecked_mut(row_idx, col_idx) +=
+                        rhs.storage.get_unchecked(row_idx, col_idx).clone();
+                };
+            }
+        }
+    }
+}
+
 impl<'a, 'b, SS, RS, ST, RT, const SR: usize, const SHARED: usize, const RC: usize>
     Mul<&'a Matrix<RS, RT, SHARED, RC>> for &'b Matrix<SS, ST, SR, SHARED>
 where

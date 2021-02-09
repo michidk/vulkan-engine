@@ -1,11 +1,14 @@
-use std::fmt;
+use std::{
+    fmt,
+    ops::{Div, Mul, Neg, Rem},
+};
 
-pub trait ToAngle: Sized {
+pub trait IntoAngle: Sized {
     fn rad(self) -> Angle<Self>;
     fn deg(self) -> Angle<Self>;
 }
 
-impl ToAngle for f32 {
+impl IntoAngle for f32 {
     fn rad(self) -> Angle<Self> {
         Angle::from_rad(self)
     }
@@ -13,6 +16,11 @@ impl ToAngle for f32 {
     fn deg(self) -> Angle<Self> {
         Angle::from_deg(self)
     }
+}
+
+pub trait AngleConst {
+    const PI_180: Self;
+    const TAU: Self;
 }
 
 pub struct Angle<T> {
@@ -63,43 +71,82 @@ impl<T: Ord> Ord for Angle<T> {
     }
 }
 
-impl Angle<f32> {
-    const PI_180: f32 = ::std::f32::consts::PI / 180.0;
+impl<T: Neg<Output = T>> Neg for Angle<T> {
+    type Output = Angle<T>;
 
-    pub fn from_rad(radians: f32) -> Self {
-        assert!(!radians.is_infinite(), "Radians is infinite");
-        assert!(!radians.is_nan(), "Radians is NaN");
+    fn neg(self) -> Self::Output {
+        Self {
+            radians: -self.radians,
+        }
+    }
+}
+
+impl<T> Angle<T>
+where
+    T: Clone + AngleConst + Mul<T, Output = T> + Div<T, Output = T> + Rem<T, Output = T>,
+{
+    pub fn from_rad(radians: T) -> Self {
         Self { radians }
     }
 
-    pub fn from_deg(degree: f32) -> Self {
-        Self::from_rad(degree * Self::PI_180)
+    pub fn from_deg(degree: T) -> Self {
+        Self::from_rad(degree * T::PI_180)
     }
 
-    pub fn to_rad(&self) -> f32 {
-        self.radians
+    pub fn to_rad(&self) -> T {
+        self.radians.clone()
     }
 
-    pub fn to_deg(&self) -> f32 {
-        self.radians / Self::PI_180
+    pub fn to_deg(&self) -> T {
+        self.radians.clone() / T::PI_180
     }
 
-    pub fn to_rad_clamped(&self) -> f32 {
-        self.radians % std::f32::consts::TAU
+    pub fn to_rad_clamped(&self) -> T {
+        self.radians.clone() % T::TAU
     }
 
-    pub fn to_deg_clamped(&self) -> f32 {
-        self.to_deg() % 360.0
+    pub fn to_deg_clamped(&self) -> T {
+        Self::from_rad(self.to_rad_clamped()).to_deg()
     }
+}
+
+impl AngleConst for f32 {
+    const PI_180: Self = std::f32::consts::PI / 180.0;
+    const TAU: Self = std::f32::consts::TAU;
+}
+
+impl AngleConst for f64 {
+    const PI_180: Self = std::f64::consts::PI / 180.0;
+    const TAU: Self = std::f64::consts::TAU;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    macro_rules! assert_eq_err {
+        ($left:expr, $right:expr, $err:literal $(,)?) => {{
+            match (&$left, &$right) {
+                (left_val, right_val) => {
+                    if ((*left_val - *right_val).abs() > $err) {
+                        // The reborrows below are intentional. Without them, the stack slot for the
+                        // borrow is initialized even before the values are compared, leading to a
+                        // noticeable slow down.
+                        panic!(
+                            r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`"#,
+                            &*left_val, &*right_val
+                        )
+                    }
+                }
+            }
+        }};
+    }
+
     #[test]
     fn angle_degrad() {
-        assert_eq!(Angle::from_deg(90.0).to_rad(), 1.5707964);
-        assert_eq!(Angle::from_rad(0.7853982).to_deg(), 45.0);
+        // TODO: tests
+        assert_eq_err!(Angle::from_deg(90.0f32).to_rad(), 1.570796, 1e-5);
     }
 }

@@ -9,16 +9,18 @@
 
 ## Next Chapter
 
-25
+27
 
 
-## FPS
+## FPS (release build)
 
 | Chapter | FPS   |
 | ------- | ----- |
 | 22      | ~5800 |
+| 24      | ~5200 |
+| 26      | ~6700 |
 
-## Resources:
+## Resources
 https://vulkan-tutorial.com/
 https://hoj-senna.github.io/ashen-aetna/text/021_Boxes.html
 https://github.com/JHorace/ForgeEngine/

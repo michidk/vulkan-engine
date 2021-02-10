@@ -1,5 +1,14 @@
-#version 450
+//# VERSION 450
 
+//# TYPE FRAGMENT
+layout (location = 0) in vec4 i_color;
+layout (location = 0) out vec4 o_color;
+
+void main(){
+    o_color = i_color;
+}
+
+//# TYPE VERTEX
 layout (location = 0) in vec3 i_position;
 layout (location = 1) in mat4 i_model_matrix;
 layout (location = 5) in vec4 i_color;

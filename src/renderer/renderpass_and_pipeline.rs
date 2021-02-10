@@ -70,13 +70,10 @@ impl PipelineWrapper {
         swapchain: &swapchain::SwapchainWrapper,
         renderpass: &vk::RenderPass,
     ) -> Result<PipelineWrapper, vk::Result> {
-        let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder().code(
-            vk_shader_macros::include_glsl!("shaders/triangle.vert", kind: vert),
-        );
+        let vertexshader_createinfo =
         let vertexshader_module =
             unsafe { logical_device.create_shader_module(&vertexshader_createinfo, None)? };
-        let fragmentshader_createinfo = vk::ShaderModuleCreateInfo::builder()
-            .code(vk_shader_macros::include_glsl!("shaders/triangle.frag"));
+        let fragmentshader_createinfo = 
         let fragmentshader_module =
             unsafe { logical_device.create_shader_module(&fragmentshader_createinfo, None)? };
         let mainfunctionname = std::ffi::CString::new("main").unwrap();

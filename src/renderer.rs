@@ -269,12 +269,14 @@ impl CameraBuilder {
 
 pub struct Model<V, I> {
     vertices: Vec<V>,
+    indicies: Vec<u32>,
     handle_to_index: HashMap<usize, usize>,
     handles: Vec<usize>,
     instances: Vec<I>,
     fist_invisible: usize,
     next_handle: usize,
     vertex_buffer: Option<BufferWrapper>,
+    index_buffer: Option<BufferWrapper>,
     instance_buffer: Option<BufferWrapper>,
 }
 
@@ -410,6 +412,27 @@ impl<V, I> Model<V, I> {
         }
     }
 
+    pub fn update_index_buffer(
+        &mut self,
+        allocator: &vk_mem::Allocator,
+    ) -> Result<(), vk_mem::error::Error> {
+        if let Some(buffer) = &mut self.index_buffer {
+            buffer.fill(allocator, &self.indicies)?;
+            Ok(())
+        } else {
+            let bytes = (self.indicies.len() * std::mem::size_of::<u32>()) as u64;
+            let mut buffer = BufferWrapper::new(
+                &allocator,
+                bytes,
+                vk::BufferUsageFlags::INDEX_BUFFER,
+                vk_mem::MemoryUsage::CpuToGpu,
+            )?;
+            buffer.fill(allocator, &self.indicies)?;
+            self.index_buffer = Some(buffer);
+            Ok(())
+        }
+    }
+
     pub fn update_instance_buffer(
         &mut self,
         allocator: &vk_mem::Allocator,
@@ -433,28 +456,37 @@ impl<V, I> Model<V, I> {
 
     fn draw(&self, logical_device: &ash::Device, command_buffer: vk::CommandBuffer) {
         if let Some(vertex_buffer) = &self.vertex_buffer {
-            if let Some(instance_buffer) = &self.instance_buffer {
-                if self.fist_invisible > 0 {
-                    unsafe {
-                        logical_device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &[vertex_buffer.buffer],
-                            &[0],
-                        );
-                        logical_device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            1,
-                            &[instance_buffer.buffer],
-                            &[0],
-                        );
-                        logical_device.cmd_draw(
-                            command_buffer,
-                            self.vertices.len() as u32,
-                            self.fist_invisible as u32,
-                            0,
-                            0,
-                        );
+            if let Some(index_buffer) = &self.index_buffer {
+                if let Some(instance_buffer) = &self.instance_buffer {
+                    if self.fist_invisible > 0 {
+                        unsafe {
+                            logical_device.cmd_bind_index_buffer(
+                                command_buffer,
+                                index_buffer.buffer,
+                                0,
+                                vk::IndexType::UINT32,
+                            );
+                            logical_device.cmd_bind_vertex_buffers(
+                                command_buffer,
+                                0,
+                                &[vertex_buffer.buffer],
+                                &[0],
+                            );
+                            logical_device.cmd_bind_vertex_buffers(
+                                command_buffer,
+                                1,
+                                &[instance_buffer.buffer],
+                                &[0],
+                            );
+                            logical_device.cmd_draw_indexed(
+                                command_buffer,
+                                self.indicies.len() as u32,
+                                self.fist_invisible as u32,
+                                0,
+                                0,
+                                0,
+                            );
+                        }
                     }
                 }
             }
@@ -463,6 +495,10 @@ impl<V, I> Model<V, I> {
 
     fn cleanup(&mut self, allocator: &vk_mem::Allocator) {
         if let Some(buffer) = &mut self.vertex_buffer {
+            buffer.cleanup(allocator)
+        }
+
+        if let Some(buffer) = &mut self.index_buffer {
             buffer.cleanup(allocator)
         }
 
@@ -494,13 +530,14 @@ impl DefaultModel {
         let rtb = Vec3::new(1.0, -1.0, 1.0);
 
         Model {
-            vertices: vec![
-                lbf, lbb, rbb, lbf, rbb, rbf, //bottom
-                ltf, rtb, ltb, ltf, rtf, rtb, //top
-                lbf, rtf, ltf, lbf, rbf, rtf, //front
-                lbb, ltb, rtb, lbb, rtb, rbb, //back
-                lbf, ltf, lbb, lbb, ltf, ltb, //left
-                rbf, rbb, rtf, rbb, rtb, rtf, //right
+            vertices: vec![lbf, lbb, ltf, ltb, rbf, rbb, rtf, rtb],
+            indicies: vec![
+                0, 1, 5, 0, 5, 4, //bottom
+                2, 7, 3, 2, 6, 7, //top
+                0, 6, 2, 0, 4, 6, //front
+                1, 3, 7, 1, 7, 5, //back
+                0, 2, 1, 1, 2, 3, //left
+                4, 5, 6, 5, 7, 6, //right
             ],
             handle_to_index: HashMap::new(),
             handles: Vec::new(),
@@ -508,6 +545,7 @@ impl DefaultModel {
             fist_invisible: 0,
             next_handle: 0,
             vertex_buffer: None,
+            index_buffer: None,
             instance_buffer: None,
         }
     }

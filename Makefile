@@ -1,4 +1,4 @@
-.PHONY: run check test lint cic clean
+.PHONY: run check test clippy fmt lint cic clean
 
 run:
 	cargo +nightly run
@@ -11,11 +11,16 @@ test:
 	cargo +nightly test
 	cargo +nightly test -p math
 
-lint:
-	cargo +nightly fmt --all -- --check
+clippy:
+	# hack to update files so that clippy/cargo does not use cached versions
+	find -name "*.rs" -not -path "./target/*" -exec touch "{}" +
 	cargo +nightly clippy -- -D warnings
+
+fmt:
+	cargo +nightly fmt --all -- --check
 	cargo +nightly fmt -p math --all -- --check
-	cargo +nightly clippy -p math -- -D warnings
+
+lint: fmt clippy
 
 # can i commit?
 cic: check test lint

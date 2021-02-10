@@ -166,7 +166,7 @@ impl PipelineWrapper {
             .line_width(1.0)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
             .cull_mode(vk::CullModeFlags::BACK)
-            .polygon_mode(vk::PolygonMode::FILL);
+            .polygon_mode(vk::PolygonMode::LINE);
         let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
         let colourblend_attachments = [vk::PipelineColorBlendAttachmentState::builder()

@@ -289,4 +289,142 @@ impl DefaultModel {
             instance_buffer: None,
         }
     }
+
+    pub fn icosahedron() -> Self {
+        let phi = (1.0 + 5.0_f32.sqrt()) / 2.0;
+        let darkgreen_front_top = Vec3::new(phi, -1.0, 0.0); //0
+        let darkgreen_front_bottom = Vec3::new(phi, 1.0, 0.0); //1
+        let darkgreen_back_top = Vec3::new(-phi, -1.0, 0.0); //2
+        let darkgreen_back_bottom = Vec3::new(-phi, 1.0, 0.0); //3
+        let lightgreen_front_right = Vec3::new(1.0, 0.0, -phi); //4
+        let lightgreen_front_left = Vec3::new(-1.0, 0.0, -phi); //5
+        let lightgreen_back_right = Vec3::new(1.0, 0.0, phi); //6
+        let lightgreen_back_left = Vec3::new(-1.0, 0.0, phi); //7
+        let purple_top_left = Vec3::new(0.0, -phi, -1.0); //8
+        let purple_top_right = Vec3::new(0.0, -phi, 1.0); //9
+        let purple_bottom_left = Vec3::new(0.0, phi, -1.0); //10
+        let purple_bottom_right = Vec3::new(0.0, phi, 1.0); //11
+
+        Model {
+            vertices: vec![
+                darkgreen_front_top,
+                darkgreen_front_bottom,
+                darkgreen_back_top,
+                darkgreen_back_bottom,
+                lightgreen_front_right,
+                lightgreen_front_left,
+                lightgreen_back_right,
+                lightgreen_back_left,
+                purple_top_left,
+                purple_top_right,
+                purple_bottom_left,
+                purple_bottom_right,
+            ],
+            indicies: vec![
+                0, 9, 8, //
+                0, 8, 4, //
+                0, 4, 1, //
+                0, 1, 6, //
+                0, 6, 9, //
+                8, 9, 2, //
+                8, 2, 5, //
+                8, 5, 4, //
+                4, 5, 10, //
+                4, 10, 1, //
+                1, 10, 11, //
+                1, 11, 6, //
+                2, 3, 5, //
+                2, 7, 3, //
+                2, 9, 7, //
+                5, 3, 10, //
+                3, 11, 10, //
+                3, 7, 11, //
+                6, 7, 9, //
+                6, 11, 7, //
+            ],
+            handle_to_index: HashMap::new(),
+            handles: Vec::new(),
+            instances: Vec::new(),
+            fist_invisible: 0,
+            next_handle: 0,
+            vertex_buffer: None,
+            index_buffer: None,
+            instance_buffer: None,
+        }
+    }
+
+    pub fn sphere(refinements: u32) -> Self {
+        let mut ico = Self::icosahedron();
+        for _ in 0..refinements {
+            ico.refine();
+        }
+        for v in &mut ico.vertices {
+            let l = v.x() * v.x() + v.y() * v.y() + v.z() * v.z();
+            *v = Vec3::new(v.x() / l, v.y() / l, v.z() / l);
+        }
+        ico
+    }
+
+    pub fn refine(&mut self) {
+        let mut new_indicies = Vec::new();
+        let mut midpoints = HashMap::<(u32, u32), u32>::new();
+
+        println!("{}", self.indicies.len());
+        for triangle in self.indicies.chunks(3) {
+            let a = triangle[0];
+            let b = triangle[1];
+            let c = triangle[2];
+
+            let vertex_a = self.vertices[a as usize];
+            let vertex_b = self.vertices[b as usize];
+            let vertex_c = self.vertices[c as usize];
+
+            let mab = if let Some(ab) = midpoints.get(&(a, b)) {
+                *ab
+            } else {
+                let vertex_ab = [
+                    0.5 * (vertex_a.x() + vertex_b.x()),
+                    0.5 * (vertex_a.y() + vertex_b.y()),
+                    0.5 * (vertex_a.z() + vertex_b.z()),
+                ];
+                let mab = self.vertices.len() as u32;
+                self.vertices.push(vertex_ab.into());
+                midpoints.insert((a, b), mab);
+                midpoints.insert((b, a), mab);
+                mab
+            };
+
+            let mbc = if let Some(bc) = midpoints.get(&(b, c)) {
+                *bc
+            } else {
+                let vertex_bc = [
+                    0.5 * (vertex_b.x() + vertex_c.x()),
+                    0.5 * (vertex_b.y() + vertex_c.y()),
+                    0.5 * (vertex_b.z() + vertex_c.z()),
+                ];
+                let mbc = self.vertices.len() as u32;
+                self.vertices.push(vertex_bc.into());
+                midpoints.insert((b, c), mbc);
+                midpoints.insert((c, b), mbc);
+                mbc
+            };
+
+            let mca = if let Some(ca) = midpoints.get(&(c, a)) {
+                *ca
+            } else {
+                let vertex_ca = [
+                    0.5 * (vertex_c.x() + vertex_a.x()),
+                    0.5 * (vertex_c.y() + vertex_a.y()),
+                    0.5 * (vertex_c.z() + vertex_a.z()),
+                ];
+                let mca = self.vertices.len() as u32;
+                self.vertices.push(vertex_ca.into());
+                midpoints.insert((c, a), mca);
+                midpoints.insert((a, c), mca);
+                mca
+            };
+            new_indicies.extend_from_slice(&[mca, a, mab, mab, b, mbc, mbc, c, mca, mab, mbc, mca]);
+        }
+        self.indicies = new_indicies;
+    }
 }

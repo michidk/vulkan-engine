@@ -5,7 +5,11 @@ use winit::event_loop::EventLoop;
 
 use vulkan_engine::{
     color::Color,
-    renderer::{self, Camera, DefaultModel, InstanceData},
+    renderer::{
+        self,
+        camera::Camera,
+        model::{DefaultModel, InstanceData},
+    },
 };
 
 struct FpsTracker {

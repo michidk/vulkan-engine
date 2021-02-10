@@ -1,4 +1,4 @@
-.PHONY: run check test clippy fmt lint cic clean
+.PHONY: run check test clippy fmt lint cic cicl clean
 
 run:
 	cargo +nightly run
@@ -23,7 +23,10 @@ fmt:
 lint: fmt clippy
 
 # can i commit?
-cic: check test lint
+cic: test fmt
+	cargo +nightly clippy -- -D warnings
+
+cicl: test fmt clippy
 
 clean:
 	cargo clean

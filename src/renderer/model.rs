@@ -250,24 +250,66 @@ impl<V, I> Model<V, I> {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct VertexData {
+    pub position: Vec3<f32>,
+    pub normal: Unit<Vec3<f32>>,
+}
+
+impl VertexData {
+    fn new(position: [f32; 3], normal: [f32; 3]) -> Self {
+        Self {
+            position: position.into(),
+            normal: Unit::new_normalize(normal.into()),
+        }
+    }
+
+    fn midpoint(a: &VertexData, b: &VertexData) -> Self {
+        Self {
+            position: Vec3::new(
+                0.5 * (a.position.x() + b.position.x()),
+                0.5 * (a.position.y() + b.position.y()),
+                0.5 * (a.position.z() + b.position.z()),
+            ),
+            normal: Unit::new_normalize(Vec3::new(
+                0.5 * (a.normal.x() + b.normal.x()),
+                0.5 * (a.normal.y() + b.normal.y()),
+                0.5 * (a.normal.z() + b.normal.z()),
+            )),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct InstanceData {
-    pub position: Mat4<f32>,
+    pub model_matrix: Mat4<f32>,
+    pub inverse_model_matrix: Mat4<f32>,
     pub color: Color,
 }
 
-pub type DefaultModel = Model<Vec3<f32>, InstanceData>;
+impl InstanceData {
+    pub fn from_matrix_and_color(model_matrix: Mat4<f32>, color: Color) -> Self {
+        Self {
+            inverse_model_matrix: model_matrix.try_inverse().unwrap(),
+            model_matrix,
+            color,
+        }
+    }
+}
+
+pub type DefaultModel = Model<VertexData, InstanceData>;
 
 impl DefaultModel {
     pub fn cube() -> Self {
         // lbf: left bottom front
-        let lbf = Vec3::new(-1.0, 1.0, -1.0);
-        let lbb = Vec3::new(-1.0, 1.0, 1.0);
-        let ltf = Vec3::new(-1.0, -1.0, -1.0);
-        let ltb = Vec3::new(-1.0, -1.0, 1.0);
-        let rbf = Vec3::new(1.0, 1.0, -1.0);
-        let rbb = Vec3::new(1.0, 1.0, 1.0);
-        let rtf = Vec3::new(1.0, -1.0, -1.0);
-        let rtb = Vec3::new(1.0, -1.0, 1.0);
+        let lbf = VertexData::new([-1.0, 1.0, -1.0], [-1.0, 1.0, -1.0]);
+        let lbb = VertexData::new([-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0]);
+        let ltf = VertexData::new([-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]);
+        let ltb = VertexData::new([-1.0, -1.0, 1.0], [-1.0, -1.0, 1.0]);
+        let rbf = VertexData::new([1.0, 1.0, -1.0], [1.0, 1.0, -1.0]);
+        let rbb = VertexData::new([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]);
+        let rtf = VertexData::new([1.0, -1.0, -1.0], [1.0, -1.0, -1.0]);
+        let rtb = VertexData::new([1.0, -1.0, 1.0], [1.0, -1.0, 1.0]);
 
         Model {
             vertices: vec![lbf, lbb, ltf, ltb, rbf, rbb, rtf, rtb],
@@ -292,18 +334,19 @@ impl DefaultModel {
 
     pub fn icosahedron() -> Self {
         let phi = (1.0 + 5.0_f32.sqrt()) / 2.0;
-        let darkgreen_front_top = Vec3::new(phi, -1.0, 0.0); //0
-        let darkgreen_front_bottom = Vec3::new(phi, 1.0, 0.0); //1
-        let darkgreen_back_top = Vec3::new(-phi, -1.0, 0.0); //2
-        let darkgreen_back_bottom = Vec3::new(-phi, 1.0, 0.0); //3
-        let lightgreen_front_right = Vec3::new(1.0, 0.0, -phi); //4
-        let lightgreen_front_left = Vec3::new(-1.0, 0.0, -phi); //5
-        let lightgreen_back_right = Vec3::new(1.0, 0.0, phi); //6
-        let lightgreen_back_left = Vec3::new(-1.0, 0.0, phi); //7
-        let purple_top_left = Vec3::new(0.0, -phi, -1.0); //8
-        let purple_top_right = Vec3::new(0.0, -phi, 1.0); //9
-        let purple_bottom_left = Vec3::new(0.0, phi, -1.0); //10
-        let purple_bottom_right = Vec3::new(0.0, phi, 1.0); //11
+
+        let darkgreen_front_top = VertexData::new([phi, -1.0, 0.0], [phi, -1.0, 0.0]); //0
+        let darkgreen_front_bottom = VertexData::new([phi, 1.0, 0.0], [phi, 1.0, 0.0]); //1
+        let darkgreen_back_top = VertexData::new([-phi, -1.0, 0.0], [-phi, -1.0, 0.0]); //2
+        let darkgreen_back_bottom = VertexData::new([-phi, 1.0, 0.0], [-phi, 1.0, 0.0]); //3
+        let lightgreen_front_right = VertexData::new([1.0, 0.0, -phi], [1.0, 0.0, -phi]); //4
+        let lightgreen_front_left = VertexData::new([-1.0, 0.0, -phi], [-1.0, 0.0, -phi]); //5
+        let lightgreen_back_right = VertexData::new([1.0, 0.0, phi], [1.0, 0.0, phi]); //6
+        let lightgreen_back_left = VertexData::new([-1.0, 0.0, phi], [-1.0, 0.0, phi]); //7
+        let purple_top_left = VertexData::new([0.0, -phi, -1.0], [0.0, -phi, -1.0]); //8
+        let purple_top_right = VertexData::new([0.0, -phi, 1.0], [0.0, -phi, 1.0]); //9
+        let purple_bottom_left = VertexData::new([0.0, phi, -1.0], [0.0, phi, -1.0]); //10
+        let purple_bottom_right = VertexData::new([0.0, phi, 1.0], [0.0, phi, 1.0]); //11
 
         Model {
             vertices: vec![
@@ -359,8 +402,7 @@ impl DefaultModel {
             ico.refine();
         }
         for v in &mut ico.vertices {
-            let l = v.x() * v.x() + v.y() * v.y() + v.z() * v.z();
-            *v = Vec3::new(v.x() / l, v.y() / l, v.z() / l);
+            v.position = Unit::new_normalize(v.position).into_inner();
         }
         ico
     }
@@ -382,13 +424,9 @@ impl DefaultModel {
             let mab = if let Some(ab) = midpoints.get(&(a, b)) {
                 *ab
             } else {
-                let vertex_ab = [
-                    0.5 * (vertex_a.x() + vertex_b.x()),
-                    0.5 * (vertex_a.y() + vertex_b.y()),
-                    0.5 * (vertex_a.z() + vertex_b.z()),
-                ];
+                let vertex_ab = VertexData::midpoint(&vertex_a, &vertex_b);
                 let mab = self.vertices.len() as u32;
-                self.vertices.push(vertex_ab.into());
+                self.vertices.push(vertex_ab);
                 midpoints.insert((a, b), mab);
                 midpoints.insert((b, a), mab);
                 mab
@@ -397,13 +435,9 @@ impl DefaultModel {
             let mbc = if let Some(bc) = midpoints.get(&(b, c)) {
                 *bc
             } else {
-                let vertex_bc = [
-                    0.5 * (vertex_b.x() + vertex_c.x()),
-                    0.5 * (vertex_b.y() + vertex_c.y()),
-                    0.5 * (vertex_b.z() + vertex_c.z()),
-                ];
+                let vertex_bc = VertexData::midpoint(&vertex_b, &vertex_c);
                 let mbc = self.vertices.len() as u32;
-                self.vertices.push(vertex_bc.into());
+                self.vertices.push(vertex_bc);
                 midpoints.insert((b, c), mbc);
                 midpoints.insert((c, b), mbc);
                 mbc
@@ -412,13 +446,9 @@ impl DefaultModel {
             let mca = if let Some(ca) = midpoints.get(&(c, a)) {
                 *ca
             } else {
-                let vertex_ca = [
-                    0.5 * (vertex_c.x() + vertex_a.x()),
-                    0.5 * (vertex_c.y() + vertex_a.y()),
-                    0.5 * (vertex_c.z() + vertex_a.z()),
-                ];
+                let vertex_ca = VertexData::midpoint(&vertex_c, &vertex_a);
                 let mca = self.vertices.len() as u32;
-                self.vertices.push(vertex_ca.into());
+                self.vertices.push(vertex_ca);
                 midpoints.insert((c, a), mca);
                 midpoints.insert((a, c), mca);
                 mca

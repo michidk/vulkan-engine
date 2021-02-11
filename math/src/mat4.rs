@@ -1,10 +1,11 @@
 use crate::{
     angle::{Angle, AngleConst},
     scalar::{Cos, Sin},
+    storage::{Allocator, DefaultAllocator},
     unit::Unit,
 };
 
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, MulAssign, Neg, Rem, Sub};
 
 use crate::{
     matn::MatN,
@@ -111,6 +112,142 @@ impl<T> Mat4<T> {
             )
         }
     }
+
+    // This function only works for a matrix backed by an continues storage
+    // like ArrayStorage as we cast the data pointer to a continues array of `T`.
+    pub fn try_inverse(&self) -> Option<Self>
+    where
+        T: Copy
+            + Zero
+            + One
+            + Add<T, Output = T>
+            + Sub<T, Output = T>
+            + Mul<T, Output = T>
+            + MulAssign<T>
+            + Div<T, Output = T>
+            + Neg<Output = T>
+            + PartialEq,
+    {
+        let mut out = Self::zero();
+
+        unsafe {
+            let m = *(self.storage.data.as_ptr() as *const [T; 16]);
+
+            *out.storage.get_unchecked_mut(0, 0) =
+                m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15]
+                    + m[9] * m[7] * m[14]
+                    + m[13] * m[6] * m[11]
+                    - m[13] * m[7] * m[10];
+
+            *out.storage.get_unchecked_mut(1, 0) =
+                -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15]
+                    - m[9] * m[3] * m[14]
+                    - m[13] * m[2] * m[11]
+                    + m[13] * m[3] * m[10];
+
+            *out.storage.get_unchecked_mut(2, 0) =
+                m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15]
+                    + m[5] * m[3] * m[14]
+                    + m[13] * m[2] * m[7]
+                    - m[13] * m[3] * m[6];
+
+            *out.storage.get_unchecked_mut(3, 0) =
+                -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11]
+                    - m[5] * m[3] * m[10]
+                    - m[9] * m[2] * m[7]
+                    + m[9] * m[3] * m[6];
+
+            *out.storage.get_unchecked_mut(0, 1) =
+                -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15]
+                    - m[8] * m[7] * m[14]
+                    - m[12] * m[6] * m[11]
+                    + m[12] * m[7] * m[10];
+
+            *out.storage.get_unchecked_mut(1, 1) =
+                m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15]
+                    + m[8] * m[3] * m[14]
+                    + m[12] * m[2] * m[11]
+                    - m[12] * m[3] * m[10];
+
+            *out.storage.get_unchecked_mut(2, 1) =
+                -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15]
+                    - m[4] * m[3] * m[14]
+                    - m[12] * m[2] * m[7]
+                    + m[12] * m[3] * m[6];
+
+            *out.storage.get_unchecked_mut(3, 1) =
+                m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11]
+                    + m[4] * m[3] * m[10]
+                    + m[8] * m[2] * m[7]
+                    - m[8] * m[3] * m[6];
+
+            *out.storage.get_unchecked_mut(0, 2) =
+                m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15]
+                    + m[8] * m[7] * m[13]
+                    + m[12] * m[5] * m[11]
+                    - m[12] * m[7] * m[9];
+
+            *out.storage.get_unchecked_mut(1, 2) =
+                -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15]
+                    - m[8] * m[3] * m[13]
+                    - m[12] * m[1] * m[11]
+                    + m[12] * m[3] * m[9];
+
+            *out.storage.get_unchecked_mut(2, 2) =
+                m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15]
+                    + m[4] * m[3] * m[13]
+                    + m[12] * m[1] * m[7]
+                    - m[12] * m[3] * m[5];
+
+            *out.storage.get_unchecked_mut(0, 3) =
+                -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14]
+                    - m[8] * m[6] * m[13]
+                    - m[12] * m[5] * m[10]
+                    + m[12] * m[6] * m[9];
+
+            *out.storage.get_unchecked_mut(3, 2) =
+                -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11]
+                    - m[4] * m[3] * m[9]
+                    - m[8] * m[1] * m[7]
+                    + m[8] * m[3] * m[5];
+
+            *out.storage.get_unchecked_mut(1, 3) =
+                m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14]
+                    + m[8] * m[2] * m[13]
+                    + m[12] * m[1] * m[10]
+                    - m[12] * m[2] * m[9];
+
+            *out.storage.get_unchecked_mut(2, 3) =
+                -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14]
+                    - m[4] * m[2] * m[13]
+                    - m[12] * m[1] * m[6]
+                    + m[12] * m[2] * m[5];
+
+            *out.storage.get_unchecked_mut(3, 3) =
+                m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10]
+                    + m[4] * m[2] * m[9]
+                    + m[8] * m[1] * m[6]
+                    - m[8] * m[2] * m[5];
+
+            let det = m[0] * *out.storage.get_unchecked(0, 0)
+                + m[1] * *out.storage.get_unchecked(0, 1)
+                + m[2] * *out.storage.get_unchecked(0, 2)
+                + m[3] * *out.storage.get_unchecked(0, 3);
+
+            if det != T::zero() {
+                let inv_det = T::one() / det;
+
+                for j in 0..4 {
+                    for i in 0..4 {
+                        *out.storage.get_unchecked_mut(i, j) *= inv_det;
+                    }
+                }
+                Some(out)
+            } else {
+                None
+            }
+        }
+    }
 }
 
 // TODO: make generic for Zero + Sin + Cos
@@ -202,6 +339,19 @@ mod tests {
             0.9098000079779422, -0.41486784839954377, 0.012190727938444015, 0.0,
             -0.057598245781191326, -0.09711554093899513, 0.9936050592620064, 0.0,
             0.0, 0.0, 0.0, 1.0
+        );
+
+        MatrixCmp::<f32>::DEFAULT.eq(&is, &should);
+    }
+
+    #[test]
+    fn mat4_try_inverse() {
+        let is = Mat4::new_scaling(2.0);
+        let should = Mat4::new(
+            0.5, 0.0, 0.0, 0.0,
+            0.0, 0.5, 0.0, 0.0,
+            0.0, 0.0, 0.5, 0.0,
+            0.0, 0.0, 0.0, 0.5,
         );
 
         MatrixCmp::<f32>::DEFAULT.eq(&is, &should);

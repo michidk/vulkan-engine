@@ -98,45 +98,75 @@ impl PipelineWrapper {
                 format: vk::Format::R32G32B32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
-                binding: 1,
+                binding: 0,
                 location: 1,
+                offset: 12,
+                format: vk::Format::R32G32B32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 2,
                 offset: 0,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
-                location: 2,
+                location: 3,
                 offset: 16,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
-                location: 3,
+                location: 4,
                 offset: 32,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
-                location: 4,
+                location: 5,
                 offset: 48,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
             vk::VertexInputAttributeDescription {
                 binding: 1,
-                location: 5,
+                location: 6,
                 offset: 64,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 7,
+                offset: 80,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 8,
+                offset: 96,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 9,
+                offset: 112,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 10,
+                offset: 128,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
         ];
         let vertex_binding_descs = [
             vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: 12,
+                stride: 24,
                 input_rate: vk::VertexInputRate::VERTEX,
             },
             vk::VertexInputBindingDescription {
                 binding: 1,
-                stride: 80,
+                stride: 144,
                 input_rate: vk::VertexInputRate::INSTANCE,
             },
         ];

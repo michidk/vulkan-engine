@@ -61,31 +61,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_window(&eventloop)
         .unwrap();
     let mut renderer = renderer::Renderer::init(window)?;
-    let mut sphere = DefaultModel::sphere(4);
+    let mut model = DefaultModel::sphere(4);
 
     let mut angle = 7.0.deg();
 
-    let model_ref = sphere.insert_visibly(InstanceData {
-        position: dbg!(
-            &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0)) * &Mat4::new_rotation_x(angle))
-                * &Mat4::new_scaling(0.1)
-        ),
-        color: Color::rgb_f32(1.0, 1.0, 0.2),
-    });
+    let model_ref = model.insert_visibly(InstanceData::from_matrix_and_color(
+        &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
+        Color::rgb_f32(1.0, 1.0, 0.2),
+    ));
 
-    sphere.update_vertex_buffer(&renderer.allocator).unwrap();
-    sphere.update_index_buffer(&renderer.allocator).unwrap();
-    sphere.update_instance_buffer(&renderer.allocator).unwrap();
+    model.update_vertex_buffer(&renderer.allocator).unwrap();
+    model.update_index_buffer(&renderer.allocator).unwrap();
+    model.update_instance_buffer(&renderer.allocator).unwrap();
 
-    renderer.models.push(sphere);
+    renderer.models.push(model);
 
     let mut camera = Camera::builder()
-        .near(0.3)
-        .far(1000.0)
-        .fovy(30.0.deg())
-        .aspect(1920.0 / 1080.0)
-        .position(Vec3::new(0.0, 3.0, 0.0))
-        .view_direction(Vec3::new(0.0, -1.0, 0.0))
+        //.fovy(30.0.deg())
+        //.aspect(1920.0 / 1080.0)
+        .position(Vec3::new(0.0, 0.0, 3.0))
+        .view_direction(Vec3::new(0.0, 0.0, -1.0))
         .build();
 
     eventloop.run(move |event, _, controlflow| {
@@ -132,10 +127,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::MainEventsCleared => {
                 // doing the work here (later)
                 angle = Angle::from_deg(angle.to_deg() + 0.01);
-                renderer.models[0].get_mut(model_ref).unwrap().position =
-                    &(&Mat4::new_translate(Vec3::new(0.05, 0.05, 0.0))
-                        * &Mat4::new_rotation_z(angle))
-                        * &Mat4::new_scaling(0.1);
+
+                let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
+
+                renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
+                renderer.models[0]
+                    .get_mut(model_ref)
+                    .unwrap()
+                    .inverse_model_matrix = new_model_matrix.try_inverse().unwrap();
+
                 renderer.window.request_redraw();
             }
             Event::RedrawRequested(_) => {

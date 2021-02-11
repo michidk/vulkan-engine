@@ -21,6 +21,10 @@ where
         value.unscale_mut(n.clone());
         (Unit { value }, n)
     }
+
+    pub fn into_inner(self) -> T {
+        self.value
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Unit<T> {

@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_ref = model.insert_visibly(InstanceData::from_matrix_and_color(
         &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
-        Color::RED,
+        Color::rgb_f32(0.955, 0.638, 0.538),
     ));
 
     model.update_vertex_buffer(&renderer.allocator).unwrap();
@@ -80,8 +80,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut camera = Camera::builder()
         //.fovy(30.0.deg())
         .aspect(window_size.width as f32 / window_size.height as f32)
-        .position(Vec3::new(0.0, 0.0, 3.0))
-        .view_direction(Vec3::new(0.0, 0.0, -1.0))
         .build();
 
     eventloop.run(move |event, _, controlflow| {

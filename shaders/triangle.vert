@@ -13,12 +13,12 @@ layout (set = 0, binding = 0) uniform UniformBufferObject {
 
 layout (location = 0) out vec4 o_color;
 layout (location = 1) out vec3 o_normal;
+layout (location = 2) out vec4 o_worldpos;
 
 void main() {
     gl_PointSize = 1.0;
-    gl_Position = ubo.projection_matrix * ubo.view_matrix * i_model_matrix * vec4(i_position, 1.0);
-
-    o_color = vec4(i_position, 1.0);
-    //o_normal = vec3(transpose(inverse(i_model_matrix)) * vec4(i_normal, 0.0));
+    o_worldpos = i_model_matrix * vec4(i_position, 1.0);
+    gl_Position = ubo.projection_matrix * ubo.view_matrix * o_worldpos;
+    o_color = i_color;
     o_normal = transpose(mat3(i_inverse_model_matrix)) * i_normal;
 }

@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_ref = model.insert_visibly(InstanceData::from_matrix_and_color(
         &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
-        Color::rgb_f32(1.0, 1.0, 0.2),
+        Color::RED,
     ));
 
     model.update_vertex_buffer(&renderer.allocator).unwrap();
@@ -125,6 +125,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 winit::event::VirtualKeyCode::F12 => {
                     renderer::screenshot(&renderer).expect("screenshot trouble");
+                }
+                winit::event::VirtualKeyCode::Q => {
+                    *controlflow = winit::event_loop::ControlFlow::Exit;
                 }
                 _ => {}
             },

@@ -1182,7 +1182,7 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 [[package]]
 name = "vk-mem"
 version = "0.2.3"
-source = "git+https://github.com/matthewjberger/vk-mem-rs#0cf0199ceb3b39ec46a2dd67b6ebdca8ca9fcd47"
+source = "git+https://github.com/gwihlidal/vk-mem-rs#ec2772294fcded340d663487503fd356b70bc3a3"
 dependencies = [
  "ash",
  "bitflags",

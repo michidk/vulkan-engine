@@ -102,6 +102,11 @@ impl Camera {
         self.turn_up(-angle);
     }
 
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
+        self.update_projection_matrix();
+    }
+
     pub fn builder() -> CameraBuilder {
         CameraBuilder {
             position: Vec3::new(0.0, -3.0, -3.0),

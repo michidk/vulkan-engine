@@ -66,25 +66,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut lights = LightManager::default();
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(-1., -1., 0.),
+        direction: Vec3::new(0., -1., 0.),
         illuminance: Vec3::new(10.1, 10.1, 10.1),
     });
-    lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    lights.add_light(DirectionalLight {
+        direction: Vec3::new(0., 1., 0.),
+        illuminance: Vec3::new(1.6, 1.6, 1.6),
     });
     lights.add_light(PointLight {
         position: Vec3::new(0.1, -3.0, -3.0),
         luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
-    lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
-    });
+    //lights.add_light(PointLight {
+    //    position: Vec3::new(0.1, -3.0, -3.0),
+    //    luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    //});
+    //lights.add_light(PointLight {
+    //    position: Vec3::new(0.1, -3.0, -3.0),
+    //    luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    //});
+    //lights.add_light(PointLight {
+    //    position: Vec3::new(0.1, -3.0, -3.0),
+    //    luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    //});
 
     lights.update_buffer(
         &renderer.device,
@@ -109,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
                 &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
                     * &Mat4::new_scaling(0.5),
-                Color::rgb_f32(0.7, 0.7, 0.0),
+                Color::rgb_f32(0.955, 0.638, 0.538),
                 i as f32 * 0.1,
                 j as f32 * 0.1,
             ));
@@ -257,11 +261,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .swapchains(&swapchains)
                     .image_indices(&indices);
                 unsafe {
-                    renderer
+                    match renderer
                         .swapchain
                         .swapchain_loader
                         .queue_present(renderer.queues.graphics_queue, &present_info)
-                        .expect("queue presentation");
+                    {
+                        Ok(..) => {}
+                        Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                            renderer.recreate_swapchain().expect("swapchain recreation");
+                            camera.set_aspect(
+                                renderer.swapchain.extent.width as f32
+                                    / renderer.swapchain.extent.height as f32,
+                            );
+                            camera.update_buffer(&renderer.allocator, &mut renderer.uniform_buffer);
+                        }
+                        _ => {
+                            panic!("unhandled queue presentation error");
+                        }
+                    }
                 };
                 renderer.swapchain.current_image = (renderer.swapchain.current_image + 1)
                     % renderer.swapchain.amount_of_images as usize;

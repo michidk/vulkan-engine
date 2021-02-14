@@ -91,18 +91,21 @@ impl PipelineWrapper {
         let shader_stages = vec![vertexshader_stage.build(), fragmentshader_stage.build()];
 
         let vertex_attrib_descs = [
+            // position
             vk::VertexInputAttributeDescription {
                 binding: 0,
                 location: 0,
                 offset: 0,
                 format: vk::Format::R32G32B32_SFLOAT,
             },
+            // normal
             vk::VertexInputAttributeDescription {
                 binding: 0,
                 location: 1,
                 offset: 12,
                 format: vk::Format::R32G32B32_SFLOAT,
             },
+            // model matrix
             vk::VertexInputAttributeDescription {
                 binding: 1,
                 location: 2,
@@ -127,6 +130,7 @@ impl PipelineWrapper {
                 offset: 48,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
+            // inverse model matrix
             vk::VertexInputAttributeDescription {
                 binding: 1,
                 location: 6,
@@ -151,11 +155,26 @@ impl PipelineWrapper {
                 offset: 112,
                 format: vk::Format::R32G32B32A32_SFLOAT,
             },
+            // Color
             vk::VertexInputAttributeDescription {
                 binding: 1,
                 location: 10,
                 offset: 128,
                 format: vk::Format::R32G32B32A32_SFLOAT,
+            },
+            // Metallic
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 11,
+                offset: 144,
+                format: vk::Format::R32_SFLOAT,
+            },
+            // Roughness
+            vk::VertexInputAttributeDescription {
+                binding: 1,
+                location: 12,
+                offset: 148,
+                format: vk::Format::R32_SFLOAT,
             },
         ];
         let vertex_binding_descs = [
@@ -166,7 +185,7 @@ impl PipelineWrapper {
             },
             vk::VertexInputBindingDescription {
                 binding: 1,
-                stride: 144,
+                stride: 152,
                 input_rate: vk::VertexInputRate::INSTANCE,
             },
         ];
@@ -217,18 +236,29 @@ impl PipelineWrapper {
         let colourblend_info =
             vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
 
-        let descriptorset_layout_binding_descs = [vk::DescriptorSetLayoutBinding::builder()
+        let descriptorset_layout_binding_descs0 = [vk::DescriptorSetLayoutBinding::builder()
             .binding(0)
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .descriptor_count(1)
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .build()];
-        let descriptorset_layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
-            .bindings(&descriptorset_layout_binding_descs);
-        let descriptorset_layout = unsafe {
-            logical_device.create_descriptor_set_layout(&descriptorset_layout_info, None)
+        let descriptorset_layout_info0 = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&descriptorset_layout_binding_descs0);
+        let descriptorset_layout0 = unsafe {
+            logical_device.create_descriptor_set_layout(&descriptorset_layout_info0, None)
         }?;
-        let desclayouts = vec![descriptorset_layout];
+        let descriptorset_layout_binding_descs1 = [vk::DescriptorSetLayoutBinding::builder()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .build()];
+        let descriptorset_layout_info1 = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&descriptorset_layout_binding_descs1);
+        let descriptorset_layout1 = unsafe {
+            logical_device.create_descriptor_set_layout(&descriptorset_layout_info1, None)
+        }?;
+        let desclayouts = vec![descriptorset_layout0, descriptorset_layout1];
 
         let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(&desclayouts);
         let pipelinelayout =

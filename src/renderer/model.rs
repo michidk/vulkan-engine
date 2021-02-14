@@ -285,14 +285,23 @@ pub struct InstanceData {
     pub model_matrix: Mat4<f32>,
     pub inverse_model_matrix: Mat4<f32>,
     pub color: Color,
+    pub metallic: f32,
+    pub roughness: f32,
 }
 
 impl InstanceData {
-    pub fn from_matrix_and_color(model_matrix: Mat4<f32>, color: Color) -> Self {
+    pub fn from_matrix_color_metallic_roughness(
+        model_matrix: Mat4<f32>,
+        color: Color,
+        metallic: f32,
+        roughness: f32,
+    ) -> Self {
         Self {
             inverse_model_matrix: model_matrix.try_inverse().unwrap(),
             model_matrix,
             color,
+            metallic,
+            roughness,
         }
     }
 }

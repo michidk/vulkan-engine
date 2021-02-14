@@ -1,8 +1,16 @@
-.PHONY: run check test clippy clippy-hack fmt lint cic cicl clean
+.PHONY: run build shaders check test clippy clippy-hack fmt lint cic cicl clean
 
+# run and compile
 run:
 	cargo +nightly run
 
+build:
+	cargo +nightly build
+
+shaders:
+	ve_shader ./shaders/* -o ./assets/shaders
+
+# test and lint
 check:
 	cargo +nightly check
 	cargo +nightly check -p math
@@ -24,11 +32,12 @@ fmt:
 
 lint: fmt clippy
 
-# can i commit?
+# utility
+## can i commit?
 cic: test fmt clippy
 	cargo +nightly clippy -- -D warnings
 
-# cic hack
+## cic hack
 cicl: test fmt clippy-hack
 
 clean:

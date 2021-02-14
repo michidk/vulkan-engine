@@ -1,6 +1,6 @@
-on: [push, pull_request]
-
 name: Continuous Integration
+
+on: [push, pull_request]
 
 jobs:
   check:
@@ -87,8 +87,12 @@ jobs:
           toolchain: nightly
           target: x86_64-unknown-linux-gnu
           override: true
+      - name: Compile shaders
+        run: cargo install ve_shader && ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release --target=x86_64-unknown-linux-gnu
+      - name: Copy assets
+        run: mkdir -p ./target/release/assets/ && cp -R ./assets/ ./target/release/assets/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
@@ -116,8 +120,12 @@ jobs:
           toolchain: nightly
           target: x86_64-pc-windows-gnu
           override: true
+      - name: Compile shaders
+        run: cargo install ve_shader; ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release
+      - name: Copy assets
+        run: cp -R ./assets/ ./target/release/assets/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:

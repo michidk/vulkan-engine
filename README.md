@@ -19,7 +19,9 @@ The goal is to build a somewhat useable game engine and a demo using it. While w
 - Git
 - cmake and ninja
 
-Then build with `make build` or run with `make run`.
+You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`.
+
+Compile the shaders with `make shaders`. Then build with `make build` or run with `make run`.
 
 ## Resources
 

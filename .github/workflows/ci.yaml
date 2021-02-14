@@ -1,11 +1,6 @@
 name: Continuous Integration
 
-
-on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
+on: [push, pull_request]
 
 jobs:
   check:
@@ -74,7 +69,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- --tests -D warnings
+          args: --all-targets -- -D warnings
 
   build-linux:
     name: Linux Build
@@ -92,13 +87,19 @@ jobs:
           toolchain: nightly
           target: x86_64-unknown-linux-gnu
           override: true
+      - name: Compile shaders
+        run: cargo install ve_shader && mkdir -p ./assets/shaders && ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release --target=x86_64-unknown-linux-gnu
+      - name: Copy assets
+        run: mkdir -p ./out/assets/ && cp -R ./assets/* ./out/assets/
+      - name: Copy application files
+        run: cp ./target/x86_64-unknown-linux-gnu/release/vulkan_engine ./out/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
-          name: executable
-          path: ./target/x86_64-unknown-linux-gnu/release/vulkan_engine
+          name: Linux Build (x86_64)
+          path: ./out
 
   build-windows:
     name: Windows Build
@@ -121,10 +122,16 @@ jobs:
           toolchain: nightly
           target: x86_64-pc-windows-gnu
           override: true
+      - name: Compile shaders
+        run: cargo install ve_shader; mkdir -p ./assets/shaders; ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release
+      - name: Copy assets
+        run: mkdir ./out/assets; cp -R ./assets/* ./out/assets/
+      - name: Copy application files
+        run: cp ./target/release/vulkan_engine.exe ./out/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
-          name: executable
-          path: ./target/release/vulkan_engine.exe
+          name: Windows Build (x86_64)
+          path: ./out

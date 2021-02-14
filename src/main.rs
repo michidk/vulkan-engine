@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
                 &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
                     * &Mat4::new_scaling(0.5),
-                Color::rgb_f32(0.955, 0.638, 0.538),
+                Color::rgb_f32(1.0, 0.86, 0.57),
                 i as f32 * 0.1,
                 j as f32 * 0.1,
             ));

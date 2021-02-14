@@ -86,8 +86,9 @@ vec3 computeRadiance(vec3 irradiance, vec3 lightDirection, vec3 normal, vec3 cam
     float nDotH = max(dot(normal, halfVector), 0);
     float nDotL = max(dot(normal, lightDirection), 0);
 
-    // use 0.03 for non-metallic materials else use the surface color
-    vec3 f0 = mix(vec3(0.03), surfaceColor, vec3(i_metallic)); // TODO: move to parameter
+    // base relectivity
+    // use 0.04 for non-metallic/dialectic materials else use the surface color
+    vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(i_metallic));
 
     // calculate irradiance by using Fresnel's equations (https://en.wikipedia.org/wiki/Fresnel_equations)
     vec3 irradianceOnSurface = irradiance * nDotL;

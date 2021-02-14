@@ -1,6 +1,9 @@
 use ash::{version::DeviceV1_0, vk};
 
-use super::swapchain;
+use super::{
+    shader::{self, ShaderKind},
+    swapchain,
+};
 
 pub fn init_renderpass(
     logical_device: &ash::Device,
@@ -70,15 +73,17 @@ impl PipelineWrapper {
         swapchain: &swapchain::SwapchainWrapper,
         renderpass: &vk::RenderPass,
     ) -> Result<PipelineWrapper, vk::Result> {
-        let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder().code(
-            vk_shader_macros::include_glsl!("shaders/triangle.vert", kind: vert),
-        );
+        let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
+        let vertexshader_createinfo =
+            shader::load("triangle", ShaderKind::Vertex, &mut vertexshader_code);
         let vertexshader_module =
             unsafe { logical_device.create_shader_module(&vertexshader_createinfo, None)? };
-        let fragmentshader_createinfo = vk::ShaderModuleCreateInfo::builder()
-            .code(vk_shader_macros::include_glsl!("shaders/triangle.frag"));
+        let fragmentshader_createinfo =
+            shader::load("triangle", ShaderKind::Fragment, &mut fragmentshader_code);
         let fragmentshader_module =
             unsafe { logical_device.create_shader_module(&fragmentshader_createinfo, None)? };
+        drop(vertexshader_code);
+        drop(fragmentshader_code);
         let mainfunctionname = std::ffi::CString::new("main").unwrap();
         let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::VERTEX)

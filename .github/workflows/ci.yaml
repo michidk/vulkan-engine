@@ -69,7 +69,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- --tests -D warnings
+          args: --tests -- -D warnings
 
   build-linux:
     name: Linux Build

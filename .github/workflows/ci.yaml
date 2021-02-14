@@ -92,12 +92,14 @@ jobs:
       - name: Build
         run: cargo build --release --target=x86_64-unknown-linux-gnu
       - name: Copy assets
-        run: mkdir -p ./target/release/assets/ && cp -R ./assets/ ./target/release/assets/
+        run: mkdir -p ./out/assets/ && cp -R ./assets/ ./out/assets/
+      - name: Copy application files
+        run: cp ./target/x86_64-unknown-linux-gnu/release/vulkan_engine ./out/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
           name: Linux Build (x86_64)
-          path: ./target/x86_64-unknown-linux-gnu/release/
+          path: ./out
 
   build-windows:
     name: Windows Build
@@ -125,9 +127,11 @@ jobs:
       - name: Build
         run: cargo build --release
       - name: Copy assets
-        run: cp -R ./assets/ ./target/release/assets/
+        run: mkdir ./out/assets; cp -R ./assets/ ./out/assets/
+      - name: Copy application files
+        run: cp ./target/release/vulkan_engine.exe ./out/
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
           name: Windows Build (x86_64)
-          path: ./target/release/
+          path: ./out

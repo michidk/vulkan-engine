@@ -5,9 +5,9 @@ mod instance_device_queues;
 pub mod model;
 mod pools_and_commandbuffers;
 mod renderpass_and_pipeline;
+mod shader;
 mod surface;
 mod swapchain;
-mod shader;
 
 use ash::{
     version::{DeviceV1_0, InstanceV1_0},

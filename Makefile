@@ -8,7 +8,6 @@ build:
 	cargo +nightly build
 
 shaders:
-	mkdir -p ./assets/shaders
 	ve_shader ./shaders/* -o ./assets/shaders
 
 # test and lint

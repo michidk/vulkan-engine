@@ -316,11 +316,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::num::{ParseIntError};
+    use std::num::ParseIntError;
 
     use super::{
-        parse_face, parse_token, parse_triplet, parse_vertex, Face, FaceIndex,
-        MeshBuilder, ParserError, Vertex,
+        parse_face, parse_token, parse_triplet, parse_vertex, Face, FaceIndex, MeshBuilder,
+        ParserError, Vertex,
     };
 
     #[test]

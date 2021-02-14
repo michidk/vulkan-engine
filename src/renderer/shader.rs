@@ -35,7 +35,18 @@ pub fn load(name: &str, kind: ShaderKind, code_ref: &mut Vec<u32>) -> vk::Shader
 }
 
 fn get_file_as_bytes(file: PathBuf, dst: &mut Vec<u32>) {
-    let len = file.metadata().expect("Panic").len().try_into().unwrap();
+    let len = file
+        .metadata()
+        .unwrap_or_else(|_| panic!("Couldn't read file metadata of shader {}", file.display()))
+        .len()
+        .try_into()
+        .unwrap_or_else(|_| {
+            panic!(
+                "Couldn't read file size into a usize of shader {}",
+                file.display()
+            )
+        });
+
     let u32_len = std::mem::size_of::<u32>();
     assert!(len % u32_len == 0, "Parsed shader file wrong length.");
 
@@ -45,8 +56,10 @@ fn get_file_as_bytes(file: PathBuf, dst: &mut Vec<u32>) {
         std::slice::from_raw_parts_mut(dst.as_mut_ptr() as *mut u8, len) // assumes little endian, convert later if neccessary
     };
 
-    let mut f = File::open(file).unwrap();
-    f.read_exact(buf).unwrap();
+    let mut f = File::open(&file)
+        .unwrap_or_else(|_| panic!("Couldn't read shader file {}", file.display()));
+    f.read_exact(buf)
+        .unwrap_or_else(|_| panic!("Couldn't read shader into the buffer {}", file.display()));
 
     // convert to big endian, if the host system uses big endian
     if cfg!(target_endian = "big") {

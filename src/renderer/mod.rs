@@ -7,6 +7,7 @@ mod pools_and_commandbuffers;
 mod renderpass_and_pipeline;
 mod surface;
 mod swapchain;
+mod shader;
 
 use ash::{
     version::{DeviceV1_0, InstanceV1_0},

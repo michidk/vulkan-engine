@@ -1,6 +1,11 @@
-on: [push, pull_request]
-
 name: Continuous Integration
+
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
 
 jobs:
   check:

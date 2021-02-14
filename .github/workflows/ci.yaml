@@ -69,7 +69,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --tests -- -D warnings
+          args: --all-targets -- -D warnings
 
   build-linux:
     name: Linux Build
@@ -96,8 +96,8 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
-          name: executable
-          path: ./target/x86_64-unknown-linux-gnu/release/vulkan_engine
+          name: Linux Build (x86_64)
+          path: ./target/x86_64-unknown-linux-gnu/release/
 
   build-windows:
     name: Windows Build
@@ -129,5 +129,5 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
-          name: executable
-          path: ./target/release/vulkan_engine.exe
+          name: Windows Build (x86_64)
+          path: ./target/release/

@@ -1,6 +1,11 @@
-on: [push, pull_request]
-
 name: Continuous Integration
+
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
 
 jobs:
   check:
@@ -19,6 +24,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
+      - name: Run cargo check (math package)
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: -p math
 
   test:
     name: Test Suite
@@ -36,6 +46,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+      - name: Run cargo test (math package)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p math
 
   lints:
     name: Lints
@@ -59,7 +74,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: -- --tests -D warnings
 
   build-linux:
     name: Linux Build

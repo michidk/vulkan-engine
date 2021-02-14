@@ -6,6 +6,7 @@ pub mod light;
 pub mod model;
 mod pools_and_commandbuffers;
 mod renderpass_and_pipeline;
+mod shader;
 mod surface;
 mod swapchain;
 

@@ -1,6 +1,7 @@
 {
     // https://stackoverflow.com/questions/65223576/what-does-the-rust-analyzer-error-could-not-resolve-macro-crateformat-args
     "rust-analyzer.diagnostics.disabled": [
-        "macro-error"
+        "macro-error",
+        "mismatched-arg-count"
     ]
 }

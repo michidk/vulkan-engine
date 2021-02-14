@@ -8,6 +8,7 @@ use vulkan_engine::{
     renderer::{
         self,
         camera::Camera,
+        light::{DirectionalLight, LightManager, PointLight},
         model::{DefaultModel, InstanceData},
     },
 };
@@ -62,14 +63,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     let window_size = window.inner_size();
     let mut renderer = renderer::Renderer::init(window)?;
+
+    let mut lights = LightManager::default();
+    lights.add_light(DirectionalLight {
+        direction: Vec3::new(-1., -1., 0.),
+        illuminance: Vec3::new(10.1, 10.1, 10.1),
+    });
+    lights.add_light(PointLight {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    });
+    lights.add_light(PointLight {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    });
+    lights.add_light(PointLight {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    });
+    lights.add_light(PointLight {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    });
+
+    lights.update_buffer(
+        &renderer.device,
+        &renderer.allocator,
+        &mut renderer.light_buffer,
+        &mut renderer.descriptor_sets_light,
+    )?;
+
     let mut model = DefaultModel::sphere(4);
 
-    let mut angle = 7.0.deg();
+    //let mut angle = 7.0.deg();
 
-    let model_ref = model.insert_visibly(InstanceData::from_matrix_and_color(
-        &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
-        Color::rgb_f32(0.955, 0.638, 0.538),
-    ));
+    //let model_ref = model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
+    //    &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
+    //    Color::rgb_f32(0.955, 0.638, 0.538),
+    //    1.0,
+    //    0.2,
+    //));
+
+    for i in 0..10 {
+        for j in 0..10 {
+            model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
+                &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
+                    * &Mat4::new_scaling(0.5),
+                Color::rgb_f32(0.7, 0.7, 0.0),
+                i as f32 * 0.1,
+                j as f32 * 0.1,
+            ));
+        }
+    }
 
     model.update_vertex_buffer(&renderer.allocator).unwrap();
     model.update_index_buffer(&renderer.allocator).unwrap();
@@ -79,6 +124,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut camera = Camera::builder()
         //.fovy(30.0.deg())
+        .position(Vec3::new(0.0, 0.0, -5.0))
+        .view_direction(Vec3::new(0.0, 0.0, 1.0))
         .aspect(window_size.width as f32 / window_size.height as f32)
         .build();
 
@@ -131,15 +178,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Event::MainEventsCleared => {
                 // doing the work here (later)
-                angle = Angle::from_deg(angle.to_deg() + 0.01);
+                //angle = Angle::from_deg(angle.to_deg() + 0.01);
 
-                let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
+                //let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
 
-                renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
-                renderer.models[0]
-                    .get_mut(model_ref)
-                    .unwrap()
-                    .inverse_model_matrix = new_model_matrix.try_inverse().unwrap();
+                //renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
+                //renderer.models[0]
+                //    .get_mut(model_ref)
+                //    .unwrap()
+                //    .inverse_model_matrix = new_model_matrix.try_inverse().unwrap();
 
                 renderer.window.request_redraw();
             }

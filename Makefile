@@ -13,14 +13,13 @@ shaders:
 
 # test and lint
 check:
-	cargo +nightly check
-	cargo +nightly check -p math
+	cargo +nightly check --all
 
 test:
-	cargo +nightly test
-	cargo +nightly test -p math
+	cargo +nightly test --all
 
 clippy:
+	cargo +nightly clippy -- -D warnings
 	cargo +nightly clippy --all-targets -- -D warnings
 
 clippy-hack:

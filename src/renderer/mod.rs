@@ -2,6 +2,7 @@ mod buffer;
 pub mod camera;
 mod debug;
 mod instance_device_queues;
+pub mod light;
 pub mod model;
 mod pools_and_commandbuffers;
 mod renderpass_and_pipeline;
@@ -350,7 +351,9 @@ pub struct Renderer {
     pub models: Vec<DefaultModel>,
     pub uniform_buffer: BufferWrapper,
     descriptor_pool: vk::DescriptorPool,
-    descriptor_sets: Vec<vk::DescriptorSet>,
+    descriptor_sets_camera: Vec<vk::DescriptorSet>,
+    pub descriptor_sets_light: Vec<vk::DescriptorSet>,
+    pub light_buffer: BufferWrapper,
 }
 
 impl Renderer {
@@ -414,23 +417,31 @@ impl Renderer {
             [Mat4::identity().into(), Mat4::identity().into()];
         uniform_buffer.fill(&allocator, &camera_transform)?;
 
-        let pool_size = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: swapchain.amount_of_images,
-        }];
+        let pool_sizes = [
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: swapchain.amount_of_images,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: swapchain.amount_of_images,
+            },
+        ];
         let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
-            .max_sets(swapchain.amount_of_images)
-            .pool_sizes(&pool_size);
+            .max_sets(2 * swapchain.amount_of_images)
+            .pool_sizes(&pool_sizes);
         let descriptor_pool =
             unsafe { logical_device.create_descriptor_pool(&descriptor_pool_info, None) }?;
-        let desc_layouts =
+
+        let desc_layouts_camera =
             vec![pipeline.descriptor_set_layouts[0]; swapchain.amount_of_images as usize];
-        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo::builder()
+        let descriptor_set_allocate_info_camera = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(descriptor_pool)
-            .set_layouts(&desc_layouts);
-        let descriptor_sets =
-            unsafe { logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info) }?;
-        for descset in &descriptor_sets {
+            .set_layouts(&desc_layouts_camera);
+        let descriptor_sets_camera = unsafe {
+            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_camera)
+        }?;
+        for descset in &descriptor_sets_camera {
             let buffer_infos = [vk::DescriptorBufferInfo {
                 buffer: uniform_buffer.buffer,
                 offset: 0,
@@ -440,6 +451,37 @@ impl Renderer {
                 .dst_set(*descset)
                 .dst_binding(0)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .buffer_info(&buffer_infos)
+                .build()];
+            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
+        }
+
+        let mut light_buffer = BufferWrapper::new(
+            &allocator,
+            8,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
+        )?;
+        light_buffer.fill(&allocator, &[0.0, 0.0])?;
+
+        let desc_layouts_light =
+            vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
+        let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&desc_layouts_light);
+        let descriptor_sets_light = unsafe {
+            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_light)
+        }?;
+        for descset in &descriptor_sets_light {
+            let buffer_infos = [vk::DescriptorBufferInfo {
+                buffer: light_buffer.buffer,
+                offset: 0,
+                range: 8,
+            }];
+            let desc_set_write = [vk::WriteDescriptorSet::builder()
+                .dst_set(*descset)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                 .buffer_info(&buffer_infos)
                 .build()];
             unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
@@ -465,7 +507,9 @@ impl Renderer {
             models: Vec::new(),
             uniform_buffer,
             descriptor_pool,
-            descriptor_sets,
+            descriptor_sets_camera,
+            descriptor_sets_light,
+            light_buffer,
         })
     }
 
@@ -514,7 +558,10 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.layout,
                 0,
-                &[self.descriptor_sets[index]],
+                &[
+                    self.descriptor_sets_camera[index],
+                    self.descriptor_sets_light[index],
+                ],
                 &[],
             );
             for m in &self.models {
@@ -537,6 +584,7 @@ impl Drop for Renderer {
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
             self.uniform_buffer.cleanup(&self.allocator);
+            self.light_buffer.cleanup(&self.allocator);
 
             // if we fail to destroy the buffer continue to destory as many things
             // as possible

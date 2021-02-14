@@ -88,7 +88,7 @@ jobs:
           target: x86_64-unknown-linux-gnu
           override: true
       - name: Compile shaders
-        run: cargo install ve_shader && ve_shader ./shaders/* -o ./assets/shaders
+        run: cargo install ve_shader && mkdir -p ./assets/shaders && ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release --target=x86_64-unknown-linux-gnu
       - name: Copy assets
@@ -121,7 +121,7 @@ jobs:
           target: x86_64-pc-windows-gnu
           override: true
       - name: Compile shaders
-        run: cargo install ve_shader; ve_shader ./shaders/* -o ./assets/shaders
+        run: cargo install ve_shader; mkdir -p ./assets/shaders; ve_shader ./shaders/* -o ./assets/shaders
       - name: Build
         run: cargo build --release
       - name: Copy assets

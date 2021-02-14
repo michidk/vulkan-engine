@@ -8,7 +8,8 @@ build:
 	cargo +nightly build
 
 shaders:
-	mkdir -p ./assets/shaders; ve_shader ./shaders/* -o ./assets/shaders
+	mkdir -p ./assets/shaders
+	ve_shader ./shaders/* -o ./assets/shaders
 
 # test and lint
 check:
@@ -35,7 +36,6 @@ lint: fmt clippy
 # utility
 ## can i commit?
 cic: test fmt clippy
-	cargo +nightly clippy -- -D warnings
 
 ## cic hack
 cicl: test fmt clippy-hack

@@ -7,7 +7,7 @@ use std::{
 
 use ash::vk;
 
-const FOLDER: &str = ".\\assets\\shaders";
+const FOLDER: &str = "./assets/shaders";
 
 pub enum ShaderKind {
     Vertex,

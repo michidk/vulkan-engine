@@ -20,12 +20,12 @@ test:
 	cargo +nightly test -p math
 
 clippy:
-	cargo +nightly clippy -- --tests -D warnings
+	cargo +nightly clippy --all-targets -- -D warnings
 
 clippy-hack:
 	# hack to update files so that clippy/cargo does not use cached versions
 	find -name "*.rs" -not -path "./target/*" -exec touch "{}" +
-	cargo +nightly clippy -- --tests -D warnings
+	cargo +nightly clippy --all-targets -- -D warnings
 
 fmt:
 	cargo +nightly fmt --all -- --check

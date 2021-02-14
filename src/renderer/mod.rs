@@ -572,6 +572,30 @@ impl Renderer {
         }
         Ok(())
     }
+
+    pub fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .expect("something went wrong while waiting");
+        }
+        unsafe {
+            self.swapchain.cleanup(&self.device, &self.allocator);
+        }
+        self.swapchain = SwapchainWrapper::init(
+            &self.instance,
+            self.physical_device,
+            &self.device,
+            &self.surfaces,
+            &self.queue_families,
+            &self.allocator,
+        )?;
+        self.swapchain
+            .create_framebuffers(&self.device, self.renderpass)?;
+        self.pipeline.cleanup(&self.device);
+        self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
+        Ok(())
+    }
 }
 
 impl Drop for Renderer {

@@ -35,7 +35,6 @@ pub fn load(name: &str, kind: ShaderKind, code_ref: &mut Vec<u32>) -> vk::Shader
 }
 
 fn get_file_as_bytes(file: PathBuf, dst: &mut Vec<u32>) {
-    println!("{}", file.display());
     let len = file.metadata().expect("Panic").len().try_into().unwrap();
     let u32_len = std::mem::size_of::<u32>();
     assert!(len % u32_len == 0, "Parsed shader file wrong length.");

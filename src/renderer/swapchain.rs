@@ -27,16 +27,17 @@ impl SwapchainWrapper {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         logical_device: &ash::Device,
-        surfaces: &surface::SurfaceWrapper,
+        surface: &surface::SurfaceWrapper,
         queue_families: &instance_device_queues::QueueFamilies,
         allocator: &vk_mem::Allocator,
     ) -> Result<SwapchainWrapper, RendererError> {
-        let surface_capabilities = surfaces.get_capabilities(physical_device)?;
+        let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
-        let surface_format = *surfaces.get_formats(physical_device)?.get(0).unwrap(); // returns B8G8R8A8_UNORM in SRGB non linear color space
+        let surface_format = *surface.get_formats(physical_device)?.get(0).unwrap(); // returns B8G8R8A8_UNORM in SRGB non linear color space
+        let present_mode = surface.choose_present_mode(physical_device)?;
 
         let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
-            .surface(surfaces.surface)
+            .surface(surface.surface)
             .min_image_count(
                 3.max(surface_capabilities.min_image_count)
                     .min(surface_capabilities.max_image_count),
@@ -49,7 +50,7 @@ impl SwapchainWrapper {
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::IMMEDIATE);
+            .present_mode(present_mode);
 
         // check whether graphics and present queue are actual the same queue
         let queuefamilies = [

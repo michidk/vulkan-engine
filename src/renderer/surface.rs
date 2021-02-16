@@ -33,15 +33,15 @@ impl SurfaceWrapper {
         }
     }
 
-    // fn get_present_modes(
-    //     &self,
-    //     physical_device: vk::PhysicalDevice,
-    // ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
-    //     unsafe {
-    //         self.surface_loader
-    //             .get_physical_device_surface_present_modes(physical_device, self.surface)
-    //     }
-    // }
+    pub fn get_present_modes(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
+        unsafe {
+            self.surface_loader
+                .get_physical_device_surface_present_modes(physical_device, self.surface)
+        }
+    }
 
     pub fn get_formats(
         &self,
@@ -65,6 +65,18 @@ impl SurfaceWrapper {
                 self.surface,
             )
         }
+    }
+
+    pub fn choose_present_mode(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<vk::PresentModeKHR, vk::Result> {
+        let present_modes = self.get_present_modes(physical_device)?;
+        Ok(if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
+            vk::PresentModeKHR::MAILBOX
+        } else {
+            vk::PresentModeKHR::FIFO
+        })
     }
 }
 

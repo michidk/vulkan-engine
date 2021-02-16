@@ -2,7 +2,10 @@
 
 ## TODO's
 
-- change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
+- change to Mailbox presentation mode (https://vulkan-tutorial.com/co
+de/15_hello_triangle.cpp)
+
+- implement chooseSwapSurfaceFormat and chooseSwapPresentMode (https://vulkan-tutorial.com/code/16_swap_chain_recreation.cpp)
 
 - next chapter: 32
 

@@ -34,11 +34,8 @@ impl SwapchainWrapper {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
         let surface_format = *surfaces.get_formats(physical_device)?.get(0).unwrap(); // returns B8G8R8A8_UNORM in SRGB non linear color space
-        let queuefamilies = [
-            queue_families.graphics_q_index,
-            queue_families.present_q_index,
-        ];
-        let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
+
+        let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surfaces.surface)
             .min_image_count(
                 3.max(surface_capabilities.min_image_count)
@@ -50,10 +47,24 @@ impl SwapchainWrapper {
             .image_array_layers(1)
             .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .queue_family_indices(&queuefamilies)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(vk::PresentModeKHR::IMMEDIATE);
+
+        // check whether graphics and present queue are actual the same queue
+        let queuefamilies = [
+            queue_families.graphics_q_index,
+            queue_families.present_q_index,
+        ];
+        if queue_families.graphics_q_index == queue_families.present_q_index {
+            swapchain_create_info =
+                swapchain_create_info.image_sharing_mode(vk::SharingMode::EXCLUSIVE);
+        } else {
+            swapchain_create_info = swapchain_create_info
+                .queue_family_indices(&queuefamilies) // queues that have access to the images in this chain
+                .image_sharing_mode(vk::SharingMode::CONCURRENT); // multiple queues are allowed to access the subresources; might result in lower performance
+        }
+
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(swapchain)? };

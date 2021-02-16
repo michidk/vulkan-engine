@@ -4,7 +4,6 @@
 
 - change to Mailbox presentation mode (https://vulkan-tutorial.com/code/15_hello_triangle.cpp)
 
-- create graphics and separate present queue, since they might not overlap: https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
 - next chapter: 32
 
 ## FPS (release build; fullscreen)

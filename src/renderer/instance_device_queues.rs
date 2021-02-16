@@ -121,6 +121,7 @@ pub fn init_physical_device_and_properties(
 
 pub struct QueueFamilies {
     pub graphics_q_index: u32,
+    pub present_q_index: u32,
 }
 
 impl QueueFamilies {
@@ -129,12 +130,11 @@ impl QueueFamilies {
         physical_device: vk::PhysicalDevice,
         surfaces: &surface::SurfaceWrapper,
     ) -> Result<QueueFamilies, RendererError> {
+        let queues =
+            QueueFamilies::find_suiltable_queue_family(instance, physical_device, surfaces)?;
         Ok(QueueFamilies {
-            graphics_q_index: QueueFamilies::find_suiltable_queue_family(
-                instance,
-                physical_device,
-                surfaces,
-            )?,
+            graphics_q_index: queues.0,
+            present_q_index: queues.1,
         })
     }
 
@@ -142,27 +142,42 @@ impl QueueFamilies {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         surfaces: &surface::SurfaceWrapper,
-    ) -> Result<u32, RendererError> {
+    ) -> Result<(u32, u32), RendererError> {
         let queuefamilyproperties =
             unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
         let mut found_graphics_q_index = None;
+        let mut found_present_q_index = None;
         for (index, qfam) in queuefamilyproperties.iter().enumerate() {
-            if qfam.queue_count > 0
-                && qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-                && surfaces.get_physical_device_surface_support(physical_device, index)?
-            {
-                found_graphics_q_index = Some(index as u32);
+            if qfam.queue_count > 0 {
+                if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                    found_graphics_q_index = Some(index as u32);
+                }
+
+                if surfaces.get_physical_device_surface_support(physical_device, index)? {
+                    found_present_q_index = Some(index as u32);
+                }
+            }
+
+            if found_graphics_q_index.is_some() && found_present_q_index.is_some() {
                 break;
             }
         }
 
-        found_graphics_q_index.ok_or(RendererError::NoSuitableQueueFamily)
+        if found_graphics_q_index.is_none() || found_present_q_index.is_none() {
+            return Err(RendererError::NoSuitableQueueFamily);
+        }
+
+        Ok((
+            found_graphics_q_index.unwrap(),
+            found_present_q_index.unwrap(),
+        ))
     }
 }
 
 pub struct Queues {
     pub graphics_queue: vk::Queue,
+    pub present_queue: vk::Queue,
 }
 
 pub fn init_device_and_queues(
@@ -170,20 +185,22 @@ pub fn init_device_and_queues(
     physical_device: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
 ) -> Result<(ash::Device, Queues), vk::Result> {
-    // select queues
-    // https://hoj-senna.github.io/ashen-engine/text/005_Queues.html
-    // in this case we only want one queue for now
-    let queue_family_index = queue_families.graphics_q_index;
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode
     let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true);
     let priorities = [1.0];
 
-    let queue_info = [vk::DeviceQueueCreateInfo::builder()
-        .queue_family_index(queue_family_index)
-        .queue_priorities(&priorities)
-        .build()];
+    let queue_info = [
+        vk::DeviceQueueCreateInfo::builder()
+            .queue_family_index(queue_families.graphics_q_index)
+            .queue_priorities(&priorities)
+            .build(),
+        vk::DeviceQueueCreateInfo::builder()
+            .queue_family_index(queue_families.present_q_index)
+            .queue_priorities(&priorities)
+            .build(),
+    ];
 
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_info)
@@ -193,12 +210,17 @@ pub fn init_device_and_queues(
     let logical_device: ash::Device =
         unsafe { instance.create_device(physical_device, &device_create_info, None) }?;
 
-    let present_queue = unsafe { logical_device.get_device_queue(queue_family_index as u32, 0) };
+    let graphics_queue =
+        unsafe { logical_device.get_device_queue(queue_families.graphics_q_index as u32, 0) };
+
+    let present_queue =
+        unsafe { logical_device.get_device_queue(queue_families.present_q_index as u32, 0) };
 
     Ok((
         logical_device,
         Queues {
-            graphics_queue: present_queue,
+            graphics_queue,
+            present_queue,
         },
     ))
 }

@@ -277,7 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match renderer
                         .swapchain
                         .swapchain_loader
-                        .queue_present(renderer.queues.graphics_queue, &present_info)
+                        .queue_present(renderer.queues.present_queue, &present_info)
                     {
                         Ok(..) => {}
                         Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {

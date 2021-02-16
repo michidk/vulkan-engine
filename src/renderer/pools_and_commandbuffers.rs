@@ -3,7 +3,7 @@ use ash::{version::DeviceV1_0, vk};
 use super::instance_device_queues::QueueFamilies;
 
 pub struct PoolsWrapper {
-    commandpool_graphics: vk::CommandPool,
+    pub commandpool_graphics: vk::CommandPool,
 }
 
 impl PoolsWrapper {

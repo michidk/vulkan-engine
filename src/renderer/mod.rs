@@ -2,9 +2,11 @@ mod buffer;
 pub mod camera;
 mod debug;
 mod instance_device_queues;
+pub mod light;
 pub mod model;
 mod pools_and_commandbuffers;
 mod renderpass_and_pipeline;
+mod shader;
 mod surface;
 mod swapchain;
 
@@ -69,6 +71,265 @@ pub const DEFAULT_WINDOW_INFO: AppInfo = AppInfo {
     title: "VulkanTriangle",
 };
 
+pub fn screenshot(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
+    let commandbuf_allocate_info = vk::CommandBufferAllocateInfo::builder()
+        .command_pool(renderer.pools.commandpool_graphics)
+        .command_buffer_count(1);
+    let copy_buffer = unsafe {
+        renderer
+            .device
+            .allocate_command_buffers(&commandbuf_allocate_info)
+    }?[0];
+
+    let cmd_begin_info =
+        vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+    unsafe {
+        renderer
+            .device
+            .begin_command_buffer(copy_buffer, &cmd_begin_info)
+    }?;
+
+    let image_create_info = vk::ImageCreateInfo::builder()
+        .format(vk::Format::R8G8B8A8_UNORM)
+        .image_type(vk::ImageType::TYPE_2D)
+        .extent(vk::Extent3D {
+            width: renderer.swapchain.extent.width,
+            height: renderer.swapchain.extent.height,
+            depth: 1,
+        })
+        .array_layers(1)
+        .mip_levels(1)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .tiling(vk::ImageTiling::LINEAR)
+        .usage(vk::ImageUsageFlags::TRANSFER_DST)
+        .initial_layout(vk::ImageLayout::UNDEFINED);
+
+    let allocation_create_info = vk_mem::AllocationCreateInfo {
+        usage: vk_mem::MemoryUsage::GpuToCpu,
+        ..Default::default()
+    };
+
+    let (destination_image, destination_allocation, _allocation_info) = renderer
+        .allocator
+        .create_image(&image_create_info, &allocation_create_info)?;
+
+    let destination_barrier = vk::ImageMemoryBarrier::builder()
+        .image(destination_image)
+        .src_access_mask(vk::AccessFlags::empty())
+        .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+        .old_layout(vk::ImageLayout::UNDEFINED)
+        .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+        .subresource_range(vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .build();
+
+    unsafe {
+        renderer.device.cmd_pipeline_barrier(
+            copy_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[destination_barrier],
+        )
+    };
+
+    let source_image = renderer.swapchain.images[renderer.swapchain.current_image];
+    let source_barrier = vk::ImageMemoryBarrier::builder()
+        .image(source_image)
+        .src_access_mask(vk::AccessFlags::MEMORY_READ)
+        .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+        .old_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+        .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+        .subresource_range(vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .build();
+
+    unsafe {
+        renderer.device.cmd_pipeline_barrier(
+            copy_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[source_barrier],
+        )
+    };
+
+    let zero_offset = vk::Offset3D::default();
+    let copy_area = vk::ImageCopy::builder()
+        .src_subresource(vk::ImageSubresourceLayers {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            mip_level: 0,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .src_offset(zero_offset)
+        .dst_subresource(vk::ImageSubresourceLayers {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            mip_level: 0,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .dst_offset(zero_offset)
+        .extent(vk::Extent3D {
+            width: renderer.swapchain.extent.width,
+            height: renderer.swapchain.extent.height,
+            depth: 1,
+        })
+        .build();
+
+    unsafe {
+        renderer.device.cmd_copy_image(
+            copy_buffer,
+            source_image,
+            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            destination_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            &[copy_area],
+        )
+    };
+
+    // make destination_image readable
+    let destination_barrier = vk::ImageMemoryBarrier::builder()
+        .image(destination_image)
+        .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+        .dst_access_mask(vk::AccessFlags::MEMORY_READ)
+        .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+        .new_layout(vk::ImageLayout::GENERAL)
+        .subresource_range(vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .build();
+
+    unsafe {
+        renderer.device.cmd_pipeline_barrier(
+            copy_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[destination_barrier],
+        )
+    };
+
+    // reset source_image
+    let source_barrier = vk::ImageMemoryBarrier::builder()
+        .image(source_image)
+        .src_access_mask(vk::AccessFlags::TRANSFER_READ)
+        .dst_access_mask(vk::AccessFlags::MEMORY_READ)
+        .old_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+        .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+        .subresource_range(vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        })
+        .build();
+    unsafe {
+        renderer.device.cmd_pipeline_barrier(
+            copy_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[source_barrier],
+        )
+    };
+
+    unsafe { renderer.device.end_command_buffer(copy_buffer) }?;
+
+    let submit_infos = [vk::SubmitInfo::builder()
+        .command_buffers(&[copy_buffer])
+        .build()];
+    let fence = unsafe {
+        renderer
+            .device
+            .create_fence(&vk::FenceCreateInfo::default(), None)
+    }?;
+    unsafe {
+        renderer
+            .device
+            .queue_submit(renderer.queues.graphics_queue, &submit_infos, fence)
+    }?;
+
+    // wait for fence
+    unsafe { renderer.device.wait_for_fences(&[fence], true, u64::MAX) }?;
+    unsafe { renderer.device.destroy_fence(fence, None) };
+    unsafe {
+        renderer
+            .device
+            .free_command_buffers(renderer.pools.commandpool_graphics, &[copy_buffer])
+    };
+
+    let source_ptr = renderer.allocator.map_memory(&destination_allocation)? as *mut u8;
+    // get image size
+    let subresource_layout = unsafe {
+        renderer.device.get_image_subresource_layout(
+            destination_image,
+            vk::ImageSubresource {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                array_layer: 0,
+            },
+        )
+    };
+
+    let mut data = Vec::<u8>::with_capacity(subresource_layout.size as usize);
+    unsafe {
+        std::ptr::copy(
+            source_ptr,
+            data.as_mut_ptr(),
+            subresource_layout.size as usize,
+        );
+        data.set_len(subresource_layout.size as usize);
+    }
+
+    // cleanup destination_image
+    renderer.allocator.unmap_memory(&destination_allocation);
+    renderer
+        .allocator
+        .destroy_image(destination_image, &destination_allocation);
+
+    let screen: image::ImageBuffer<image::Bgra<u8>, _> = image::ImageBuffer::from_raw(
+        renderer.swapchain.extent.width,
+        renderer.swapchain.extent.height,
+        data,
+    )
+    .expect("ImageBuffer creation");
+
+    let screen_image = image::DynamicImage::ImageBgra8(screen).to_rgba8();
+    screen_image.save(format!(
+        "screenshot_{}.jpg",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_secs()
+    ))?;
+
+    Ok(())
+}
+
 #[allow(dead_code)]
 pub struct Renderer {
     pub window: winit::window::Window,
@@ -90,7 +351,9 @@ pub struct Renderer {
     pub models: Vec<DefaultModel>,
     pub uniform_buffer: BufferWrapper,
     descriptor_pool: vk::DescriptorPool,
-    descriptor_sets: Vec<vk::DescriptorSet>,
+    descriptor_sets_camera: Vec<vk::DescriptorSet>,
+    pub descriptor_sets_light: Vec<vk::DescriptorSet>,
+    pub light_buffer: BufferWrapper,
 }
 
 impl Renderer {
@@ -154,23 +417,31 @@ impl Renderer {
             [Mat4::identity().into(), Mat4::identity().into()];
         uniform_buffer.fill(&allocator, &camera_transform)?;
 
-        let pool_size = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: swapchain.amount_of_images,
-        }];
+        let pool_sizes = [
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: swapchain.amount_of_images,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: swapchain.amount_of_images,
+            },
+        ];
         let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
-            .max_sets(swapchain.amount_of_images)
-            .pool_sizes(&pool_size);
+            .max_sets(2 * swapchain.amount_of_images)
+            .pool_sizes(&pool_sizes);
         let descriptor_pool =
             unsafe { logical_device.create_descriptor_pool(&descriptor_pool_info, None) }?;
-        let desc_layouts =
+
+        let desc_layouts_camera =
             vec![pipeline.descriptor_set_layouts[0]; swapchain.amount_of_images as usize];
-        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo::builder()
+        let descriptor_set_allocate_info_camera = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(descriptor_pool)
-            .set_layouts(&desc_layouts);
-        let descriptor_sets =
-            unsafe { logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info) }?;
-        for descset in &descriptor_sets {
+            .set_layouts(&desc_layouts_camera);
+        let descriptor_sets_camera = unsafe {
+            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_camera)
+        }?;
+        for descset in &descriptor_sets_camera {
             let buffer_infos = [vk::DescriptorBufferInfo {
                 buffer: uniform_buffer.buffer,
                 offset: 0,
@@ -180,6 +451,37 @@ impl Renderer {
                 .dst_set(*descset)
                 .dst_binding(0)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .buffer_info(&buffer_infos)
+                .build()];
+            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
+        }
+
+        let mut light_buffer = BufferWrapper::new(
+            &allocator,
+            8,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
+        )?;
+        light_buffer.fill(&allocator, &[0.0, 0.0])?;
+
+        let desc_layouts_light =
+            vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
+        let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&desc_layouts_light);
+        let descriptor_sets_light = unsafe {
+            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_light)
+        }?;
+        for descset in &descriptor_sets_light {
+            let buffer_infos = [vk::DescriptorBufferInfo {
+                buffer: light_buffer.buffer,
+                offset: 0,
+                range: 8,
+            }];
+            let desc_set_write = [vk::WriteDescriptorSet::builder()
+                .dst_set(*descset)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                 .buffer_info(&buffer_infos)
                 .build()];
             unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
@@ -205,7 +507,9 @@ impl Renderer {
             models: Vec::new(),
             uniform_buffer,
             descriptor_pool,
-            descriptor_sets,
+            descriptor_sets_camera,
+            descriptor_sets_light,
+            light_buffer,
         })
     }
 
@@ -254,7 +558,10 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.layout,
                 0,
-                &[self.descriptor_sets[index]],
+                &[
+                    self.descriptor_sets_camera[index],
+                    self.descriptor_sets_light[index],
+                ],
                 &[],
             );
             for m in &self.models {
@@ -263,6 +570,30 @@ impl Renderer {
             self.device.cmd_end_render_pass(commandbuffer);
             self.device.end_command_buffer(commandbuffer)?;
         }
+        Ok(())
+    }
+
+    pub fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .expect("something went wrong while waiting");
+        }
+        unsafe {
+            self.swapchain.cleanup(&self.device, &self.allocator);
+        }
+        self.swapchain = SwapchainWrapper::init(
+            &self.instance,
+            self.physical_device,
+            &self.device,
+            &self.surfaces,
+            &self.queue_families,
+            &self.allocator,
+        )?;
+        self.swapchain
+            .create_framebuffers(&self.device, self.renderpass)?;
+        self.pipeline.cleanup(&self.device);
+        self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
         Ok(())
     }
 }
@@ -277,6 +608,7 @@ impl Drop for Renderer {
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
             self.uniform_buffer.cleanup(&self.allocator);
+            self.light_buffer.cleanup(&self.allocator);
 
             // if we fail to destroy the buffer continue to destory as many things
             // as possible

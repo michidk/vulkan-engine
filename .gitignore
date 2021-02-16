@@ -1,2 +1,5 @@
 /target
+/out
 /assets/hide
+/assets/shaders
+screenshot_*.jpg

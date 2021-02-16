@@ -316,11 +316,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::num::{ParseFloatError, ParseIntError};
+    use std::num::ParseIntError;
 
     use super::{
-        parse_face, parse_numbers, parse_token, parse_triplet, parse_vertex, Face, FaceIndex,
-        MeshBuilder, ParserError, Vertex,
+        parse_face, parse_token, parse_triplet, parse_vertex, Face, FaceIndex, MeshBuilder,
+        ParserError, Vertex,
     };
 
     #[test]
@@ -368,15 +368,6 @@ mod test {
             }
         );
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_numbers() -> Result<(), ParseFloatError> {
-        assert_eq!(
-            parse_numbers("1 -2.8 888834.2348234")?,
-            &[1f32, -2.8f32, 888834.2348234f32]
-        );
         Ok(())
     }
 

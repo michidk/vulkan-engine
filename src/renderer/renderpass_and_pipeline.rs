@@ -75,11 +75,11 @@ impl PipelineWrapper {
     ) -> Result<PipelineWrapper, vk::Result> {
         let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
         let vertexshader_createinfo =
-            shader::load("triangle", ShaderKind::Vertex, &mut vertexshader_code); // TODO: implement resource manager and load only once
+            shader::load("brdf", ShaderKind::Vertex, &mut vertexshader_code); // TODO: implement resource manager and load only once
         let vertexshader_module =
             unsafe { logical_device.create_shader_module(&vertexshader_createinfo, None)? };
         let fragmentshader_createinfo =
-            shader::load("triangle", ShaderKind::Fragment, &mut fragmentshader_code);
+            shader::load("brdf", ShaderKind::Fragment, &mut fragmentshader_code);
         let fragmentshader_module =
             unsafe { logical_device.create_shader_module(&fragmentshader_createinfo, None)? };
         drop(vertexshader_code);

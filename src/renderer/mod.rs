@@ -393,7 +393,7 @@ impl Renderer {
         )?;
         let format = surfaces
             .get_formats(physical_device)?
-            .first()
+            .get(0)
             .unwrap()
             .format;
         let renderpass = renderpass_and_pipeline::init_renderpass(&logical_device, format)?;

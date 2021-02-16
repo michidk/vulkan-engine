@@ -33,7 +33,7 @@ impl SwapchainWrapper {
     ) -> Result<SwapchainWrapper, RendererError> {
         let surface_capabilities = surfaces.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
-        let surface_format = *surfaces.get_formats(physical_device)?.first().unwrap();
+        let surface_format = *surfaces.get_formats(physical_device)?.get(0).unwrap(); // returns B8G8R8A8_UNORM in SRGB non linear color space
         let queuefamilies = [queue_families.graphics_q_index];
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surfaces.surface)

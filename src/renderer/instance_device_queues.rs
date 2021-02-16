@@ -164,14 +164,10 @@ impl QueueFamilies {
             }
         }
 
-        if found_graphics_q_index.is_none() || found_present_q_index.is_none() {
-            return Err(RendererError::NoSuitableQueueFamily);
+        match found_graphics_q_index.zip(found_present_q_index) {
+            Some(zipped) => Ok(zipped),
+            _ => Err(RendererError::NoSuitableQueueFamily),
         }
-
-        Ok((
-            found_graphics_q_index.unwrap(),
-            found_present_q_index.unwrap(),
-        ))
     }
 }
 

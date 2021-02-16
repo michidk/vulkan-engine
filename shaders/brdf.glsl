@@ -100,7 +100,6 @@ vec3 computeRadiance(vec3 irradiance, vec3 lightDirection, vec3 normal, vec3 cam
     float nDotV = max(dot(normal, cameraDirection), 0.0);
 
     vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(i_metallic)); // base relectivity: use 0.04 for non-metallic/dialectic materials else use the surface color
-    // vec3 f0 = vec3(1, 0.86, 0.57);
     vec3 f = schlick(f0, hDotV);
 
     float ndf = distributionGGX(normal, halfVector, i_roughness);
@@ -148,7 +147,7 @@ void main() {
     };
 
     radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping
-    // radiance.xyz = pow(radiance.xyz, vec3(1.0/2.2)); // gamma correction
+    // radiance = pow(radiance, vec3(1.0/2.2)); // gamma correction
 
     o_color = vec4(radiance, 1.0);
 }

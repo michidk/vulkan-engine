@@ -2,9 +2,6 @@
 
 ## TODO's
 
-
-- implement chooseSwapSurfaceFormat and chooseSwapPresentMode (https://vulkan-tutorial.com/code/16_swap_chain_recreation.cpp)
-
 - next chapter: 32
 
 ## FPS (release build; fullscreen)

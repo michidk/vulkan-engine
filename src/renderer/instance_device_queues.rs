@@ -128,10 +128,10 @@ impl QueueFamilies {
     pub fn init(
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
-        surfaces: &surface::SurfaceWrapper,
+        surface: &surface::SurfaceWrapper,
     ) -> Result<QueueFamilies, RendererError> {
         let queues =
-            QueueFamilies::find_suiltable_queue_family(instance, physical_device, surfaces)?;
+            QueueFamilies::find_suiltable_queue_family(instance, physical_device, surface)?;
         Ok(QueueFamilies {
             graphics_q_index: queues.0,
             present_q_index: queues.1,
@@ -141,7 +141,7 @@ impl QueueFamilies {
     fn find_suiltable_queue_family(
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
-        surfaces: &surface::SurfaceWrapper,
+        surface: &surface::SurfaceWrapper,
     ) -> Result<(u32, u32), RendererError> {
         let queuefamilyproperties =
             unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
@@ -154,7 +154,7 @@ impl QueueFamilies {
                     found_graphics_q_index = Some(index as u32);
                 }
 
-                if surfaces.get_physical_device_surface_support(physical_device, index)? {
+                if surface.get_physical_device_surface_support(physical_device, index)? {
                     found_present_q_index = Some(index as u32);
                 }
             }

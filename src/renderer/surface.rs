@@ -78,6 +78,22 @@ impl SurfaceWrapper {
             vk::PresentModeKHR::FIFO
         })
     }
+
+    pub fn choose_format(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<vk::SurfaceFormatKHR, vk::Result> {
+        let formats = self.get_formats(physical_device)?;
+        let optimal = formats.iter().find(|x| {
+            x.format == vk::Format::B8G8R8A8_UNORM
+                && x.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+        });
+        Ok(if let Some(optimal) = optimal {
+            *optimal
+        } else {
+            formats[0]
+        })
+    }
 }
 
 impl Drop for SurfaceWrapper {

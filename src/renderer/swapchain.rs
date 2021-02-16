@@ -33,7 +33,7 @@ impl SwapchainWrapper {
     ) -> Result<SwapchainWrapper, RendererError> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
-        let surface_format = *surface.get_formats(physical_device)?.get(0).unwrap(); // returns B8G8R8A8_UNORM in SRGB non linear color space
+        let surface_format = surface.choose_format(physical_device)?;
         let present_mode = surface.choose_present_mode(physical_device)?;
 
         let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
@@ -81,7 +81,7 @@ impl SwapchainWrapper {
             let imageview_create_info = vk::ImageViewCreateInfo::builder()
                 .image(*image)
                 .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::B8G8R8A8_UNORM)
+                .format(surface_format.format)
                 .subresource_range(*subresource_range);
             let imageview =
                 unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;

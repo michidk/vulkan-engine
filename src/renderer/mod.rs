@@ -336,7 +336,7 @@ pub struct Renderer {
     entry: ash::Entry,
     instance: ash::Instance,
     debug: std::mem::ManuallyDrop<DebugMessenger>,
-    surfaces: std::mem::ManuallyDrop<SurfaceWrapper>,
+    surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
@@ -362,12 +362,12 @@ impl Renderer {
 
         let instance = instance_device_queues::init_instance(&window, &entry)?;
         let debug = DebugMessenger::init(&entry, &instance)?;
-        let surfaces = SurfaceWrapper::init(&window, &entry, &instance);
+        let surface = SurfaceWrapper::init(&window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
             instance_device_queues::init_physical_device_and_properties(&instance)?;
 
-        let queue_families = QueueFamilies::init(&instance, physical_device, &surfaces)?;
+        let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
         let (logical_device, queues) = instance_device_queues::init_device_and_queues(
             &instance,
@@ -387,15 +387,12 @@ impl Renderer {
             &instance,
             physical_device,
             &logical_device,
-            &surfaces,
+            &surface,
             &queue_families,
             &allocator,
         )?;
-        let format = surfaces
-            .get_formats(physical_device)?
-            .get(0)
-            .unwrap()
-            .format;
+
+        let format = surface.choose_format(physical_device)?.format;
         let renderpass = renderpass_and_pipeline::init_renderpass(&logical_device, format)?;
         swapchain.create_framebuffers(&logical_device, renderpass)?;
         let pipeline = PipelineWrapper::init(&logical_device, &swapchain, &renderpass)?;
@@ -492,7 +489,7 @@ impl Renderer {
             entry,
             instance,
             debug: std::mem::ManuallyDrop::new(debug),
-            surfaces: std::mem::ManuallyDrop::new(surfaces),
+            surface: std::mem::ManuallyDrop::new(surface),
             physical_device,
             physical_device_properties,
             queue_families,
@@ -586,7 +583,7 @@ impl Renderer {
             &self.instance,
             self.physical_device,
             &self.device,
-            &self.surfaces,
+            &self.surface,
             &self.queue_families,
             &self.allocator,
         )?;
@@ -624,7 +621,7 @@ impl Drop for Renderer {
             self.allocator.destroy();
             self.device.destroy_device(None);
             // --segfault
-            std::mem::ManuallyDrop::drop(&mut self.surfaces);
+            std::mem::ManuallyDrop::drop(&mut self.surface);
             std::mem::ManuallyDrop::drop(&mut self.debug);
             self.instance.destroy_instance(None)
         };

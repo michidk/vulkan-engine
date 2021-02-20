@@ -154,7 +154,7 @@ impl CameraBuilder {
 
         self.fovy = fovy.max(MIN).min(MAX);
         if (self.fovy - fovy).abs() > 1e-6 {
-            log::warn!("Fovy out of bounds: {} <= `{}` <= {}", MIN, fovy, MAX);
+            log::warn!("FovY out of bounds: {} <= `{}` <= {}", MIN, fovy, MAX);
         }
         self
     }

@@ -147,7 +147,6 @@ void main() {
     };
 
     radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping
-    // radiance = pow(radiance, vec3(1.0/2.2)); // gamma correction
 
     o_color = vec4(radiance, 1.0);
 }

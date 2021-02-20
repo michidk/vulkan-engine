@@ -72,6 +72,7 @@ impl SurfaceWrapper {
         physical_device: vk::PhysicalDevice,
     ) -> Result<vk::PresentModeKHR, vk::Result> {
         let present_modes = self.get_present_modes(physical_device)?;
+        // todo: prefere immediate over fifo
         Ok(if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
             vk::PresentModeKHR::MAILBOX
         } else {

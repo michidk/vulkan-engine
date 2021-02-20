@@ -74,6 +74,8 @@ impl SurfaceWrapper {
         let present_modes = self.get_present_modes(physical_device)?;
         Ok(if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
             vk::PresentModeKHR::MAILBOX
+        } else if present_modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
+            vk::PresentModeKHR::IMMEDIATE
         } else {
             vk::PresentModeKHR::FIFO
         })
@@ -85,7 +87,7 @@ impl SurfaceWrapper {
     ) -> Result<vk::SurfaceFormatKHR, vk::Result> {
         let formats = self.get_formats(physical_device)?;
         let optimal = formats.iter().find(|x| {
-            x.format == vk::Format::B8G8R8A8_SRGB
+            (x.format == vk::Format::B8G8R8A8_SRGB || x.format == vk::Format::R8G8B8A8_SRGB)
                 && x.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
         });
         Ok(if let Some(optimal) = optimal {

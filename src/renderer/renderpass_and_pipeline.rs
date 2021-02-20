@@ -25,7 +25,7 @@ pub fn init_renderpass(
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE) // TODO: should this be STORE?
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -49,9 +49,7 @@ pub fn init_renderpass(
         .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
         .dst_subpass(0)
         .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-        .dst_access_mask(
-            vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-        )
+        .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
         .build()];
     let renderpass_info = vk::RenderPassCreateInfo::builder()
         .attachments(&attachments)
@@ -204,7 +202,7 @@ impl PipelineWrapper {
             x: 0.,
             y: 0.,
             width: swapchain.extent.width as f32,
-            height: swapchain.extent.height as f32,
+            height: swapchain.extent.height as f32, // TODO: consider using negative height to make y axis normal
             min_depth: 0.,
             max_depth: 1.,
         }];

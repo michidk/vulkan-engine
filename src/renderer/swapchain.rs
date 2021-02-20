@@ -2,6 +2,8 @@ use ash::{version::DeviceV1_0, vk};
 
 use super::{instance_device_queues, surface, RendererError};
 
+const PREFERRED_IMAGE_COUNT: u32 = 3;
+
 #[allow(dead_code)]
 pub struct SwapchainWrapper {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
@@ -32,18 +34,21 @@ impl SwapchainWrapper {
         allocator: &vk_mem::Allocator,
     ) -> Result<SwapchainWrapper, RendererError> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;
-        let extent = surface_capabilities.current_extent;
+        let extent = surface_capabilities.current_extent; // TODO: handle 0xFFFF x 0xFFFF extent
         let surface_format = surface.choose_format(physical_device)?;
         let present_mode = surface.choose_present_mode(physical_device)?;
 
+        let image_count = if surface_capabilities.max_image_count > 0 {
+            PREFERRED_IMAGE_COUNT
+                .max(surface_capabilities.min_image_count)
+                .min(surface_capabilities.max_image_count)
+        } else {
+            PREFERRED_IMAGE_COUNT.max(surface_capabilities.min_image_count)
+        };
+
         let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surface.surface)
-            .min_image_count(if surface_capabilities.max_image_count > 0 {
-                3.max(surface_capabilities.min_image_count)
-                    .min(surface_capabilities.max_image_count)
-            } else {
-                3.max(surface_capabilities.min_image_count)
-            })
+            .min_image_count(image_count)
             .image_format(surface_format.format)
             .image_color_space(surface_format.color_space)
             .image_extent(extent)
@@ -63,6 +68,7 @@ impl SwapchainWrapper {
             swapchain_create_info =
                 swapchain_create_info.image_sharing_mode(vk::SharingMode::EXCLUSIVE);
         } else {
+            // TODO: probably better to never use CONCURRENT
             swapchain_create_info = swapchain_create_info
                 .queue_family_indices(&queuefamilies) // queues that have access to the images in this chain
                 .image_sharing_mode(vk::SharingMode::CONCURRENT); // multiple queues are allowed to access the subresources; might result in lower performance
@@ -104,8 +110,7 @@ impl SwapchainWrapper {
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
             .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .queue_family_indices(&queuefamilies);
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()

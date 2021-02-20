@@ -38,13 +38,12 @@ impl SwapchainWrapper {
 
         let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surface.surface)
-            .min_image_count(
-                if surface_capabilities.max_image_count > 0 {
-                    3.max(surface_capabilities.min_image_count).min(surface_capabilities.max_image_count)
-                } else {
-                    3.max(surface_capabilities.min_image_count)
-                }
-            )
+            .min_image_count(if surface_capabilities.max_image_count > 0 {
+                3.max(surface_capabilities.min_image_count)
+                    .min(surface_capabilities.max_image_count)
+            } else {
+                3.max(surface_capabilities.min_image_count)
+            })
             .image_format(surface_format.format)
             .image_color_space(surface_format.color_space)
             .image_extent(extent)

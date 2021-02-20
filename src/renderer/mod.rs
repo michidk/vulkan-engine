@@ -521,7 +521,7 @@ impl Renderer {
         let clearvalues = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.08, 1.0],
+                    float32: [0.0, 0.0, 0.0038618729, 1.0],
                 },
             },
             vk::ClearValue {
@@ -557,7 +557,7 @@ impl Renderer {
                 0,
                 &[
                     self.descriptor_sets_camera[index],
-                    self.descriptor_sets_light[index],
+                    // self.descriptor_sets_light[index],
                 ],
                 &[],
             );

@@ -142,7 +142,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut camera = Camera::builder()
         //.fovy(30.0.deg())
         .position(Vec3::new(0.0, 0.0, -5.0))
-        .view_direction(Vec3::new(0.0, 0.0, 1.0))
         .aspect(window_size.width as f32 / window_size.height as f32)
         .build();
 

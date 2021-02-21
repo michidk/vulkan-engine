@@ -146,8 +146,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .aspect(window_size.width as f32 / window_size.height as f32)
         .build();
 
+    let mut last_time = std::time::Instant::now();
+    let mut fwd = false;
+    let mut back = false;
+    let mut turn_right = false;
+    let mut turn_left = false;
+    let mut turn_up = false;
+    let mut turn_down = false;
+
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
+
+        let delta = last_time.elapsed().as_nanos() as f32 / 1000000000.0f32;
+        last_time = std::time::Instant::now();
 
         match event {
             Event::WindowEvent {
@@ -159,7 +170,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     WindowEvent::KeyboardInput {
                         input:
                             winit::event::KeyboardInput {
-                                state: winit::event::ElementState::Pressed,
+                                state,
                                 virtual_keycode: Some(keycode),
                                 ..
                             },
@@ -168,22 +179,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } => match keycode {
                 winit::event::VirtualKeyCode::Up | winit::event::VirtualKeyCode::W => {
-                    camera.move_forward(0.05);
+                    fwd = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::Down | winit::event::VirtualKeyCode::S => {
-                    camera.move_backward(0.05);
+                    back = state == winit::event::ElementState::Pressed;
                 }
-                winit::event::VirtualKeyCode::Left | winit::event::VirtualKeyCode::A => {
-                    camera.turn_left(0.1.rad());
+                winit::event::VirtualKeyCode::A | winit::event::VirtualKeyCode::Left => {
+                    turn_left = state == winit::event::ElementState::Pressed;
                 }
-                winit::event::VirtualKeyCode::Right | winit::event::VirtualKeyCode::D => {
-                    camera.turn_right(0.1.rad());
+                winit::event::VirtualKeyCode::D | winit::event::VirtualKeyCode::Right => {
+                    turn_right = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::PageUp => {
-                    camera.turn_up(0.02.rad());
+                    turn_up = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::PageDown => {
-                    camera.turn_down(0.02.rad());
+                    turn_down = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::R => {
                     renderer.recreate_swapchain().expect("swapchain recreation");
@@ -305,5 +316,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => {}
         }
+
+        if fwd {
+            camera.move_forward(5.0f32 * delta);
+        }
+        if back {
+            camera.move_backward(5.0f32 * delta);
+        }
+        if turn_left {
+            camera.turn_left((90.0f32 * delta).deg());
+        }
+        if turn_right {
+            camera.turn_right((90.0f32 * delta).deg());
+        }
+        if turn_up {
+            camera.turn_up((90.0f32 * delta).deg());
+        }
+        if turn_down {
+            camera.turn_down((90.0f32 * delta).deg());
+        }
+
+        println!("Delta: {}", delta);
     });
 }

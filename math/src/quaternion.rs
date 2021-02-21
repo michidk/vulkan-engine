@@ -18,7 +18,7 @@ impl Quaternion {
         Quaternion { x, y, z, w }
     }
 
-    pub fn from_axis_angle(axis: Unit<Vec3<f32>>, angle: Angle<f32>) -> Quaternion {
+    pub fn from_axis_angle(axis: &Unit<Vec3<f32>>, angle: Angle<f32>) -> Quaternion {
         let mut axis = *axis.as_ref();
         axis.scale_mut((angle.to_rad() * 0.5f32).sin());
 
@@ -40,13 +40,13 @@ impl Quaternion {
     }
 
     pub fn forward(&self) -> Vec3<f32> {
-        *self * Vec3::new(0.0, 0.0, 1.0)
+        *self * &Vec3::new(0.0, 0.0, 1.0)
     }
     pub fn right(&self) -> Vec3<f32> {
-        *self * Vec3::new(1.0, 0.0, 0.0)
+        *self * &Vec3::new(1.0, 0.0, 0.0)
     }
     pub fn up(&self) -> Vec3<f32> {
-        *self * Vec3::new(0.0, 1.0, 0.0)
+        *self * &Vec3::new(0.0, 1.0, 0.0)
     }
 }
 
@@ -89,10 +89,10 @@ impl Mul<Quaternion> for Quaternion {
     }
 }
 
-impl Mul<Vec3<f32>> for Quaternion {
+impl Mul<&Vec3<f32>> for Quaternion {
     type Output = Vec3<f32>;
 
-    fn mul(self, rhs: Vec3<f32>) -> Vec3<f32> {
+    fn mul(self, rhs: &Vec3<f32>) -> Vec3<f32> {
         let res = self * Quaternion::new(*rhs.x(), *rhs.y(), *rhs.z(), 0.0) * self.conjugated();
         Vec3::new(res.x, res.y, res.z)
     }

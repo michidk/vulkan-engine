@@ -338,6 +338,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if left {
             movement += Vec3::new(-1.0, 0.0, 0.0);
         }
-        camera.move_in_view_direction(&movement * (5.0 * delta));
+        camera.move_in_view_direction(&(&movement * (5.0 * delta)));
     });
 }

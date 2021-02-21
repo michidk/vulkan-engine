@@ -85,24 +85,18 @@ impl Camera {
         self.view_matrix = m;
     }
 
-    pub fn move_forward(&mut self, distance: f32) {
+    pub fn move_in_view_direction(&mut self, movement: Vec3<f32>) {
         let rotation = self.get_rotation();
-        let fwd = rotation.forward();
-        self.position += &fwd * distance;
+        self.position += rotation * movement;
         self.update_view_matrix();
     }
 
-    pub fn move_backward(&mut self, distance: f32) {
-        self.move_forward(-distance);
-    }
-
-    pub fn turn_right(&mut self, angle: Angle<f32>) {
-        self.rotation_y += angle.to_rad();
+    pub fn rotate(&mut self, angle_x: Angle<f32>, angle_y: Angle<f32>) {
+        self.rotation_y += angle_y.to_rad();
+        self.rotation_x = (self.rotation_x + angle_x.to_rad())
+            .min(Angle::from_deg(85.0).to_rad())
+            .max(Angle::from_deg(-85.0).to_rad());
         self.update_view_matrix();
-    }
-
-    pub fn turn_left(&mut self, angle: Angle<f32>) {
-        self.turn_right(-angle);
     }
 
     pub fn turn_up(&mut self, angle: Angle<f32>) {

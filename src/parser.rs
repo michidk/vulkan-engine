@@ -186,13 +186,11 @@ pub fn parse(filepath: &str) -> Result<MeshBuilder, ParserError> {
     let lines = read_lines(filepath)?;
     log::info!("Loading mesh: {}", filepath);
 
-    for line in lines {
-        if let Ok(line) = line {
-            println!("Parsing: {}", line);
+    for line in lines.flatten() {
+        println!("Parsing: {}", line);
 
-            if let Some((token, value)) = line.split_once(' ') {
-                parse_token(token, value, &mut builder)?;
-            }
+        if let Some((token, value)) = line.split_once(' ') {
+            parse_token(token, value, &mut builder)?;
         }
     }
 

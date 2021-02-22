@@ -20,7 +20,7 @@ pub fn init_instance(
         .application_version(vk::make_version(0, 0, 1))
         .engine_name(&app_name)
         .engine_version(vk::make_version(0, 0, 1))
-        .api_version(vk::make_version(1, 0, 0));
+        .api_version(vk::make_version(1, 2, 0));
 
     // sooo, we need to use display extensions as well
     // let extension_name_pointers: Vec<*const i8> =
@@ -82,6 +82,22 @@ pub fn init_physical_device_and_properties(
         let properties = unsafe { instance.get_physical_device_properties(device) };
         let features = unsafe { instance.get_physical_device_features(device) };
 
+        #[cfg(debug_assertions)]
+        {
+            use std::ffi::CStr;
+
+            let name = String::from(
+                unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
+                    .to_str()
+                    .unwrap(),
+            );
+            log::info!("GPU detected: {}", name);
+        }
+
+        if vk::version_major(properties.api_version) != 1 || vk::version_minor(properties.api_version) < 2 {
+            continue;
+        }
+
         let mut score: u32 = 0;
 
         // prefere discrete gpu
@@ -98,18 +114,6 @@ pub fn init_physical_device_and_properties(
         }
 
         candidates.insert(score, (device, properties, features));
-
-        #[cfg(debug_assertions)]
-        {
-            use std::ffi::CStr;
-
-            let name = String::from(
-                unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
-                    .to_str()
-                    .unwrap(),
-            );
-            log::info!("GPU detected: {}", name);
-        }
     }
 
     if candidates.is_empty() {
@@ -148,16 +152,20 @@ impl QueueFamilies {
         let mut found_graphics_q_index = None;
         let mut found_present_q_index = None;
         for (index, qfam) in queuefamilyproperties.iter().enumerate() {
-            if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                found_graphics_q_index = Some(index as u32);
-            }
+            let surface_support = surface.get_physical_device_surface_support(physical_device, index)?;
 
-            if surface.get_physical_device_surface_support(physical_device, index)? {
+            if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) && surface_support {
+                // found perfect queue family, break
+                found_graphics_q_index = Some(index as u32);
                 found_present_q_index = Some(index as u32);
             }
 
-            if found_graphics_q_index.is_some() && found_present_q_index.is_some() {
-                break;
+            if found_graphics_q_index.is_none() && qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                found_graphics_q_index = Some(index as u32);
+            }
+
+            if found_present_q_index.is_none() && surface_support {
+                found_present_q_index = Some(index as u32);
             }
         }
 

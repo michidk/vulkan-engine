@@ -303,6 +303,7 @@ impl PipelineWrapper {
         })
     }
 
+    #[allow(unused)]
     pub fn init_textured(
         logical_device: &ash::Device,
         swapchain: &swapchain::SwapchainWrapper,

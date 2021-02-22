@@ -490,14 +490,15 @@ impl Renderer {
             unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
         }
 
-        let desc_layouts_texture =
-            vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
-        let descriptor_set_allocate_info_texture = vk::DescriptorSetAllocateInfo::builder()
-            .descriptor_pool(descriptor_pool)
-            .set_layouts(&desc_layouts_texture);
-        let descriptor_sets_texture = unsafe {
-            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_texture)
-        }?;
+        // let desc_layouts_texture =
+        //     vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
+        // let descriptor_set_allocate_info_texture = vk::DescriptorSetAllocateInfo::builder()
+        //     .descriptor_pool(descriptor_pool)
+        //     .set_layouts(&desc_layouts_texture);
+        // let descriptor_sets_texture = unsafe {
+        //     logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_texture)
+        // }?;
+        let descriptor_sets_texture = vec![];
 
         Ok(Renderer {
             window,
@@ -576,7 +577,7 @@ impl Renderer {
                 &[
                     self.descriptor_sets_camera[index],
                     self.descriptor_sets_light[index],
-                    self.descriptor_sets_texture[index],
+                    // self.descriptor_sets_texture[index],
                 ],
                 &[],
             );

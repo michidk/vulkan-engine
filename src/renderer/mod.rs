@@ -521,7 +521,7 @@ impl Renderer {
         let clearvalues = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.08, 1.0],
+                    float32: [0.0, 0.0, 0.003861872, 1.0],
                 },
             },
             vk::ClearValue {

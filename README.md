@@ -8,6 +8,17 @@ This repository contains a playground project by [Jonas](https://github.com/Shem
 
 The goal is to build a somewhat useable game engine and a demo using it. While we are probably never going to implement a fully-fledged engine, we try to make shortcuts to implement specific parts of it that we find interesting. It is more a learning project than anything else.
 
+## Features
+
+Currently implemented features are:
+- Own math library
+- Custom shader format ([ve-shader](https://github.com/michidk/ve-shader))
+- BRDF rendering
+
+## Screenshots
+
+BRDF testing: ![brdf testing](./.github/images/brdf.png)
+
 ## Building
 
 ### Prerequisites

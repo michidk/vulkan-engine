@@ -7,8 +7,8 @@ use super::buffer;
 pub struct Camera {
     view_matrix: Mat4<f32>,
     position: Vec3<f32>,
-    view_direction: Unit<Vec3<f32>>,
-    down_direction: Unit<Vec3<f32>>,
+    rotation_x: f32,
+    rotation_y: f32,
     fovy: f32,
     aspect: f32,
     near: f32,
@@ -44,24 +44,38 @@ impl Camera {
         );
     }
 
+    fn get_rotation(&self) -> Quaternion {
+        Quaternion::from_axis_angle(
+            &Unit::new_normalize(Vec3::new(0.0, 1.0, 0.0)),
+            Angle::from_rad(self.rotation_y),
+        ) * Quaternion::from_axis_angle(
+            &Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
+            Angle::from_rad(self.rotation_x),
+        )
+    }
+
     fn update_view_matrix(&mut self) {
-        // TODO: Unit
-        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
+        let rotation = self.get_rotation();
+
+        let forward_dir = rotation.forward();
+        let right_dir = rotation.right();
+        let up_dir = rotation.up();
+
         let m: Mat4<f32> = Mat4::new(
-            *right.x(),
-            *right.y(),
-            *right.z(),
-            -right.dot_product(&self.position),
+            *right_dir.x(),
+            *right_dir.y(),
+            *right_dir.z(),
+            -right_dir.dot_product(&self.position),
             //
-            *self.down_direction.x(),
-            *self.down_direction.y(),
-            *self.down_direction.z(),
-            -self.down_direction.dot_product(&self.position),
+            *up_dir.x(),
+            *up_dir.y(),
+            *up_dir.z(),
+            -up_dir.dot_product(&self.position),
             //
-            *self.view_direction.x(),
-            *self.view_direction.y(),
-            *self.view_direction.z(),
-            -self.view_direction.dot_product(&self.position),
+            *forward_dir.x(),
+            *forward_dir.y(),
+            *forward_dir.z(),
+            -forward_dir.dot_product(&self.position),
             //
             0.0,
             0.0,
@@ -71,30 +85,29 @@ impl Camera {
         self.view_matrix = m;
     }
 
-    pub fn move_forward(&mut self, distance: f32) {
-        self.position += self.view_direction.as_ref() * distance;
+    pub fn move_in_view_direction(&mut self, movement: &Vec3<f32>) {
+        let rotation = self.get_rotation();
+        self.position += rotation * movement;
         self.update_view_matrix();
     }
 
-    pub fn move_backward(&mut self, distance: f32) {
-        self.move_forward(-distance);
-    }
-
-    pub fn turn_right(&mut self, angle: Angle<f32>) {
-        let rotation = Mat3::from_axis_angle(&self.down_direction, angle);
-        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
+    pub fn rotate(&mut self, angle_x: Angle<f32>, angle_y: Angle<f32>) {
+        self.rotation_y += angle_y.to_rad();
+        self.rotation_x = (self.rotation_x + angle_x.to_rad())
+            .min(Angle::from_deg(85.0).to_rad())
+            .max(Angle::from_deg(-85.0).to_rad());
         self.update_view_matrix();
-    }
-
-    pub fn turn_left(&mut self, angle: Angle<f32>) {
-        self.turn_right(-angle);
     }
 
     pub fn turn_up(&mut self, angle: Angle<f32>) {
-        let right = Unit::new_normalize(self.down_direction.cross_product(&self.view_direction));
-        let rotation = Mat3::from_axis_angle(&right, angle);
-        self.view_direction = Unit::new_normalize(&rotation * self.view_direction.as_ref());
-        self.down_direction = Unit::new_normalize(&rotation * self.down_direction.as_ref());
+        self.rotation_x += angle.to_rad();
+        if self.rotation_x < Angle::from_deg(-85.0).to_rad() {
+            self.rotation_x = Angle::from_deg(-85.0).to_rad();
+        }
+        if self.rotation_x > Angle::from_deg(85.0).to_rad() {
+            self.rotation_x = Angle::from_deg(85.0).to_rad();
+        }
+
         self.update_view_matrix();
     }
 
@@ -110,8 +123,7 @@ impl Camera {
     pub fn builder() -> CameraBuilder {
         CameraBuilder {
             position: Vec3::new(0.0, -3.0, -3.0),
-            view_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, 1.0)),
-            down_direction: Unit::new_normalize(Vec3::new(0.0, 1.0, -1.0)),
+            rotation: (0.0, 0.0),
             fovy: std::f32::consts::FRAC_PI_3,
             aspect: 800.0 / 600.0,
             near: 0.1,
@@ -123,8 +135,7 @@ impl Camera {
 #[allow(dead_code)]
 pub struct CameraBuilder {
     position: Vec3<f32>,
-    view_direction: Unit<Vec3<f32>>,
-    down_direction: Unit<Vec3<f32>>,
+    rotation: (f32, f32),
     fovy: f32,
     aspect: f32,
     near: f32,
@@ -137,13 +148,8 @@ impl CameraBuilder {
         self
     }
 
-    pub fn view_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
-        self.view_direction = Unit::new_normalize(direction);
-        self
-    }
-
-    pub fn down_direction(&mut self, direction: Vec3<f32>) -> &mut Self {
-        self.down_direction = Unit::new_normalize(direction);
+    pub fn rotation(&mut self, rotation: (f32, f32)) -> &mut Self {
+        self.rotation = rotation;
         self
     }
 
@@ -184,16 +190,11 @@ impl CameraBuilder {
         if self.far < self.near {
             log::warn!("Far is closer than near: `{}` `{}`", self.far, self.near);
         }
-        let down = self.down_direction.as_ref();
-        let view = self.view_direction.as_ref();
-
-        let dv = view * down.dot_product(view);
-        let ds = down - &dv;
 
         let mut cam = Camera {
             position: self.position,
-            view_direction: self.view_direction,
-            down_direction: Unit::new_normalize(ds),
+            rotation_x: self.rotation.0,
+            rotation_y: self.rotation.1,
             fovy: self.fovy,
             aspect: self.aspect,
             near: self.near,

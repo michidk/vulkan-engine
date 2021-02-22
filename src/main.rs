@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // for i in 0..10 {
     //     for j in 0..10 {
     //         model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-    //             &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
+    //             &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
     //                 * &Mat4::new_scaling(0.5),
     //             Color::rgb_f32(1.0, 0.86, 0.57),
     //             i as f32 * 0.1,
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // for i in 0..10 {
     //     model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-    //         &Mat4::new_translate(Vec3::new(i as f32 - 5.0, 6.0, 10.0)) * &Mat4::new_scaling(0.5),
+    //         &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::new_scaling(0.5),
     //         Color::rgb_f32(
     //             1.0 * i as f32 * 0.1,
     //             0.0 * i as f32 * 0.1,
@@ -173,12 +173,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut camera = Camera::builder()
         //.fovy(30.0.deg())
         .position(Vec3::new(0.0, 0.0, -5.0))
-        .view_direction(Vec3::new(0.0, 0.0, 1.0))
         .aspect(window_size.width as f32 / window_size.height as f32)
         .build();
 
+    let mut last_time = std::time::Instant::now();
+    let mut fwd = false;
+    let mut back = false;
+    let mut right = false;
+    let mut left = false;
+
+    let mut last_mouse = (0.0f32, 0.0f32);
+
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
+
+        let delta = last_time.elapsed().as_nanos() as f32 / 1000000000.0f32;
+        last_time = std::time::Instant::now();
 
         match event {
             Event::WindowEvent {
@@ -186,11 +196,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } => *controlflow = winit::event_loop::ControlFlow::Exit,
             Event::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
+                let cursor_delta = (
+                    position.x as f32 - last_mouse.0,
+                    position.y as f32 - last_mouse.1,
+                );
+                last_mouse = (position.x as f32, position.y as f32);
+
+                camera.rotate(
+                    Angle::from_deg(cursor_delta.1),
+                    Angle::from_deg(cursor_delta.0),
+                );
+            }
+            Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
                         input:
                             winit::event::KeyboardInput {
-                                state: winit::event::ElementState::Pressed,
+                                state,
                                 virtual_keycode: Some(keycode),
                                 ..
                             },
@@ -199,22 +224,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } => match keycode {
                 winit::event::VirtualKeyCode::Up | winit::event::VirtualKeyCode::W => {
-                    camera.move_forward(0.05);
+                    fwd = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::Down | winit::event::VirtualKeyCode::S => {
-                    camera.move_backward(0.05);
+                    back = state == winit::event::ElementState::Pressed;
                 }
-                winit::event::VirtualKeyCode::Left | winit::event::VirtualKeyCode::A => {
-                    camera.turn_left(0.1.rad());
+                winit::event::VirtualKeyCode::A | winit::event::VirtualKeyCode::Left => {
+                    left = state == winit::event::ElementState::Pressed;
                 }
-                winit::event::VirtualKeyCode::Right | winit::event::VirtualKeyCode::D => {
-                    camera.turn_right(0.1.rad());
-                }
-                winit::event::VirtualKeyCode::PageUp => {
-                    camera.turn_up(0.02.rad());
-                }
-                winit::event::VirtualKeyCode::PageDown => {
-                    camera.turn_down(0.02.rad());
+                winit::event::VirtualKeyCode::D | winit::event::VirtualKeyCode::Right => {
+                    right = state == winit::event::ElementState::Pressed;
                 }
                 winit::event::VirtualKeyCode::R => {
                     renderer.recreate_swapchain().expect("swapchain recreation");
@@ -336,5 +355,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => {}
         }
+
+        let mut movement = Vec3::new(0.0f32, 0.0f32, 0.0f32);
+        if fwd {
+            movement += Vec3::new(0.0, 0.0, 1.0);
+        }
+        if back {
+            movement += Vec3::new(0.0, 0.0, -1.0);
+        }
+        if right {
+            movement += Vec3::new(1.0, 0.0, 0.0);
+        }
+        if left {
+            movement += Vec3::new(-1.0, 0.0, 0.0);
+        }
+        camera.move_in_view_direction(&(&movement * (5.0 * delta)));
     });
 }

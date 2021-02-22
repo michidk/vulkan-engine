@@ -19,8 +19,8 @@ pub fn init_instance(
         .application_name(&app_name)
         .application_version(vk::make_version(0, 0, 1))
         .engine_name(&app_name)
-        .engine_version(vk::make_version(0, 42, 0))
-        .api_version(vk::make_version(1, 0, 106));
+        .engine_version(vk::make_version(0, 0, 1))
+        .api_version(vk::make_version(1, 2, 0));
 
     // sooo, we need to use display extensions as well
     // let extension_name_pointers: Vec<*const i8> =
@@ -82,6 +82,22 @@ pub fn init_physical_device_and_properties(
         let properties = unsafe { instance.get_physical_device_properties(device) };
         let features = unsafe { instance.get_physical_device_features(device) };
 
+        #[cfg(debug_assertions)]
+        {
+            use std::ffi::CStr;
+
+            let name = String::from(
+                unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
+                    .to_str()
+                    .unwrap(),
+            );
+            log::info!("GPU detected: {}", name);
+        }
+
+        if vk::version_major(properties.api_version) != 1 || vk::version_minor(properties.api_version) < 2 {
+            continue;
+        }
+
         let mut score: u32 = 0;
 
         // prefere discrete gpu
@@ -94,29 +110,17 @@ pub fn init_physical_device_and_properties(
 
         // require geometry shader
         if features.geometry_shader == vk::FALSE {
-            score = 0;
+            continue;
         }
 
         candidates.insert(score, (device, properties, features));
-
-        #[cfg(debug_assertions)]
-        {
-            use std::ffi::CStr;
-
-            let name = String::from(
-                unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
-                    .to_str()
-                    .unwrap(),
-            );
-            log::info!("GPU detected: {}", name);
-        }
     }
 
     if candidates.is_empty() {
         return Err(RendererError::NoSuitableGpu);
     }
 
-    Ok(candidates.pop_first().unwrap().1)
+    Ok(candidates.pop_last().unwrap().1) // use physical device with the highest score
 }
 
 pub struct QueueFamilies {
@@ -130,15 +134,14 @@ impl QueueFamilies {
         physical_device: vk::PhysicalDevice,
         surface: &surface::SurfaceWrapper,
     ) -> Result<QueueFamilies, RendererError> {
-        let queues =
-            QueueFamilies::find_suiltable_queue_family(instance, physical_device, surface)?;
+        let queues = QueueFamilies::find_suitable_queue_family(instance, physical_device, surface)?;
         Ok(QueueFamilies {
             graphics_q_index: queues.0,
             present_q_index: queues.1,
         })
     }
 
-    fn find_suiltable_queue_family(
+    fn find_suitable_queue_family(
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         surface: &surface::SurfaceWrapper,
@@ -149,18 +152,20 @@ impl QueueFamilies {
         let mut found_graphics_q_index = None;
         let mut found_present_q_index = None;
         for (index, qfam) in queuefamilyproperties.iter().enumerate() {
-            if qfam.queue_count > 0 {
-                if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                    found_graphics_q_index = Some(index as u32);
-                }
+            let surface_support = surface.get_physical_device_surface_support(physical_device, index)?;
 
-                if surface.get_physical_device_surface_support(physical_device, index)? {
-                    found_present_q_index = Some(index as u32);
-                }
+            if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) && surface_support {
+                // found perfect queue family, break
+                found_graphics_q_index = Some(index as u32);
+                found_present_q_index = Some(index as u32);
             }
 
-            if found_graphics_q_index.is_some() && found_present_q_index.is_some() {
-                break;
+            if found_graphics_q_index.is_none() && qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                found_graphics_q_index = Some(index as u32);
+            }
+
+            if found_present_q_index.is_none() && surface_support {
+                found_present_q_index = Some(index as u32);
             }
         }
 
@@ -184,9 +189,10 @@ pub fn init_device_and_queues(
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode
-    let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true);
+    let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true); // TODO: check if feature is supported before force-enabling it
     let priorities = [1.0];
 
+    // TODO: prevent multiple DeviceQueueCreateInfos with same queue family
     let queue_info = [
         vk::DeviceQueueCreateInfo::builder()
             .queue_family_index(queue_families.graphics_q_index)

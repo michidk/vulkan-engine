@@ -2,7 +2,7 @@
 
 ![Continuous integration](https://github.com/michidk/vulkan-renderer/workflows/Continuous%20Integration/badge.svg)
 
-This repository contains a playground project by [Jonas](https://github.com/Shemnei) and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
+This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309) and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
 
 ## Goal
 

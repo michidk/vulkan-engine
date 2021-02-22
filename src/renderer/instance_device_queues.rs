@@ -94,7 +94,9 @@ pub fn init_physical_device_and_properties(
             log::info!("GPU detected: {}", name);
         }
 
-        if vk::version_major(properties.api_version) != 1 || vk::version_minor(properties.api_version) < 2 {
+        if vk::version_major(properties.api_version) != 1
+            || vk::version_minor(properties.api_version) < 2
+        {
             continue;
         }
 
@@ -152,7 +154,8 @@ impl QueueFamilies {
         let mut found_graphics_q_index = None;
         let mut found_present_q_index = None;
         for (index, qfam) in queuefamilyproperties.iter().enumerate() {
-            let surface_support = surface.get_physical_device_surface_support(physical_device, index)?;
+            let surface_support =
+                surface.get_physical_device_surface_support(physical_device, index)?;
 
             if qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) && surface_support {
                 // found perfect queue family, break
@@ -160,7 +163,9 @@ impl QueueFamilies {
                 found_present_q_index = Some(index as u32);
             }
 
-            if found_graphics_q_index.is_none() && qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+            if found_graphics_q_index.is_none()
+                && qfam.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+            {
                 found_graphics_q_index = Some(index as u32);
             }
 

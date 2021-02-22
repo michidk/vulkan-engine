@@ -400,7 +400,7 @@ impl Renderer {
         let format = surface.choose_format(physical_device)?.format;
         let renderpass = renderpass_and_pipeline::init_renderpass(&logical_device, format)?;
         swapchain.create_framebuffers(&logical_device, renderpass)?;
-        let pipeline = PipelineWrapper::init_textured(&logical_device, &swapchain, &renderpass)?;
+        let pipeline = PipelineWrapper::init(&logical_device, &swapchain, &renderpass)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers = pools_and_commandbuffers::create_commandbuffers(
@@ -466,29 +466,29 @@ impl Renderer {
         )?;
         light_buffer.fill(&allocator, &[0.0, 0.0])?;
 
-        let descriptor_sets_light = vec![];
-        // let desc_layouts_light =
-        //     vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
-        // let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
-        //     .descriptor_pool(descriptor_pool)
-        //     .set_layouts(&desc_layouts_light);
-        // let descriptor_sets_light = unsafe {
-        //     logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_light)
-        // }?;
-        // for descset in &descriptor_sets_light {
-        //     let buffer_infos = [vk::DescriptorBufferInfo {
-        //         buffer: light_buffer.buffer,
-        //         offset: 0,
-        //         range: 8,
-        //     }];
-        //     let desc_set_write = [vk::WriteDescriptorSet::builder()
-        //         .dst_set(*descset)
-        //         .dst_binding(0)
-        //         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-        //         .buffer_info(&buffer_infos)
-        //         .build()];
-        //     unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
-        // }
+        // let descriptor_sets_light = vec![];
+        let desc_layouts_light =
+            vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
+        let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&desc_layouts_light);
+        let descriptor_sets_light = unsafe {
+            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_light)
+        }?;
+        for descset in &descriptor_sets_light {
+            let buffer_infos = [vk::DescriptorBufferInfo {
+                buffer: light_buffer.buffer,
+                offset: 0,
+                range: 8,
+            }];
+            let desc_set_write = [vk::WriteDescriptorSet::builder()
+                .dst_set(*descset)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&buffer_infos)
+                .build()];
+            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
+        }
 
         let desc_layouts_texture =
             vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
@@ -612,8 +612,7 @@ impl Renderer {
         self.swapchain
             .create_framebuffers(&self.device, self.renderpass)?;
         self.pipeline.cleanup(&self.device);
-        self.pipeline =
-            PipelineWrapper::init_textured(&self.device, &self.swapchain, &self.renderpass)?;
+        self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
         Ok(())
     }
 

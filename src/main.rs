@@ -3,14 +3,10 @@ use math::prelude::*;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 
-use vulkan_engine::{
-    color::Color,
-    renderer::{
-        self,
-        camera::Camera,
-        light::{DirectionalLight, LightManager, PointLight},
-        model::{DefaultModel, InstanceData},
-    },
+use vulkan_engine::renderer::{
+    self,
+    camera::Camera,
+    model::{TextureQuadModel, TexturedInstanceData},
 };
 
 struct FpsTracker {
@@ -64,19 +60,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let window_size = window.inner_size();
     let mut renderer = renderer::Renderer::init(window)?;
 
-    let mut lights = LightManager::default();
-    lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., -1., 0.),
-        illuminance: Vec3::new(10.1, 10.1, 10.1),
-    });
-    lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., 1., 0.),
-        illuminance: Vec3::new(1.6, 1.6, 1.6),
-    });
-    lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
-    });
+    // let mut lights = LightManager::default();
+    // lights.add_light(DirectionalLight {
+    //     direction: Vec3::new(0., -1., 0.),
+    //     illuminance: Vec3::new(10.1, 10.1, 10.1),
+    // });
+    // lights.add_light(DirectionalLight {
+    //     direction: Vec3::new(0., 1., 0.),
+    //     illuminance: Vec3::new(1.6, 1.6, 1.6),
+    // });
+    // lights.add_light(PointLight {
+    //     position: Vec3::new(0.1, -3.0, -3.0),
+    //     luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+    // });
     //lights.add_light(PointLight {
     //    position: Vec3::new(0.1, -3.0, -3.0),
     //    luminous_flux: Vec3::new(100.0, 100.0, 100.0),
@@ -90,14 +86,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     //});
 
-    lights.update_buffer(
-        &renderer.device,
-        &renderer.allocator,
-        &mut renderer.light_buffer,
-        &mut renderer.descriptor_sets_light,
-    )?;
+    // lights.update_buffer(
+    //     &renderer.device,
+    //     &renderer.allocator,
+    //     &mut renderer.light_buffer,
+    //     &mut renderer.descriptor_sets_light,
+    // )?;
 
-    let mut model = DefaultModel::sphere(4);
+    // let mut model = DefaultModel::sphere(4);
 
     //let mut angle = 7.0.deg();
 
@@ -108,36 +104,71 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    0.2,
     //));
 
-    for i in 0..10 {
-        for j in 0..10 {
-            model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-                &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
-                    * &Mat4::new_scaling(0.5),
-                Color::rgb_f32(1.0, 0.86, 0.57),
-                i as f32 * 0.1,
-                j as f32 * 0.1,
-            ));
+    // for i in 0..10 {
+    //     for j in 0..10 {
+    //         model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
+    //             &Mat4::new_translate(Vec3::new(i as f32 - 5.0, j as f32 - 5.0, 10.0))
+    //                 * &Mat4::new_scaling(0.5),
+    //             Color::rgb_f32(1.0, 0.86, 0.57),
+    //             i as f32 * 0.1,
+    //             j as f32 * 0.1,
+    //         ));
+    //     }
+    // }
+
+    // for i in 0..10 {
+    //     model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
+    //         &Mat4::new_translate(Vec3::new(i as f32 - 5.0, 6.0, 10.0)) * &Mat4::new_scaling(0.5),
+    //         Color::rgb_f32(
+    //             1.0 * i as f32 * 0.1,
+    //             0.0 * i as f32 * 0.1,
+    //             0.0 * i as f32 * 0.1,
+    //         ),
+    //         0.5,
+    //         0.5,
+    //     ));
+    // }
+
+    // model.update_vertex_buffer(&renderer.allocator).unwrap();
+    // model.update_index_buffer(&renderer.allocator).unwrap();
+    // model.update_instance_buffer(&renderer.allocator).unwrap();
+
+    // renderer.models.push(model);
+    let texture_id = renderer.new_texture_from_file("./assets/images/rust.png")?;
+
+    if let Some(texture) = renderer.texture_storage.get(texture_id) {
+        for dss in &renderer.descriptor_sets_texture {
+            let imageinfo = vk::DescriptorImageInfo {
+                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                image_view: texture.imageview,
+                sampler: texture.sampler,
+            };
+            let descriptorwrite_image = vk::WriteDescriptorSet {
+                dst_set: *dss,
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                descriptor_count: 1,
+                p_image_info: [imageinfo].as_ptr(),
+                ..Default::default()
+            };
+
+            unsafe {
+                renderer
+                    .device
+                    .update_descriptor_sets(&[descriptorwrite_image], &[]);
+            }
         }
     }
 
-    for i in 0..10 {
-        model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-            &Mat4::new_translate(Vec3::new(i as f32 - 5.0, 6.0, 10.0)) * &Mat4::new_scaling(0.5),
-            Color::rgb_f32(
-                1.0 * i as f32 * 0.1,
-                0.0 * i as f32 * 0.1,
-                0.0 * i as f32 * 0.1,
-            ),
-            0.5,
-            0.5,
-        ));
-    }
+    let mut model = TextureQuadModel::quad();
+    model.insert_visibly(TexturedInstanceData::from_matrix(Mat4::identity()));
 
     model.update_vertex_buffer(&renderer.allocator).unwrap();
     model.update_index_buffer(&renderer.allocator).unwrap();
     model.update_instance_buffer(&renderer.allocator).unwrap();
 
-    renderer.models.push(model);
+    renderer.texture_quads.push(model);
 
     let mut camera = Camera::builder()
         //.fovy(30.0.deg())

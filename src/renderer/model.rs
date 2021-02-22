@@ -467,3 +467,60 @@ impl DefaultModel {
         self.indicies = new_indicies;
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct TexturedVertexData {
+    pub position: [f32; 3],
+    pub texcoord: [f32; 2],
+}
+
+#[repr(C)]
+pub struct TexturedInstanceData {
+    pub modelmatrix: [[f32; 4]; 4],
+    pub inverse_modelmatrix: [[f32; 4]; 4],
+}
+
+impl TexturedInstanceData {
+    pub fn from_matrix(modelmatrix: Mat4<f32>) -> TexturedInstanceData {
+        TexturedInstanceData {
+            modelmatrix: modelmatrix.into(),
+            inverse_modelmatrix: modelmatrix.try_inverse().unwrap().into(),
+        }
+    }
+}
+
+pub type TextureQuadModel = Model<TexturedVertexData, TexturedInstanceData>;
+
+impl Model<TexturedVertexData, TexturedInstanceData> {
+    pub fn quad() -> Self {
+        let lb = TexturedVertexData {
+            position: [-1.0, 1.0, 0.0],
+            texcoord: [0.0, 1.0],
+        }; //lb: left-bottom
+        let lt = TexturedVertexData {
+            position: [-1.0, -1.0, 0.0],
+            texcoord: [0.0, 0.0],
+        };
+        let rb = TexturedVertexData {
+            position: [1.0, 1.0, 0.0],
+            texcoord: [1.0, 1.0],
+        };
+        let rt = TexturedVertexData {
+            position: [1.0, -1.0, 0.0],
+            texcoord: [1.0, 0.0],
+        };
+        Model {
+            vertices: vec![lb, lt, rb, rt],
+            indicies: vec![0, 2, 1, 1, 2, 3],
+            handle_to_index: std::collections::HashMap::new(),
+            handles: Vec::new(),
+            instances: Vec::new(),
+            fist_invisible: 0,
+            next_handle: 0,
+            vertex_buffer: None,
+            index_buffer: None,
+            instance_buffer: None,
+        }
+    }
+}

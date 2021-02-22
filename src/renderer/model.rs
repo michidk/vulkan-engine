@@ -344,18 +344,18 @@ impl DefaultModel {
     pub fn icosahedron() -> Self {
         let phi = (1.0 + 5.0_f32.sqrt()) / 2.0;
 
-        let darkgreen_front_top = VertexData::new([phi, -1.0, 0.0], [phi, -1.0, 0.0]); //0
-        let darkgreen_front_bottom = VertexData::new([phi, 1.0, 0.0], [phi, 1.0, 0.0]); //1
-        let darkgreen_back_top = VertexData::new([-phi, -1.0, 0.0], [-phi, -1.0, 0.0]); //2
-        let darkgreen_back_bottom = VertexData::new([-phi, 1.0, 0.0], [-phi, 1.0, 0.0]); //3
+        let darkgreen_front_top = VertexData::new([phi, 1.0, 0.0], [phi, 1.0, 0.0]); //0
+        let darkgreen_front_bottom = VertexData::new([phi, -1.0, 0.0], [phi, -1.0, 0.0]); //1
+        let darkgreen_back_top = VertexData::new([-phi, 1.0, 0.0], [-phi, 1.0, 0.0]); //2
+        let darkgreen_back_bottom = VertexData::new([-phi, -1.0, 0.0], [-phi, -1.0, 0.0]); //3
         let lightgreen_front_right = VertexData::new([1.0, 0.0, -phi], [1.0, 0.0, -phi]); //4
         let lightgreen_front_left = VertexData::new([-1.0, 0.0, -phi], [-1.0, 0.0, -phi]); //5
         let lightgreen_back_right = VertexData::new([1.0, 0.0, phi], [1.0, 0.0, phi]); //6
         let lightgreen_back_left = VertexData::new([-1.0, 0.0, phi], [-1.0, 0.0, phi]); //7
-        let purple_top_left = VertexData::new([0.0, -phi, -1.0], [0.0, -phi, -1.0]); //8
-        let purple_top_right = VertexData::new([0.0, -phi, 1.0], [0.0, -phi, 1.0]); //9
-        let purple_bottom_left = VertexData::new([0.0, phi, -1.0], [0.0, phi, -1.0]); //10
-        let purple_bottom_right = VertexData::new([0.0, phi, 1.0], [0.0, phi, 1.0]); //11
+        let purple_top_left = VertexData::new([0.0, phi, -1.0], [0.0, phi, -1.0]); //8
+        let purple_top_right = VertexData::new([0.0, phi, 1.0], [0.0, phi, 1.0]); //9
+        let purple_bottom_left = VertexData::new([0.0, -phi, -1.0], [0.0, -phi, -1.0]); //10
+        let purple_bottom_right = VertexData::new([0.0, -phi, 1.0], [0.0, -phi, 1.0]); //11
 
         Model {
             vertices: vec![

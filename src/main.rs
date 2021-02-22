@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 last_mouse = (position.x as f32, position.y as f32);
 
                 camera.rotate(
-                    -Angle::from_deg(cursor_delta.1),
+                    Angle::from_deg(cursor_delta.1),
                     Angle::from_deg(cursor_delta.0),
                 );
             }

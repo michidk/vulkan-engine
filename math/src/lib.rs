@@ -11,6 +11,7 @@ mod norm;
 mod quaternion;
 mod scalar;
 mod storage;
+#[cfg(test)]
 mod test_util;
 mod unit;
 mod vector;

@@ -3,7 +3,15 @@ use math::prelude::*;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 
-use vulkan_engine::{color::Color, renderer::{self, camera::Camera, light::{DirectionalLight, LightManager, PointLight}, model::{DefaultModel, InstanceData, TextureQuadModel, TexturedInstanceData}}};
+use vulkan_engine::{
+    color::Color,
+    renderer::{
+        self,
+        camera::Camera,
+        light::{DirectionalLight, LightManager, PointLight},
+        model::{DefaultModel, InstanceData},
+    },
+};
 
 struct FpsTracker {
     median: f32,
@@ -70,16 +78,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
     lights.add_light(PointLight {
-       position: Vec3::new(0.1, -3.0, -3.0),
-       luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
     lights.add_light(PointLight {
-       position: Vec3::new(0.1, -3.0, -3.0),
-       luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
     lights.add_light(PointLight {
-       position: Vec3::new(0.1, -3.0, -3.0),
-       luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec3::new(0.1, -3.0, -3.0),
+        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
 
     lights.update_buffer(
@@ -94,10 +102,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut angle = 7.0.deg();
 
     let model_ref = model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-       &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
-       Color::rgb_f32(0.955, 0.638, 0.538),
-       1.0,
-       0.2,
+        &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
+        Color::rgb_f32(0.955, 0.638, 0.538),
+        1.0,
+        0.2,
     ));
 
     for i in 0..10 {
@@ -244,15 +252,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Event::MainEventsCleared => {
                 // doing the work here (later)
-                //angle = Angle::from_deg(angle.to_deg() + 0.01);
+                angle = Angle::from_deg(angle.to_deg() + 0.01);
 
-                //let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
+                let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
 
-                //renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
-                //renderer.models[0]
-                //    .get_mut(model_ref)
-                //    .unwrap()
-                //    .inverse_model_matrix = new_model_matrix.try_inverse().unwrap();
+                renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
+                renderer.models[0]
+                    .get_mut(model_ref)
+                    .unwrap()
+                    .inverse_model_matrix = new_model_matrix.try_inverse().unwrap();
 
                 renderer.window.request_redraw();
             }

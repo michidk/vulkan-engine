@@ -1,4 +1,4 @@
-mod buffer;
+pub mod buffer;
 pub mod camera;
 mod debug;
 mod instance_device_queues;
@@ -9,6 +9,7 @@ mod renderpass_and_pipeline;
 mod shader;
 mod surface;
 mod swapchain;
+pub mod texture;
 
 use ash::{
     version::{DeviceV1_0, InstanceV1_0},
@@ -20,11 +21,12 @@ use self::{
     buffer::BufferWrapper,
     debug::DebugMessenger,
     instance_device_queues::{QueueFamilies, Queues},
-    model::DefaultModel,
+    model::{DefaultModel, TextureQuadModel},
     pools_and_commandbuffers::PoolsWrapper,
     renderpass_and_pipeline::PipelineWrapper,
     surface::SurfaceWrapper,
     swapchain::SwapchainWrapper,
+    texture::TextureStorage,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -336,7 +338,7 @@ pub struct Renderer {
     entry: ash::Entry,
     instance: ash::Instance,
     debug: std::mem::ManuallyDrop<DebugMessenger>,
-    surfaces: std::mem::ManuallyDrop<SurfaceWrapper>,
+    surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
@@ -345,15 +347,18 @@ pub struct Renderer {
     pub swapchain: SwapchainWrapper,
     renderpass: vk::RenderPass,
     pipeline: PipelineWrapper,
-    pools: PoolsWrapper,
+    pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: vk_mem::Allocator,
     pub models: Vec<DefaultModel>,
+    pub texture_quads: Vec<TextureQuadModel>,
     pub uniform_buffer: BufferWrapper,
     descriptor_pool: vk::DescriptorPool,
     descriptor_sets_camera: Vec<vk::DescriptorSet>,
     pub descriptor_sets_light: Vec<vk::DescriptorSet>,
+    pub descriptor_sets_texture: Vec<vk::DescriptorSet>,
     pub light_buffer: BufferWrapper,
+    pub texture_storage: TextureStorage,
 }
 
 impl Renderer {
@@ -362,12 +367,12 @@ impl Renderer {
 
         let instance = instance_device_queues::init_instance(&window, &entry)?;
         let debug = DebugMessenger::init(&entry, &instance)?;
-        let surfaces = SurfaceWrapper::init(&window, &entry, &instance);
+        let surface = SurfaceWrapper::init(&window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
             instance_device_queues::init_physical_device_and_properties(&instance)?;
 
-        let queue_families = QueueFamilies::init(&instance, physical_device, &surfaces)?;
+        let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
         let (logical_device, queues) = instance_device_queues::init_device_and_queues(
             &instance,
@@ -387,15 +392,12 @@ impl Renderer {
             &instance,
             physical_device,
             &logical_device,
-            &surfaces,
+            &surface,
             &queue_families,
             &allocator,
         )?;
-        let format = surfaces
-            .get_formats(physical_device)?
-            .first()
-            .unwrap()
-            .format;
+
+        let format = surface.choose_format(physical_device)?.format;
         let renderpass = renderpass_and_pipeline::init_renderpass(&logical_device, format)?;
         swapchain.create_framebuffers(&logical_device, renderpass)?;
         let pipeline = PipelineWrapper::init(&logical_device, &swapchain, &renderpass)?;
@@ -464,6 +466,7 @@ impl Renderer {
         )?;
         light_buffer.fill(&allocator, &[0.0, 0.0])?;
 
+        // let descriptor_sets_light = vec![];
         let desc_layouts_light =
             vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
         let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
@@ -487,12 +490,22 @@ impl Renderer {
             unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
         }
 
+        // let desc_layouts_texture =
+        //     vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
+        // let descriptor_set_allocate_info_texture = vk::DescriptorSetAllocateInfo::builder()
+        //     .descriptor_pool(descriptor_pool)
+        //     .set_layouts(&desc_layouts_texture);
+        // let descriptor_sets_texture = unsafe {
+        //     logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_texture)
+        // }?;
+        let descriptor_sets_texture = vec![];
+
         Ok(Renderer {
             window,
             entry,
             instance,
             debug: std::mem::ManuallyDrop::new(debug),
-            surfaces: std::mem::ManuallyDrop::new(surfaces),
+            surface: std::mem::ManuallyDrop::new(surface),
             physical_device,
             physical_device_properties,
             queue_families,
@@ -505,11 +518,14 @@ impl Renderer {
             commandbuffers,
             allocator,
             models: Vec::new(),
+            texture_quads: Vec::new(),
             uniform_buffer,
             descriptor_pool,
             descriptor_sets_camera,
             descriptor_sets_light,
+            descriptor_sets_texture,
             light_buffer,
+            texture_storage: TextureStorage::new(),
         })
     }
 
@@ -524,7 +540,7 @@ impl Renderer {
         let clearvalues = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.08, 1.0],
+                    float32: [0.0, 0.0, 0.003_861_873, 1.0],
                 },
             },
             vk::ClearValue {
@@ -561,10 +577,14 @@ impl Renderer {
                 &[
                     self.descriptor_sets_camera[index],
                     self.descriptor_sets_light[index],
+                    // self.descriptor_sets_texture[index],
                 ],
                 &[],
             );
             for m in &self.models {
+                m.draw(&self.device, commandbuffer);
+            }
+            for m in &self.texture_quads {
                 m.draw(&self.device, commandbuffer);
             }
             self.device.cmd_end_render_pass(commandbuffer);
@@ -586,7 +606,7 @@ impl Renderer {
             &self.instance,
             self.physical_device,
             &self.device,
-            &self.surfaces,
+            &self.surface,
             &self.queue_families,
             &self.allocator,
         )?;
@@ -595,6 +615,19 @@ impl Renderer {
         self.pipeline.cleanup(&self.device);
         self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
         Ok(())
+    }
+
+    pub fn new_texture_from_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<usize, Box<dyn std::error::Error>> {
+        self.texture_storage.new_texture_from_file(
+            path,
+            &self.device,
+            &self.allocator,
+            &self.pools.commandpool_graphics,
+            &self.queues.graphics_queue,
+        )
     }
 }
 
@@ -605,6 +638,7 @@ impl Drop for Renderer {
                 .device_wait_idle()
                 .expect("something wrong while waiting");
 
+            self.texture_storage.cleanup(&self.device, &self.allocator);
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
             self.uniform_buffer.cleanup(&self.allocator);
@@ -613,6 +647,9 @@ impl Drop for Renderer {
             // if we fail to destroy the buffer continue to destory as many things
             // as possible
             for m in &mut self.models {
+                m.cleanup(&self.allocator);
+            }
+            for m in &mut self.texture_quads {
                 m.cleanup(&self.allocator);
             }
 
@@ -624,7 +661,7 @@ impl Drop for Renderer {
             self.allocator.destroy();
             self.device.destroy_device(None);
             // --segfault
-            std::mem::ManuallyDrop::drop(&mut self.surfaces);
+            std::mem::ManuallyDrop::drop(&mut self.surface);
             std::mem::ManuallyDrop::drop(&mut self.debug);
             self.instance.destroy_instance(None)
         };

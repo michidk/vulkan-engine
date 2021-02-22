@@ -1,3 +1,5 @@
+//# NAME BRDF
+//# DESCRIPTION Renders an object using the Cook-Torrance BRDF
 //# VERSION 450
 
 //# TYPE VERTEX
@@ -36,7 +38,7 @@ void main() {
 
 
 //# TYPE FRAGMENT
-layout (location = 0) in vec4 i_color;
+layout (location = 0) in vec4 i_color; // TODO: rename to albedo
 layout (location = 1) in vec3 i_normal;
 layout (location = 2) in vec4 i_worldpos;
 layout (location = 3) in vec3 i_cameraCoordinates;
@@ -53,56 +55,69 @@ readonly layout (set = 1, binding = 0) buffer StorageBufferObject {
     vec3 data[];
 } sbo;
 
-// what fraction of microsurfaces his this normal?
-float distribution(vec3 normal, vec3 halfVector, float roughness) {
-    float nDotH = dot(halfVector, normal);
-    if (nDotH > 0) {
-        float r = roughness * roughness;
-        return r / (PI * (1 + nDotH * nDotH * (r - 1)) * (1 + nDotH * nDotH * (r - 1)));
-    } else {
-        return 0.0;
-    }
+
+// normal distribution function: Trowbridge-Reitz GGX
+float distributionGGX(vec3 normal, vec3 halfVector, float roughness) {
+    float a = roughness * roughness; // rougness apparently looks more "correct", when beeing squared (according to Disney)
+    float a2 = a * a;
+    float nDotH  = max(dot(normal, halfVector), 0.0);
+    float nDotH2 = nDotH * nDotH;
+
+    float denom = (nDotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return a2 / denom;
 }
 
-// how visible are the microsurfaces (masking, occlusion)?
-float geometry(vec3 light, vec3 normal, vec3 view, float roughness) {
-    float nDotRadiance = abs(dot(normal, light));
-    float nDotV = abs(dot(normal, view));
+// geometry function: Schlick-GGX
+float geometrySchlickGGX(float vec, float roughness) {
+    float r = roughness + 1.0;
+    float k = (r * r) / 8.0;
 
-    return 0.5 / max(0.01, mix(2 * nDotRadiance * nDotV, nDotRadiance + nDotV, roughness));
+    float denom = vec * (1.0 - k) + k;
+
+    return vec / denom;
+}
+
+// approximate geometry: account for view dir and light dir: Smith's method
+float geometrySmith(float nDotV, float nDotL, float roughness) {
+    return geometrySchlickGGX(nDotL, roughness) * geometrySchlickGGX(nDotV, roughness);
 }
 
 // Schlicks approximation (approximates r_0 = ((n_1 - n_2)/(n_1 + n_2))^2)
 vec3 schlick(vec3 r0, float cosTheta) {
     // we could use pow, but then it do all the float checks - which we don't need
-    return r0 + (1 - r0) * (1 - cosTheta) * (1 - cosTheta) * (1 - cosTheta) * (1 - cosTheta) * (1 - cosTheta);
+    return r0 + (1.0 - r0) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta);
 }
 
 vec3 computeRadiance(vec3 irradiance, vec3 lightDirection, vec3 normal, vec3 cameraDirection, vec3 surfaceColor) {
 
     // utils
-    float roughness = i_roughness * i_roughness;
-    vec3 halfVector = normalize(0.5 * (cameraDirection + lightDirection));
-    float nDotH = max(dot(normal, halfVector), 0);
-    float nDotL = max(dot(normal, lightDirection), 0);
+    vec3 halfVector = normalize(cameraDirection + lightDirection);
+    float nDotH = max(dot(normal, halfVector), 0.0);
+    float nDotL = max(dot(normal, lightDirection), 0.0);
+    float hDotV = max(dot(halfVector, cameraDirection), 0.0);
+    float nDotV = max(dot(normal, cameraDirection), 0.0);
 
-    // base relectivity
-    // use 0.04 for non-metallic/dialectic materials else use the surface color
-    vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(i_metallic));
+    vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(i_metallic)); // base relectivity: use 0.04 for non-metallic/dialectic materials else use the surface color
+    vec3 f = schlick(f0, hDotV);
 
-    // calculate irradiance by using Fresnel's equations (https://en.wikipedia.org/wiki/Fresnel_equations)
-    vec3 irradianceOnSurface = irradiance * nDotL;
-    vec3 reflectedIrradiance = schlick(f0, nDotL) * irradianceOnSurface;
-    vec3 refractedIrradiance = irradianceOnSurface - reflectedIrradiance;
-    vec3 refractedNotAbsorbedIrradiance = refractedIrradiance * (1 - i_metallic);
+    float ndf = distributionGGX(normal, halfVector, i_roughness);
+    float geometry = geometrySmith(nDotV, nDotL, i_roughness);
 
-    vec3 F = schlick(f0, nDotH); // Fresnel coefficient (What part of the incoming light is reflected?)
-    vec3 relevantReflection = reflectedIrradiance * F * distribution(normal, halfVector, roughness) * geometry(lightDirection, normal, cameraDirection, roughness);
+    // Cook-Torrance BRDF
+    vec3 numerator = ndf * geometry * f;
+    float denominator = 4.0 * nDotV * nDotL;
+    vec3 specular = numerator / max(denominator, 0.001);
 
-    return refractedNotAbsorbedIrradiance * surfaceColor / PI + relevantReflection;
+    vec3 kS = f; // energy of light that gets reflected
+    vec3 kD = vec3(1.0) - kS; // remaining light that gets refracted
+    kD *= 1.0 - i_metallic; // metalls don't refract, so set it to 0 if it's a metal
+
+    return (kD * i_color.xyz / PI + specular) * irradiance * nDotL;
 }
 
-void main(){
+void main() {
     vec3 radiance = vec3(0);
     vec3 i_normal = normalize(i_normal);
     vec3 directionToCamera = normalize(i_cameraCoordinates - i_worldpos.xyz);
@@ -131,7 +146,7 @@ void main(){
         radiance += computeRadiance(irradiance, directionToLight, i_normal, directionToCamera, i_color.xyz);
     };
 
-    radiance = radiance / (1 + radiance); // Reinhard tone mapping
+    radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping
 
     o_color = vec4(radiance, 1.0);
 }

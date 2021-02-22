@@ -33,15 +33,15 @@ impl SurfaceWrapper {
         }
     }
 
-    // fn get_present_modes(
-    //     &self,
-    //     physical_device: vk::PhysicalDevice,
-    // ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
-    //     unsafe {
-    //         self.surface_loader
-    //             .get_physical_device_surface_present_modes(physical_device, self.surface)
-    //     }
-    // }
+    pub fn get_present_modes(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
+        unsafe {
+            self.surface_loader
+                .get_physical_device_surface_present_modes(physical_device, self.surface)
+        }
+    }
 
     pub fn get_formats(
         &self,
@@ -65,6 +65,36 @@ impl SurfaceWrapper {
                 self.surface,
             )
         }
+    }
+
+    pub fn choose_present_mode(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<vk::PresentModeKHR, vk::Result> {
+        let present_modes = self.get_present_modes(physical_device)?;
+        Ok(if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
+            vk::PresentModeKHR::MAILBOX
+        } else if present_modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
+            vk::PresentModeKHR::IMMEDIATE
+        } else {
+            vk::PresentModeKHR::FIFO
+        })
+    }
+
+    pub fn choose_format(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> Result<vk::SurfaceFormatKHR, vk::Result> {
+        let formats = self.get_formats(physical_device)?;
+        let optimal = formats.iter().find(|x| {
+            (x.format == vk::Format::B8G8R8A8_SRGB || x.format == vk::Format::R8G8B8A8_SRGB)
+                && x.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+        });
+        Ok(if let Some(optimal) = optimal {
+            *optimal
+        } else {
+            formats[0]
+        })
     }
 }
 

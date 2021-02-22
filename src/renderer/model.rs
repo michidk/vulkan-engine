@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ash::{version::DeviceV1_0, vk};
-use math::prelude::*;
+use crystal::prelude::*;
 
 use crate::color::Color;
 

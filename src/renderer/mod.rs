@@ -15,7 +15,7 @@ use ash::{
     version::{DeviceV1_0, InstanceV1_0},
     vk,
 };
-use math::prelude::*;
+use crystal::prelude::*;
 
 use self::{
     buffer::BufferWrapper,

@@ -1,5 +1,5 @@
 use ash::{version::DeviceV1_0, vk};
-use math::prelude::*;
+use crystal::prelude::*;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 

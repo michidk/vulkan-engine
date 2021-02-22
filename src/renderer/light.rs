@@ -1,5 +1,5 @@
 use ash::{version::DeviceV1_0, vk};
-use math::prelude::Vec3;
+use crystal::prelude::Vec3;
 
 use super::buffer::BufferWrapper;
 

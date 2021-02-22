@@ -1,4 +1,4 @@
-use math::prelude::*;
+use crystal::prelude::*;
 
 use super::buffer;
 

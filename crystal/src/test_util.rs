@@ -1,6 +1,6 @@
 use std::{fmt, ops::Sub};
 
-use crate::{matrix::Matrix, scalar::Abs, storage::Storage};
+use crate::{matrix::Matrix, scalar::Abs};
 
 #[derive(Debug, Clone)]
 pub struct MatrixCmp<T> {
@@ -11,21 +11,18 @@ impl<T> MatrixCmp<T>
 where
     T: fmt::Debug + Clone + PartialOrd + Abs<Output = T> + Sub<T, Output = T>,
 {
-    pub fn eq_margin<OS, TS, const R: usize, const C: usize>(
+    pub fn eq_margin<const R: usize, const C: usize>(
         &self,
-        mat_one: &Matrix<OS, T, R, C>,
-        mat_two: &Matrix<TS, T, R, C>,
+        mat_one: &Matrix<T, R, C>,
+        mat_two: &Matrix<T, R, C>,
         error_margin: T,
-    ) where
-        OS: Storage<T, R, C>,
-        TS: Storage<T, R, C>,
-    {
+    ) {
         for col_idx in 0..R {
             for row_idx in 0..C {
                 let (v1, v2) = unsafe {
                     (
-                        mat_one.storage.get_unchecked(row_idx, col_idx),
-                        mat_two.storage.get_unchecked(row_idx, col_idx),
+                        mat_one.get_unchecked((row_idx, col_idx)),
+                        mat_two.get_unchecked((row_idx, col_idx)),
                     )
                 };
                 let diff_abs = (v1.clone() - v2.clone()).abs();
@@ -43,14 +40,11 @@ where
         }
     }
 
-    pub fn eq<OS, TS, const R: usize, const C: usize>(
+    pub fn eq<const R: usize, const C: usize>(
         &self,
-        mat_one: &Matrix<OS, T, R, C>,
-        mat_two: &Matrix<TS, T, R, C>,
-    ) where
-        OS: Storage<T, R, C>,
-        TS: Storage<T, R, C>,
-    {
+        mat_one: &Matrix<T, R, C>,
+        mat_two: &Matrix<T, R, C>,
+    ) {
         self.eq_margin(mat_one, mat_two, self.error_margin.clone())
     }
 }

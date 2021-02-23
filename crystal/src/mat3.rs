@@ -7,12 +7,10 @@ use crate::vector::Vec3;
 use crate::{
     angle::AngleConst,
     matn::MatN,
-    matrix::Owned,
     scalar::{Cos, Sin},
-    storage::{ArrayStorage, Storage},
 };
 
-pub type Mat3<T, S = Owned<T, 3, 3>> = MatN<T, S, 3>;
+pub type Mat3<T> = MatN<T, 3>;
 
 impl<T> Mat3<T> {
     #[rustfmt::skip]
@@ -22,16 +20,14 @@ impl<T> Mat3<T> {
         c0r1: T, c1r1: T, c2r1: T,
         c0r2: T, c1r2: T, c2r2: T,
     ) -> Self {
-        Self::from_storage(ArrayStorage {
-            data: [
-                [c0r0, c0r1, c0r2],
-                [c1r0, c1r1, c1r2],
-                [c2r0, c2r1, c2r2],
-            ],
-        })
+        Self::from_data([
+            [c0r0, c0r1, c0r2],
+            [c1r0, c1r1, c1r2],
+            [c2r0, c2r1, c2r2],
+        ])
     }
 
-    pub fn from_axis_angle<RS>(axis: &Unit<Vec3<T, RS>>, angle: Angle<T>) -> Self
+    pub fn from_axis_angle<RS>(axis: &Unit<Vec3<T>>, angle: Angle<T>) -> Self
     where
         T: Clone
             + AngleConst
@@ -45,7 +41,6 @@ impl<T> Mat3<T> {
             + Rem<T, Output = T>
             + Sin<Output = T>
             + Cos<Output = T>,
-        RS: Storage<T, 3, 1>,
     {
         let rad = angle.to_rad_clamped();
         if rad == T::zero() {

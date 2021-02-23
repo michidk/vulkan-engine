@@ -1,6 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::*;
-use winit::event::{Event, WindowEvent};
+use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 
 use vulkan_engine::{
@@ -186,7 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut right = false;
     let mut left = false;
 
-    let mut last_mouse = (0.0f32, 0.0f32);
+    let mut cursor_catched = false;
 
     eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
@@ -199,20 +199,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *controlflow = winit::event_loop::ControlFlow::Exit,
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta: motion },
                 ..
             } => {
-                let cursor_delta = (
-                    position.x as f32 - last_mouse.0,
-                    position.y as f32 - last_mouse.1,
-                );
-                last_mouse = (position.x as f32, position.y as f32);
-
-                camera.rotate(
-                    Angle::from_deg(cursor_delta.1),
-                    Angle::from_deg(cursor_delta.0),
-                );
+                if cursor_catched {
+                    camera.rotate(
+                        Angle::from_deg(motion.1 as f32 * 0.5),
+                        Angle::from_deg(motion.0 as f32 * 0.5),
+                    );
+                }
             }
             Event::WindowEvent {
                 event:
@@ -227,6 +223,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 ..
             } => match keycode {
+                winit::event::VirtualKeyCode::Escape => {
+                    if state == winit::event::ElementState::Pressed {
+                        cursor_catched = !cursor_catched;
+                        if cursor_catched {
+                            renderer.window.set_cursor_visible(false);
+                            renderer.window.set_cursor_grab(true);
+                        } else {
+                            renderer.window.set_cursor_visible(true);
+                            renderer.window.set_cursor_grab(false);
+                        }
+                    }
+                }
                 winit::event::VirtualKeyCode::Up | winit::event::VirtualKeyCode::W => {
                     fwd = state == winit::event::ElementState::Pressed;
                 }

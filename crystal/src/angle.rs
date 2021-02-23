@@ -124,29 +124,8 @@ impl AngleConst for f64 {
 mod tests {
     use super::*;
 
-    macro_rules! assert_eq_err {
-        ($left:expr, $right:expr, $err:literal $(,)?) => {{
-            match (&$left, &$right) {
-                (left_val, right_val) => {
-                    if ((*left_val - *right_val).abs() > $err) {
-                        // The reborrows below are intentional. Without them, the stack slot for the
-                        // borrow is initialized even before the values are compared, leading to a
-                        // noticeable slow down.
-                        panic!(
-                            r#"assertion failed: `(left == right)`
-  left: `{:?}`,
- right: `{:?}`"#,
-                            &*left_val, &*right_val
-                        )
-                    }
-                }
-            }
-        }};
-    }
-
     #[test]
     fn angle_degrad() {
-        // TODO: tests
-        assert_eq_err!(Angle::from_deg(90.0f32).to_rad(), 1.570796, 1e-5);
+        assert!((Angle::from_deg(90.0f32).to_rad() - 1.570796).abs() < 1e-5);
     }
 }

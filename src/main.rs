@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut angle = 7.0.deg();
 
     let model_ref = model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-        &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1),
+        &Mat4::rotation_x(angle) * &Mat4::scale(0.1),
         Color::rgb_f32(0.955, 0.638, 0.538),
         1.0,
         0.2,
@@ -111,8 +111,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         for j in 0..10 {
             model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-                &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
-                    * &Mat4::new_scaling(0.5),
+                &Mat4::translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
+                    * &Mat4::scale(0.5),
                 Color::rgb_f32(1.0, 0.86, 0.57),
                 i as f32 * 0.1,
                 j as f32 * 0.1,
@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for i in 0..10 {
         model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-            &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::new_scaling(0.5),
+            &Mat4::translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::scale(0.5),
             Color::rgb_f32(
                 1.0 * i as f32 * 0.1,
                 0.0 * i as f32 * 0.1,
@@ -254,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // doing the work here (later)
                 angle = Angle::from_deg(angle.to_deg() + 0.01);
 
-                let new_model_matrix = &Mat4::new_rotation_x(angle) * &Mat4::new_scaling(0.1);
+                let new_model_matrix = &Mat4::rotation_x(angle) * &Mat4::scale(0.1);
 
                 renderer.models[0].get_mut(model_ref).unwrap().model_matrix = new_model_matrix;
                 renderer.models[0]

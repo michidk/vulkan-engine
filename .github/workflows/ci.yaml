@@ -19,11 +19,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-      - name: Run cargo check (math package)
+      - name: Run cargo check (crystal package)
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: -p math
+          args: -p crystal
 
   test:
     name: Test Suite
@@ -41,11 +41,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-      - name: Run cargo test (math package)
+      - name: Run cargo test (crystal package)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: -p math
+          args: -p crystal
 
   lints:
     name: Lints

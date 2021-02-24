@@ -18,7 +18,18 @@ use ash::{
 };
 use crystal::prelude::*;
 
-use self::{buffer::BufferWrapper, debug::DebugMessenger, descriptor_manager::DescriptorManager, instance_device_queues::{QueueFamilies, Queues}, model::{DefaultModel, TextureQuadModel}, pools_and_commandbuffers::PoolsWrapper, renderpass_and_pipeline::PipelineWrapper, surface::SurfaceWrapper, swapchain::SwapchainWrapper, texture::TextureStorage};
+use self::{
+    buffer::BufferWrapper,
+    debug::DebugMessenger,
+    descriptor_manager::DescriptorManager,
+    instance_device_queues::{QueueFamilies, Queues},
+    model::{DefaultModel, TextureQuadModel},
+    pools_and_commandbuffers::PoolsWrapper,
+    renderpass_and_pipeline::PipelineWrapper,
+    surface::SurfaceWrapper,
+    swapchain::SwapchainWrapper,
+    texture::TextureStorage,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RendererError {
@@ -503,24 +514,24 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline,
             );
-            
-            let cam_set_data = vec![
-                descriptor_manager::DescriptorData::UniformBuffer{
-                    buffer: self.uniform_buffer.buffer,
-                    offset: 0,
-                    size: self.uniform_buffer.get_size()
-                }
-            ];
-            let cam_set = self.descriptor_manager.get_descriptor_set(self.layout_camera, &cam_set_data)?;
 
-            let light_set_data = vec![
-                descriptor_manager::DescriptorData::StorageBuffer{
-                    buffer: self.light_buffer.buffer,
-                    offset: 0,
-                    size: self.light_buffer.get_size()
-                }
-            ];
-            let light_set = self.descriptor_manager.get_descriptor_set(self.layout_lights, &light_set_data)?;
+            let cam_set_data = vec![descriptor_manager::DescriptorData::UniformBuffer {
+                buffer: self.uniform_buffer.buffer,
+                offset: 0,
+                size: self.uniform_buffer.get_size(),
+            }];
+            let cam_set = self
+                .descriptor_manager
+                .get_descriptor_set(self.layout_camera, &cam_set_data)?;
+
+            let light_set_data = vec![descriptor_manager::DescriptorData::StorageBuffer {
+                buffer: self.light_buffer.buffer,
+                offset: 0,
+                size: self.light_buffer.get_size(),
+            }];
+            let light_set = self
+                .descriptor_manager
+                .get_descriptor_set(self.layout_lights, &light_set_data)?;
 
             self.device.cmd_bind_descriptor_sets(
                 commandbuffer,
@@ -528,8 +539,7 @@ impl Renderer {
                 self.pipeline.layout,
                 0,
                 &[
-                    cam_set,
-                    light_set,
+                    cam_set, light_set,
                     // self.descriptor_sets_texture[index],
                 ],
                 &[],

@@ -1,14 +1,9 @@
 use std::{
-    array,
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
 };
 
-use ash::{
-    version::DeviceV1_0,
-    vk::{self, DescriptorSetAllocateInfo, DescriptorType, Handle},
-    Device,
-};
+use ash::{version::DeviceV1_0, vk};
 
 #[derive(Hash, Copy, Clone, PartialEq, Eq)]
 pub enum DescriptorData {
@@ -25,8 +20,8 @@ pub enum DescriptorData {
     StorageBuffer {
         buffer: vk::Buffer,
         offset: vk::DeviceSize,
-        size: vk::DeviceSize
-    }
+        size: vk::DeviceSize,
+    },
 }
 
 struct DescriptorSetData {
@@ -56,13 +51,13 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                 .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .build(),
         ];
-        let poolInfo = vk::DescriptorPoolCreateInfo::builder()
+        let pool_info = vk::DescriptorPoolCreateInfo::builder()
             .max_sets(4096)
             .pool_sizes(&pool_sizes)
             .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
             .build();
 
-        let pool = unsafe { device.create_descriptor_pool(&poolInfo, None) }?;
+        let pool = unsafe { device.create_descriptor_pool(&pool_info, None) }?;
 
         const VAL: Vec<u64> = Vec::new();
 
@@ -123,15 +118,15 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         }
 
         // step 2: Try to allocate a new descriptor
-        let allocInfo = vk::DescriptorSetAllocateInfo::builder()
+        let alloc_info = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(self.pool)
             .set_layouts(&[layout])
             .build();
-        let newSet = unsafe { self.device.allocate_descriptor_sets(&allocInfo)?[0] };
+        let new_set = unsafe { self.device.allocate_descriptor_sets(&alloc_info)?[0] };
 
-        let mut bufferInfos = Vec::with_capacity(bindings.len());
-        let mut imageInfos = Vec::with_capacity(bindings.len());
-        let mut setWrites = Vec::with_capacity(bindings.len());
+        let mut buffer_infos = Vec::with_capacity(bindings.len());
+        let mut image_infos = Vec::with_capacity(bindings.len());
+        let mut set_writes = Vec::with_capacity(bindings.len());
         for (index, b) in bindings.iter().enumerate() {
             match b {
                 DescriptorData::UniformBuffer {
@@ -139,38 +134,40 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                     offset,
                     size,
                 } => {
-                    bufferInfos.push(
+                    buffer_infos.push(
                         vk::DescriptorBufferInfo::builder()
                             .buffer(*buffer)
                             .offset(*offset)
                             .range(*size)
                             .build(),
                     );
-                    setWrites.push(
+                    set_writes.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                             .dst_binding(index as u32)
-                            .dst_set(newSet)
-                            .buffer_info(&[*bufferInfos.last().unwrap()])
+                            .dst_set(new_set)
+                            .buffer_info(&[*buffer_infos.last().unwrap()])
                             .build(),
                     );
                 }
                 DescriptorData::StorageBuffer {
-                    buffer, offset, size
+                    buffer,
+                    offset,
+                    size,
                 } => {
-                    bufferInfos.push(
+                    buffer_infos.push(
                         vk::DescriptorBufferInfo::builder()
                             .buffer(*buffer)
                             .offset(*offset)
                             .range(*size)
                             .build(),
                     );
-                    setWrites.push(
+                    set_writes.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                             .dst_binding(index as u32)
-                            .dst_set(newSet)
-                            .buffer_info(&[*bufferInfos.last().unwrap()])
+                            .dst_set(new_set)
+                            .buffer_info(&[*buffer_infos.last().unwrap()])
                             .build(),
                     );
                 }
@@ -179,25 +176,25 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                     layout,
                     sampler,
                 } => {
-                    imageInfos.push(
+                    image_infos.push(
                         vk::DescriptorImageInfo::builder()
                             .image_view(*image)
                             .image_layout(*layout)
                             .sampler(*sampler)
                             .build(),
                     );
-                    setWrites.push(
+                    set_writes.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                             .dst_binding(index as u32)
-                            .dst_set(newSet)
-                            .image_info(&[*imageInfos.last().unwrap()])
+                            .dst_set(new_set)
+                            .image_info(&[*image_infos.last().unwrap()])
                             .build(),
                     );
                 }
             }
         }
-        unsafe { self.device.update_descriptor_sets(&setWrites, &[]) };
+        unsafe { self.device.update_descriptor_sets(&set_writes, &[]) };
 
         self.frame_sets[self.frame_index as usize].push(hash);
         assert!(self
@@ -206,19 +203,21 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                 hash,
                 DescriptorSetData {
                     data_hash: hash,
-                    layout: layout,
+                    layout,
                     frame_index: self.frame_index,
-                    set: newSet,
+                    set: new_set,
                 }
             )
             .is_none());
 
-        return Ok(newSet);
+        Ok(new_set)
     }
 
     pub fn destroy(&mut self) {
         if self.pool != vk::DescriptorPool::null() {
-            unsafe { self.device.destroy_descriptor_pool(self.pool, None); }
+            unsafe {
+                self.device.destroy_descriptor_pool(self.pool, None);
+            }
             self.pool = vk::DescriptorPool::null();
         }
     }

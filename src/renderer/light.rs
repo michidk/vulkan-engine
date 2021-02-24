@@ -1,4 +1,3 @@
-use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::Vec3;
 
 use super::buffer::BufferWrapper;
@@ -51,7 +50,7 @@ impl LightManager {
     pub fn update_buffer(
         &self,
         allocator: &vk_mem::Allocator,
-        buffer: &mut BufferWrapper
+        buffer: &mut BufferWrapper,
     ) -> Result<(), vk_mem::error::Error> {
         // push padding float as vulkan vecs are always 4 * T
         let mut data: Vec<f32> = vec![

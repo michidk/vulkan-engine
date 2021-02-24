@@ -90,10 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
 
-    lights.update_buffer(
-        &renderer.allocator,
-        &mut renderer.light_buffer
-    )?;
+    lights.update_buffer(&renderer.allocator, &mut renderer.light_buffer)?;
 
     let mut model = DefaultModel::sphere(4);
 

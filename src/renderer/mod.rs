@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod camera;
 mod debug;
+mod descriptor_manager;
 mod instance_device_queues;
 pub mod light;
 pub mod model;
@@ -17,17 +18,7 @@ use ash::{
 };
 use crystal::prelude::*;
 
-use self::{
-    buffer::BufferWrapper,
-    debug::DebugMessenger,
-    instance_device_queues::{QueueFamilies, Queues},
-    model::{DefaultModel, TextureQuadModel},
-    pools_and_commandbuffers::PoolsWrapper,
-    renderpass_and_pipeline::PipelineWrapper,
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-    texture::TextureStorage,
-};
+use self::{buffer::BufferWrapper, debug::DebugMessenger, descriptor_manager::DescriptorManager, instance_device_queues::{QueueFamilies, Queues}, model::{DefaultModel, TextureQuadModel}, pools_and_commandbuffers::PoolsWrapper, renderpass_and_pipeline::PipelineWrapper, surface::SurfaceWrapper, swapchain::SwapchainWrapper, texture::TextureStorage};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RendererError {
@@ -359,6 +350,7 @@ pub struct Renderer {
     pub descriptor_sets_texture: Vec<vk::DescriptorSet>,
     pub light_buffer: BufferWrapper,
     pub texture_storage: TextureStorage,
+    descriptor_manager: DescriptorManager<8>
 }
 
 impl Renderer {
@@ -500,6 +492,8 @@ impl Renderer {
         // }?;
         let descriptor_sets_texture = vec![];
 
+        let descriptor_manager = DescriptorManager::new(logical_device.clone())?;
+
         Ok(Renderer {
             window,
             entry,
@@ -526,6 +520,7 @@ impl Renderer {
             descriptor_sets_texture,
             light_buffer,
             texture_storage: TextureStorage::new(),
+            descriptor_manager
         })
     }
 
@@ -637,6 +632,8 @@ impl Drop for Renderer {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
+            self.descriptor_manager.destroy();
 
             self.texture_storage.cleanup(&self.device, &self.allocator);
             self.device

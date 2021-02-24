@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 
+use crate::vulkan::error::VulkanError;
+use crate::{utils::color::Color, vulkan::buffer};
 use ash::{version::DeviceV1_0, vk};
 use math::prelude::*;
-
-use crate::color::Color;
-
-use super::{buffer, RendererError};
 
 pub struct Model<V, I> {
     vertices: Vec<V>,
@@ -15,9 +13,9 @@ pub struct Model<V, I> {
     instances: Vec<I>,
     fist_invisible: usize,
     next_handle: usize,
-    vertex_buffer: Option<buffer::BufferWrapper>,
-    index_buffer: Option<buffer::BufferWrapper>,
-    instance_buffer: Option<buffer::BufferWrapper>,
+    pub(crate) vertex_buffer: Option<buffer::BufferWrapper>,
+    pub(crate) index_buffer: Option<buffer::BufferWrapper>,
+    pub(crate) instance_buffer: Option<buffer::BufferWrapper>,
 }
 
 #[allow(dead_code)]
@@ -30,7 +28,7 @@ impl<V, I> Model<V, I> {
         self.instances.get_mut(*self.handle_to_index.get(&handle)?)
     }
 
-    fn swap_by_handle(&mut self, handle1: usize, handle2: usize) -> Result<(), RendererError> {
+    fn swap_by_handle(&mut self, handle1: usize, handle2: usize) -> Result<(), VulkanError> {
         if handle1 == handle2 {
             return Ok(());
         }
@@ -45,7 +43,7 @@ impl<V, I> Model<V, I> {
             self.handle_to_index.insert(index2, handle1);
             Ok(())
         } else {
-            Err(RendererError::InvalidHandle)
+            Err(VulkanError::InvalidHandle)
         }
     }
 
@@ -61,15 +59,15 @@ impl<V, I> Model<V, I> {
         self.handle_to_index.insert(index2, handle1);
     }
 
-    fn is_visible(&self, handle: usize) -> Result<bool, RendererError> {
+    fn is_visible(&self, handle: usize) -> Result<bool, VulkanError> {
         Ok(self
             .handle_to_index
             .get(&handle)
-            .ok_or(RendererError::InvalidHandle)?
+            .ok_or(VulkanError::InvalidHandle)?
             < &self.fist_invisible)
     }
 
-    fn make_visible(&mut self, handle: usize) -> Result<(), RendererError> {
+    fn make_visible(&mut self, handle: usize) -> Result<(), VulkanError> {
         if let Some(&index) = self.handle_to_index.get(&handle) {
             // if already visible to nothing
             if index < self.fist_invisible {
@@ -80,11 +78,11 @@ impl<V, I> Model<V, I> {
             self.fist_invisible += 1;
             Ok(())
         } else {
-            Err(RendererError::InvalidHandle)
+            Err(VulkanError::InvalidHandle)
         }
     }
 
-    fn make_invisible(&mut self, handle: usize) -> Result<(), RendererError> {
+    fn make_invisible(&mut self, handle: usize) -> Result<(), VulkanError> {
         if let Some(&index) = self.handle_to_index.get(&handle) {
             // if already invisible to nothing
             if index >= self.fist_invisible {
@@ -95,7 +93,7 @@ impl<V, I> Model<V, I> {
             self.fist_invisible -= 1;
             Ok(())
         } else {
-            Err(RendererError::InvalidHandle)
+            Err(VulkanError::InvalidHandle)
         }
     }
 
@@ -116,7 +114,7 @@ impl<V, I> Model<V, I> {
         new_handle
     }
 
-    fn remove(&mut self, handle: usize) -> Result<I, RendererError> {
+    fn remove(&mut self, handle: usize) -> Result<I, VulkanError> {
         if let Some(&index) = self.handle_to_index.get(&handle) {
             if index < self.fist_invisible {
                 self.swap_by_index(index, self.fist_invisible - 1);
@@ -127,7 +125,7 @@ impl<V, I> Model<V, I> {
             self.handle_to_index.remove(&handle);
             Ok(self.instances.pop().expect("Failed to pop instance"))
         } else {
-            Err(RendererError::InvalidHandle)
+            Err(VulkanError::InvalidHandle)
         }
     }
 
@@ -420,7 +418,6 @@ impl DefaultModel {
         let mut new_indicies = Vec::new();
         let mut midpoints = HashMap::<(u32, u32), u32>::new();
 
-        println!("{}", self.indicies.len());
         for triangle in self.indicies.chunks(3) {
             let a = triangle[0];
             let b = triangle[1];

@@ -2,7 +2,8 @@ use std::fs;
 use std::io::{self, BufRead};
 use std::{num, path::Path};
 
-use crate::mesh;
+use crate::scene::model::mesh;
+
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Vertex {

@@ -2,7 +2,13 @@
 
 ## TODO's
 
-- next chapter: 32
+- restructure project
+- rework math lib @Shemnei
+- implement smart buffers @Rob
+- fix all unwraps and implement proper error handling
+- check //TO DO:
+- rework textures
+- check access modifier (especially package ones)
 
 ## FPS (release build; fullscreen)
 
@@ -34,3 +40,5 @@ Obj test files: https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
 https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
 http://www.realtimerendering.com/udacity/?load=demo/unit7-view-pipeline.js
 http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/
+https://github.com/HeroesGrave/ecs-rs/blob/master/src/entity.rs
+https://github.com/MaikKlein/pyro/tree/master/pyro/src

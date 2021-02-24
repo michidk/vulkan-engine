@@ -1,6 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
 
-use super::{instance_device_queues, surface, RendererError};
+use super::{error::VulkanError, queue, surface};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -30,9 +30,9 @@ impl SwapchainWrapper {
         physical_device: vk::PhysicalDevice,
         logical_device: &ash::Device,
         surface: &surface::SurfaceWrapper,
-        queue_families: &instance_device_queues::QueueFamilies,
+        queue_families: &queue::QueueFamilies,
         allocator: &vk_mem::Allocator,
-    ) -> Result<SwapchainWrapper, RendererError> {
+    ) -> Result<SwapchainWrapper, VulkanError> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent; // TODO: handle 0xFFFF x 0xFFFF extent
         let surface_format = surface.choose_format(physical_device)?;
@@ -59,20 +59,8 @@ impl SwapchainWrapper {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode);
 
-        // check whether graphics and present queue are actual the same queue
-        let queuefamilies = [
-            queue_families.graphics_q_index,
-            queue_families.present_q_index,
-        ];
-        if queue_families.graphics_q_index == queue_families.present_q_index {
-            swapchain_create_info =
-                swapchain_create_info.image_sharing_mode(vk::SharingMode::EXCLUSIVE);
-        } else {
-            // TODO: probably better to never use CONCURRENT
-            swapchain_create_info = swapchain_create_info
-                .queue_family_indices(&queuefamilies) // queues that have access to the images in this chain
-                .image_sharing_mode(vk::SharingMode::CONCURRENT); // multiple queues are allowed to access the subresources; might result in lower performance
-        }
+        swapchain_create_info =
+            swapchain_create_info.image_sharing_mode(vk::SharingMode::EXCLUSIVE);
 
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };

@@ -1,6 +1,6 @@
 use math::prelude::*;
 
-use super::buffer;
+use crate::vulkan::buffer;
 
 #[allow(dead_code)]
 #[derive(Debug)]

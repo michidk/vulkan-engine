@@ -1,11 +1,10 @@
 use ash::{version::DeviceV1_0, vk};
 use math::prelude::Vec3;
 
-use super::buffer::BufferWrapper;
-
+use crate::vulkan::buffer::BufferWrapper;
 pub struct DirectionalLight {
     pub direction: Vec3<f32>,
-    pub illuminance: Vec3<f32>, // in lx = lm / m * m
+    pub illuminance: Vec3<f32>, // in lx = lm / m^2
 }
 
 pub struct PointLight {
@@ -33,6 +32,7 @@ impl From<DirectionalLight> for Light {
 pub struct LightManager {
     directional_lights: Vec<DirectionalLight>,
     point_lights: Vec<PointLight>,
+    is_dirty: bool,
 }
 
 impl LightManager {
@@ -46,6 +46,7 @@ impl LightManager {
                 self.point_lights.push(pl);
             }
         }
+        self.is_dirty = true;
     }
 
     pub fn update_buffer(
@@ -55,6 +56,10 @@ impl LightManager {
         buffer: &mut BufferWrapper,
         descriptor_sets_light: &mut [vk::DescriptorSet],
     ) -> Result<(), vk_mem::error::Error> {
+        if !self.is_dirty {
+            return Ok(());
+        }
+
         // push padding float as vulkan vecs are always 4 * T
         let mut data: Vec<f32> = vec![
             self.directional_lights.len() as f32,
@@ -112,6 +117,7 @@ impl Default for LightManager {
         LightManager {
             directional_lights: Vec::new(),
             point_lights: Vec::new(),
+            is_dirty: false,
         }
     }
 }

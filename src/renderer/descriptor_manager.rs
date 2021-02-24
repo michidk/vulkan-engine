@@ -31,6 +31,9 @@ struct DescriptorSetData {
     set: vk::DescriptorSet,
 }
 
+/// This class automatically creates, caches and updates descriptor sets
+/// The descriptor caching mechanism is losely inspired by the system the Granite Engine uses
+/// (http://themaister.net/blog/2019/04/20/a-tour-of-granites-vulkan-backend-part-3/).
 pub struct DescriptorManager<const HISTORY_SIZE: usize> {
     device: ash::Device,
     pool: vk::DescriptorPool,

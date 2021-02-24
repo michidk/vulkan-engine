@@ -7,7 +7,8 @@ pub struct BufferWrapper {
     pub buffer: vk::Buffer,
     allocation: vk_mem::Allocation,
     allocation_info: vk_mem::AllocationInfo,
-    size_in_bytes: u64,
+    capacity: u64,
+    size: u64,
     buffer_usage: vk::BufferUsageFlags,
     memory_usage: vk_mem::MemoryUsage,
 }
@@ -15,7 +16,7 @@ pub struct BufferWrapper {
 impl BufferWrapper {
     pub fn new(
         allocator: &vk_mem::Allocator,
-        size_in_bytes: u64,
+        capacity: u64,
         buffer_usage: vk::BufferUsageFlags,
         memory_usage: vk_mem::MemoryUsage,
     ) -> Result<Self, vk_mem::error::Error> {
@@ -26,7 +27,7 @@ impl BufferWrapper {
 
         let (buffer, allocation, allocation_info) = allocator.create_buffer(
             &vk::BufferCreateInfo::builder()
-                .size(size_in_bytes)
+                .size(capacity)
                 .usage(buffer_usage)
                 .build(),
             &allocation_create_info,
@@ -36,7 +37,8 @@ impl BufferWrapper {
             buffer,
             allocation,
             allocation_info,
-            size_in_bytes,
+            capacity,
+            size: 0,
             buffer_usage,
             memory_usage,
         })
@@ -48,7 +50,7 @@ impl BufferWrapper {
         data: &[T],
     ) -> Result<(), vk_mem::error::Error> {
         let bytes_to_write = (data.len() * std::mem::size_of::<T>()) as u64;
-        if bytes_to_write > self.size_in_bytes {
+        if bytes_to_write > self.capacity {
             log::warn!("Not enough memory allocated in buffer; Resizing");
             self.resize(allocator, bytes_to_write)?;
         }
@@ -58,18 +60,23 @@ impl BufferWrapper {
             data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
         };
         allocator.unmap_memory(&self.allocation);
+        self.size = bytes_to_write;
         Ok(())
+    }
+
+    pub fn get_size(&self) -> u64 {
+        self.size
     }
 
     fn resize(
         &mut self,
         allocator: &vk_mem::Allocator,
-        bytes_to_write: u64,
+        new_capacity: u64,
     ) -> Result<(), vk_mem::error::Error> {
         allocator.destroy_buffer(self.buffer, &self.allocation);
         let new_buffer = BufferWrapper::new(
             allocator,
-            bytes_to_write,
+            new_capacity,
             self.buffer_usage,
             self.memory_usage,
         )?;

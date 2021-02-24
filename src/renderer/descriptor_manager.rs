@@ -12,7 +12,7 @@ use ash::{
 
 #[derive(Hash, Copy, Clone, PartialEq, Eq)]
 pub enum DescriptorData {
-    Buffer {
+    UniformBuffer {
         buffer: vk::Buffer,
         offset: vk::DeviceSize,
         size: vk::DeviceSize,
@@ -22,6 +22,11 @@ pub enum DescriptorData {
         layout: vk::ImageLayout,
         sampler: vk::Sampler,
     },
+    StorageBuffer {
+        buffer: vk::Buffer,
+        offset: vk::DeviceSize,
+        size: vk::DeviceSize
+    }
 }
 
 struct DescriptorSetData {
@@ -129,7 +134,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         let mut setWrites = Vec::with_capacity(bindings.len());
         for (index, b) in bindings.iter().enumerate() {
             match b {
-                DescriptorData::Buffer {
+                DescriptorData::UniformBuffer {
                     buffer,
                     offset,
                     size,
@@ -144,6 +149,25 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                     setWrites.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                            .dst_binding(index as u32)
+                            .dst_set(newSet)
+                            .buffer_info(&[*bufferInfos.last().unwrap()])
+                            .build(),
+                    );
+                }
+                DescriptorData::StorageBuffer {
+                    buffer, offset, size
+                } => {
+                    bufferInfos.push(
+                        vk::DescriptorBufferInfo::builder()
+                            .buffer(*buffer)
+                            .offset(*offset)
+                            .range(*size)
+                            .build(),
+                    );
+                    setWrites.push(
+                        vk::WriteDescriptorSet::builder()
+                            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                             .dst_binding(index as u32)
                             .dst_set(newSet)
                             .buffer_info(&[*bufferInfos.last().unwrap()])

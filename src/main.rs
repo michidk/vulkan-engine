@@ -91,10 +91,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     lights.update_buffer(
-        &renderer.device,
         &renderer.allocator,
-        &mut renderer.light_buffer,
-        &mut renderer.descriptor_sets_light,
+        &mut renderer.light_buffer
     )?;
 
     let mut model = DefaultModel::sphere(4);

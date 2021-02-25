@@ -21,7 +21,9 @@ where
         value.unscale_mut(n.clone());
         (Unit { value }, n)
     }
+}
 
+impl<T> Unit<T> {
     pub fn into_inner(self) -> T {
         self.value
     }

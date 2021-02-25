@@ -24,6 +24,12 @@ pub trait Cos {
     fn cos(&self) -> Self::Output;
 }
 
+pub trait Sqrt {
+    type Output;
+
+    fn sqrt(&self) -> Self::Output;
+}
+
 pub trait Scalar {}
 
 macro_rules! impl_nums_zero {
@@ -78,7 +84,7 @@ macro_rules! impl_unums_abs {
     };
 }
 
-macro_rules! impl_sin_cos_float {
+macro_rules! impl_float_sin_cos {
     ( $( $float:ty )+ ) => {
         $(
             impl Sin for $float {
@@ -100,6 +106,20 @@ macro_rules! impl_sin_cos_float {
     }
 }
 
+macro_rules! impl_float_sqrt {
+    ( $( $float:ty )+ ) => {
+        $(
+            impl Sqrt for $float {
+                type Output = Self;
+
+                fn sqrt(&self) -> Self::Output {
+                    (*self).sqrt()
+                }
+            }
+        )+
+    };
+}
+
 impl_nums_zero! { u8 u16 u32 u64 u128 usize }
 impl_nums_zero! { i8 i16 i32 i64 i128 isize }
 impl_nums_zero! { f32 f64 }
@@ -111,6 +131,9 @@ impl_nums_one! { f32 f64 }
 impl_inums_abs! { i8 i16 i32 i64 i128 isize f32 f64 }
 impl_unums_abs! { u8 u16 u32 u64 u128 usize }
 
-impl_sin_cos_float! { f32 f64 }
+impl_float_sin_cos! { f32 f64 }
+
+// TODO: handle NaN
+impl_float_sqrt! { f32 f64 }
 
 impl<T> Scalar for T {}

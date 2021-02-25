@@ -9,6 +9,7 @@
 - check //TO DO:
 - rework textures
 - check access modifier (especially package ones)
+- put example resources into example itself, and build a seperate output folder for each example
 
 ## FPS (release build; fullscreen)
 

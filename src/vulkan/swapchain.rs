@@ -155,6 +155,21 @@ impl SwapchainWrapper {
         })
     }
 
+    // TODO: handle error
+    pub fn aquire_next_image(&self) -> u32 {
+        let (image_index, _) = unsafe {
+            self.swapchain_loader
+                .acquire_next_image(
+                    self.swapchain,
+                    std::u64::MAX,
+                    self.image_available[self.current_image],
+                    vk::Fence::null(),
+                )
+                .expect("image acquisition trouble")
+        };
+        image_index
+    }
+
     pub fn create_framebuffers(
         &mut self,
         logical_device: &ash::Device,

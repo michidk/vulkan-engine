@@ -8,4 +8,4 @@ modules:
 - utils
 
 workspaces:
-- crystal (currently known as `math`)
+- crystal (currently known as `math`) (see crystal branch)

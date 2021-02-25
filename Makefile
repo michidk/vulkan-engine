@@ -20,7 +20,7 @@ build-release-windows: prepare-release-windows shaders build
 build-release-linux: prepare-release-linux shaders build
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
-	ls ./targe
+	ls ./target
 	ls ./target/release
 	ls ./target/release/examples
 	cp ./target/release/examples/* ./out/

@@ -121,7 +121,7 @@ jobs:
       - name: Install ve_shader
         run: cargo install ve_shader
       - name: Build
-        run: make build-release-windows
+        run: make build-release-mingw
       - name: Upload
         uses: actions/upload-artifact@v2
         with:

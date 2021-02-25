@@ -29,6 +29,8 @@ build-release-mingw: prepare-release-linux shaders build-release
 # build on linux for linux with make for linux
 build-release-linux: prepare-release-linux shaders build-release
 	mkdir -p ./out/assets/
+	ls ./target/release/
+	ls ./target/release/examples/
 	cp -R ./assets/* ./out/assets/
 	cp ./target/release/examples/* ./out/
 

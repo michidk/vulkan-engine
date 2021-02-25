@@ -335,15 +335,78 @@ impl VulkanManager {
         Ok(())
     }
 
-    // TODO: temp, place elsewhere
-    // fn update_light_buffer(&mut self, light_manager: &LightManager) {
-    //     light_manager.update_buffer(
-    //         &self.device,
-    //         &self.allocator,
-    //         &mut self.light_buffer,
-    //         &mut self.descriptor_sets_light,
-    //     );
-    // }
+    pub fn wait_for_fence(&self) {
+        unsafe {
+            &self
+                .device
+                .wait_for_fences(
+                    &[self.swapchain.may_begin_drawing[self.swapchain.current_image]],
+                    true,
+                    std::u64::MAX,
+                )
+                .expect("fence-waiting");
+            &self
+                .device
+                .reset_fences(&[self.swapchain.may_begin_drawing[self.swapchain.current_image]])
+                .expect("resetting fences");
+        }
+    }
+
+    pub fn render(&self, image_index: u32) -> [vk::Semaphore; 1] {
+        let semaphores_available = [self.swapchain.image_available[self.swapchain.current_image]];
+        let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let semaphores_finished = [self.swapchain.rendering_finished[self.swapchain.current_image]];
+        let commandbuffers = [self.commandbuffers[image_index as usize]];
+        let submit_info = [vk::SubmitInfo::builder()
+            .wait_semaphores(&semaphores_available)
+            .wait_dst_stage_mask(&waiting_stages)
+            .command_buffers(&commandbuffers)
+            .signal_semaphores(&semaphores_finished)
+            .build()];
+        unsafe {
+            &self
+                .device
+                .queue_submit(
+                    self.queues.graphics_queue,
+                    &submit_info,
+                    self.swapchain.may_begin_drawing[self.swapchain.current_image],
+                )
+                .expect("queue submission");
+        };
+
+        semaphores_finished
+    }
+
+    pub fn present(&mut self, image_index: u32, semaphores_finished: &[vk::Semaphore]) {
+        let swapchains = [self.swapchain.swapchain];
+        let indices = [image_index];
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(semaphores_finished)
+            .swapchains(&swapchains)
+            .image_indices(&indices);
+        unsafe {
+            match &self
+                .swapchain
+                .swapchain_loader
+                .queue_present(self.queues.graphics_queue, &present_info)
+            {
+                Ok(..) => {}
+                Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    self.recreate_swapchain().expect("swapchain recreation");
+                    // camera.set_aspect(
+                    //     vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32,
+                    // );
+                    // camera.update_buffer(&vk.allocator, &mut vk.uniform_buffer);
+                }
+                _ => {
+                    panic!("unhandled queue presentation error");
+                }
+            }
+        };
+
+        self.swapchain.current_image =
+            (self.swapchain.current_image + 1) % self.swapchain.amount_of_images as usize;
+    }
 }
 
 impl Drop for VulkanManager {

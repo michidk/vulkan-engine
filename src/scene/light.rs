@@ -8,7 +8,7 @@ pub struct DirectionalLight {
 }
 
 pub struct PointLight {
-    pub position: Vec3<f32>,      // in m
+    pub position: Vec3<f32>,
     pub luminous_flux: Vec3<f32>, // in lm
 }
 

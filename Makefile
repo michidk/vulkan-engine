@@ -12,12 +12,17 @@ shaders:
 	ve_shader "./shaders/*" -o ./assets/shaders/
 
 build-release-windows: prepare-release-windows shaders build
-	xcopy /s /y "assets\*" ".\out\assets\*"
-	xcopy /s /y "target\release\examples\*" "out\"
+	# xcopy /s /y "assets\*" ".\out\assets\*"
+	# xcopy /s /y "target\release\examples\*" "out\"
+	mkdir -p ./out/assets/
+	cp -R ./assets/* ./out/assets/
 
 build-release-linux: prepare-release-linux shaders build
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
+	ls ./targe
+	ls ./target/release
+	ls ./target/release/examples
 	cp ./target/release/examples/* ./out/
 
 # test and lint

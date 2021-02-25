@@ -1,5 +1,4 @@
 /// A minimal example that just initializes the engine but does not display anything
-
 use std::process::exit;
 
 use log::error;
@@ -7,7 +6,6 @@ use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
 };
-
 
 fn main() {
     // setting up logger
@@ -22,6 +20,7 @@ fn main() {
             },
             title: "Vulkan Minimal Example",
         },
+        app_name: "Vulkan Minimal Example",
     };
 
     // setup engine

@@ -9,8 +9,8 @@ build:
 	cargo +nightly build --example brdf
 
 build-release:
-	cargo +nightly build --example minimal
-	cargo +nightly build --example brdf
+	cargo +nightly build --release --example minimal
+	cargo +nightly build --release --example brdf
 
 shaders:
 	ve_shader "./shaders/*" -o ./assets/shaders/

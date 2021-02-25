@@ -21,6 +21,10 @@ impl GameLoop {
     pub(crate) fn update(&self, vulkan_manager: &mut VulkanManager, scene: &Scene) {
         let mut vk = vulkan_manager;
 
+        self.render(vk, scene);
+    }
+
+    fn render(&self, vk: &mut VulkanManager, scene: &Scene) {
         scene.light_manager.update_buffer(
             &vk.device,
             &vk.allocator,
@@ -36,7 +40,7 @@ impl GameLoop {
         &vk.update_commandbuffer(image_index as usize)
             .expect("updating the command buffer");
 
-        let semaphores_finished = vk.render(image_index);
+        let semaphores_finished = vk.submit(image_index);
         vk.present(image_index, &semaphores_finished);
     }
 }

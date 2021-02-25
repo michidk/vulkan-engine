@@ -352,7 +352,8 @@ impl VulkanManager {
         }
     }
 
-    pub fn render(&self, image_index: u32) -> [vk::Semaphore; 1] {
+    /// submits queued commands
+    pub fn submit(&self, image_index: u32) -> [vk::Semaphore; 1] {
         let semaphores_available = [self.swapchain.image_available[self.swapchain.current_image]];
         let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let semaphores_finished = [self.swapchain.rendering_finished[self.swapchain.current_image]];
@@ -377,6 +378,7 @@ impl VulkanManager {
         semaphores_finished
     }
 
+    /// add present command to queue
     pub fn present(&mut self, image_index: u32, semaphores_finished: &[vk::Semaphore]) {
         let swapchains = [self.swapchain.swapchain];
         let indices = [image_index];

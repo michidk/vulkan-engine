@@ -44,12 +44,12 @@ impl Camera {
         );
     }
 
-    fn get_rotation(&self) -> Quaternion {
+    fn get_rotation(&self) -> Quaternion<f32> {
         Quaternion::from_axis_angle(
-            &Unit::new_normalize(Vec3::new(0.0, 1.0, 0.0)),
+            Unit::new_normalize(Vec3::new(0.0, 1.0, 0.0)),
             Angle::from_rad(self.rotation_y),
         ) * Quaternion::from_axis_angle(
-            &Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
+            Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
             Angle::from_rad(self.rotation_x),
         )
     }
@@ -87,7 +87,7 @@ impl Camera {
 
     pub fn move_in_view_direction(&mut self, movement: &Vec3<f32>) {
         let rotation = self.get_rotation();
-        self.position += rotation * movement;
+        self.position += &rotation * movement;
         self.update_view_matrix();
     }
 

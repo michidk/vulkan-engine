@@ -1,6 +1,7 @@
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
+    slice,
 };
 
 use ash::{version::DeviceV1_0, vk};
@@ -123,7 +124,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         // step 2: Try to allocate a new descriptor
         let alloc_info = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(self.pool)
-            .set_layouts(&[layout])
+            .set_layouts(slice::from_ref(&layout))
             .build();
         let new_set = unsafe { self.device.allocate_descriptor_sets(&alloc_info)?[0] };
 
@@ -149,7 +150,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                             .dst_binding(index as u32)
                             .dst_set(new_set)
-                            .buffer_info(&[*buffer_infos.last().unwrap()])
+                            .buffer_info(slice::from_ref(buffer_infos.last().unwrap()))
                             .build(),
                     );
                 }
@@ -170,7 +171,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                             .dst_binding(index as u32)
                             .dst_set(new_set)
-                            .buffer_info(&[*buffer_infos.last().unwrap()])
+                            .buffer_info(slice::from_ref(buffer_infos.last().unwrap()))
                             .build(),
                     );
                 }
@@ -191,7 +192,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                             .dst_binding(index as u32)
                             .dst_set(new_set)
-                            .image_info(&[*image_infos.last().unwrap()])
+                            .image_info(slice::from_ref(image_infos.last().unwrap()))
                             .build(),
                     );
                 }

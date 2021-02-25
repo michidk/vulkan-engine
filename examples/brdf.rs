@@ -1,8 +1,8 @@
 /// Renders a brdf example
 use std::process::exit;
 
+use crystal::prelude::{Mat4, Vec3};
 use log::error;
-use math::prelude::{Mat4, Vec3};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -81,8 +81,8 @@ fn setup(engine: &mut Engine) {
     for i in 0..10 {
         for j in 0..10 {
             model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-                &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
-                    * &Mat4::new_scaling(0.5),
+                &Mat4::translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
+                    * &Mat4::scale(0.5),
                 Color::rgb_f32(1.0, 0.86, 0.57),
                 i as f32 * 0.1,
                 j as f32 * 0.1,
@@ -92,7 +92,7 @@ fn setup(engine: &mut Engine) {
 
     for i in 0..10 {
         model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-            &Mat4::new_translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::new_scaling(0.5),
+            &Mat4::translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::scale(0.5),
             Color::rgb_f32(
                 1.0 * i as f32 * 0.1,
                 0.0 * i as f32 * 0.1,

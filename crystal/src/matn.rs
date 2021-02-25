@@ -1,24 +1,21 @@
 use std::ops::Mul;
 
 use crate::{
-    matrix::{Matrix, Owned},
+    matrix::Matrix,
     scalar::{One, Zero},
-    storage::{ArrayStorage, StorageMut},
 };
 
-pub type MatN<T, S, const SIDE: usize> = Matrix<S, T, SIDE, SIDE>;
+pub type MatN<T, const SIDE: usize> = Matrix<T, SIDE, SIDE>;
 
-impl<S, T, const SIDE: usize> MatN<T, S, SIDE> {}
-
-impl<T, const SIDE: usize> MatN<T, Owned<T, SIDE, SIDE>, SIDE>
+impl<T, const SIDE: usize> MatN<T, SIDE>
 where
     T: Clone + Zero + One,
 {
     pub fn identity() -> Self {
-        let mut zero = Matrix::zero();
+        let mut zero = Self::zero();
 
         for idx in 0..SIDE {
-            unsafe { *zero.storage.get_unchecked_mut(idx, idx) = T::one() };
+            unsafe { *zero.get_unchecked_mut((idx, idx)) = T::one() };
         }
 
         zero
@@ -33,7 +30,7 @@ mod tests {
 
     #[test]
     fn matn_identity() {
-        let m: MatN<f32, _, 4> = &Matrix::identity() * 2.0;
+        let m: MatN<f32, 4> = &Matrix::identity() * 2.0;
 
         let res: Mat4<f32> = [
             [2.0, 0.0, 0.0, 0.0],

@@ -1,4 +1,4 @@
-use math::prelude::*;
+use crystal::prelude::*;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]

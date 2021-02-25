@@ -1,27 +1,22 @@
 use std::{
     marker::PhantomData,
-    ops::{Add, AddAssign, Div, Mul, Rem, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, Sub},
 };
 
 use crate::{
     angle::{Angle, AngleConst},
-    matrix::{Matrix, Owned},
+    matrix::Matrix,
     norm::Normed,
-    scalar::Zero,
-    storage::{Storage, StorageMut},
+    scalar::{One, Scalar, Sqrt, Zero},
     unit::Unit,
 };
-use crate::{
-    scalar::{One, Scalar},
-    storage::ArrayStorage,
-};
 
-type RowVector<S, T, const C: usize> = Matrix<S, T, 1, C>;
-type ColVector<S, T, const R: usize> = Matrix<S, T, R, 1>;
+type RowVector<T, const C: usize> = Matrix<T, 1, C>;
+type ColVector<T, const R: usize> = Matrix<T, R, 1>;
 
-pub type Vec2<T, S = Owned<T, 2, 1>> = ColVector<S, T, 2>;
-pub type Vec3<T, S = Owned<T, 3, 1>> = ColVector<S, T, 3>;
-pub type Vec4<T, S = Owned<T, 4, 1>> = ColVector<S, T, 4>;
+pub type Vec2<T> = ColVector<T, 2>;
+pub type Vec3<T> = ColVector<T, 3>;
+pub type Vec4<T> = ColVector<T, 4>;
 
 pub struct VecLen0 {}
 pub struct VecLen1 {}
@@ -37,7 +32,7 @@ pub trait VecLenCmp<T> {
 macro_rules! impl_vec_len_gt {
     ( $($vec:ty => $( $len:ty )+  ;)+ ) => {
         $($(
-            impl<T, S> VecLenCmp<$len> for $vec {
+            impl<T> VecLenCmp<$len> for $vec {
                 type Cmp = Greater;
             }
         )+)+
@@ -45,20 +40,20 @@ macro_rules! impl_vec_len_gt {
 }
 
 impl_vec_len_gt! {
-    Vec2<T, S> => VecLen0 VecLen1;
-    Vec3<T, S> => VecLen0 VecLen1 VecLen2;
-    Vec4<T, S> => VecLen0 VecLen1 VecLen2 VecLen3;
+    Vec2<T> => VecLen0 VecLen1;
+    Vec3<T> => VecLen0 VecLen1 VecLen2;
+    Vec4<T> => VecLen0 VecLen1 VecLen2 VecLen3;
 }
 
-impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
+impl<T, const R: usize> ColVector<T, R> {
     pub fn unit_x() -> Self
     where
         Self: VecLenCmp<VecLen0, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
-            *zero.storage.get_unchecked_mut(0, 0) = T::one();
+            *zero.get_unchecked_mut((0, 0)) = T::one();
         };
         zero
     }
@@ -66,11 +61,11 @@ impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
     pub fn unit_y() -> Self
     where
         Self: VecLenCmp<VecLen1, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
-            *zero.storage.get_unchecked_mut(1, 0) = T::one();
+            *zero.get_unchecked_mut((1, 0)) = T::one();
         };
         zero
     }
@@ -78,11 +73,11 @@ impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
     pub fn unit_z() -> Self
     where
         Self: VecLenCmp<VecLen2, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
-            *zero.storage.get_unchecked_mut(2, 0) = T::one();
+            *zero.get_unchecked_mut((2, 0)) = T::one();
         };
         zero
     }
@@ -90,67 +85,83 @@ impl<T, const R: usize> ColVector<Owned<T, R, 1>, T, R> {
     pub fn unit_w() -> Self
     where
         Self: VecLenCmp<VecLen3, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
-            *zero.storage.get_unchecked_mut(3, 0) = T::one();
+            *zero.get_unchecked_mut((3, 0)) = T::one();
         };
         zero
     }
-}
 
-impl<T, S, const R: usize> ColVector<S, T, R>
-where
-    S: Storage<T, R, 1>,
-{
     pub fn x(&self) -> &T
     where
         Self: VecLenCmp<VecLen0, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
-        unsafe { self.storage.get_unchecked(0, 0) }
+        unsafe { self.get_unchecked((0, 0)) }
     }
 
     pub fn y(&self) -> &T
     where
         Self: VecLenCmp<VecLen1, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
-        unsafe { self.storage.get_unchecked(1, 0) }
+        unsafe { self.get_unchecked((1, 0)) }
     }
 
     pub fn z(&self) -> &T
     where
         Self: VecLenCmp<VecLen2, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
-        unsafe { self.storage.get_unchecked(2, 0) }
+        unsafe { self.get_unchecked((2, 0)) }
     }
 
     pub fn w(&self) -> &T
     where
         Self: VecLenCmp<VecLen3, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
-        unsafe { self.storage.get_unchecked(3, 0) }
+        unsafe { self.get_unchecked((3, 0)) }
+    }
+
+    pub fn x_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen0, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((0, 0)) }
+    }
+
+    pub fn y_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen1, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((1, 0)) }
+    }
+
+    pub fn z_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen2, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((2, 0)) }
+    }
+
+    pub fn w_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen3, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((3, 0)) }
     }
 }
 
-impl<S, T, const R: usize> ColVector<S, T, R> {
-    pub fn dot_product<RS, RT>(&self, rhs: &ColVector<RS, RT, R>) -> T
+impl<T, const R: usize> ColVector<T, R> {
+    pub fn dot_product<RT>(&self, rhs: &ColVector<RT, R>) -> T
     where
         T: Clone + Zero + Mul<RT, Output = T> + AddAssign<T>,
-        S: Storage<T, R, 1>,
         RT: Clone,
-        RS: Storage<RT, R, 1>,
     {
         let mut value = T::zero();
 
         for idx in 0..R {
             value += unsafe {
-                self.storage.get_unchecked(idx, 0).clone()
-                    * rhs.storage.get_unchecked(idx, 0).clone()
+                self.get_unchecked((idx, 0)).clone() * rhs.get_unchecked((idx, 0)).clone()
             };
         }
 
@@ -158,63 +169,70 @@ impl<S, T, const R: usize> ColVector<S, T, R> {
     }
 }
 
-impl<S, const R: usize> Normed for ColVector<S, f32, R>
+impl<T, const R: usize> Normed for ColVector<T, R>
 where
-    S: Storage<f32, R, 1> + StorageMut<f32, R, 1>,
+    T: Clone
+        + Zero
+        + Sqrt<Output = T>
+        + Add<T, Output = T>
+        + AddAssign<T>
+        + Mul<T, Output = T>
+        + MulAssign<T>
+        + DivAssign<T>,
 {
-    type Norm = f32;
+    type Norm = T;
 
     fn norm(&self) -> Self::Norm {
-        let mut value = 0.0;
-        for row_idx in 0..R {
-            value += unsafe { *self.storage.get_unchecked(row_idx, 0) }.powi(2);
-        }
-        value.sqrt()
+        self.norm_squared().sqrt()
     }
 
     fn norm_squared(&self) -> Self::Norm {
-        self.norm().powi(2)
+        let mut value = T::zero();
+        for row_idx in 0..R {
+            value += unsafe {
+                self.get_unchecked((row_idx, 0)).clone() * self.get_unchecked((row_idx, 0)).clone()
+            };
+        }
+        value
     }
 
     fn scale_mut(&mut self, n: Self::Norm) {
         for row_idx in 0..R {
-            unsafe { *self.storage.get_unchecked_mut(row_idx, 0) *= n };
+            unsafe { *self.get_unchecked_mut((row_idx, 0)) *= n.clone() };
         }
     }
 
     fn unscale_mut(&mut self, n: Self::Norm) {
         for row_idx in 0..R {
-            unsafe { *self.storage.get_unchecked_mut(row_idx, 0) /= n };
+            unsafe { *self.get_unchecked_mut((row_idx, 0)) /= n.clone() };
         }
     }
 }
 
 impl<T> Vec3<T> {
     pub const fn new(x: T, y: T, z: T) -> Self {
-        Self::from_storage(ArrayStorage { data: [[x, y, z]] })
+        Self::from_data([[x, y, z]])
     }
 }
 
-impl<T, S> Vec3<T, S> {
-    pub fn cross_product<RT, RS>(&self, rhs: &Vec3<RT, RS>) -> Vec3<T>
+impl<T> Vec3<T> {
+    pub fn cross_product<RT>(&self, rhs: &Vec3<RT>) -> Vec3<T>
     where
         T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
-        S: Storage<T, 3, 1>,
         RT: Clone,
-        RS: Storage<RT, 3, 1>,
     {
         let (a1, a2, a3) = unsafe {
             (
-                self.storage.get_unchecked(0, 0),
-                self.storage.get_unchecked(1, 0),
-                self.storage.get_unchecked(2, 0),
+                self.get_unchecked((0, 0)),
+                self.get_unchecked((1, 0)),
+                self.get_unchecked((2, 0)),
             )
         };
         let (b1, b2, b3) = unsafe {
             (
-                rhs.storage.get_unchecked(0, 0),
-                rhs.storage.get_unchecked(1, 0),
-                rhs.storage.get_unchecked(2, 0),
+                rhs.get_unchecked((0, 0)),
+                rhs.get_unchecked((1, 0)),
+                rhs.get_unchecked((2, 0)),
             )
         };
 
@@ -228,9 +246,7 @@ impl<T, S> Vec3<T, S> {
 
 impl<T> Vec4<T> {
     pub const fn new(x: T, y: T, z: T, w: T) -> Self {
-        Self::from_storage(ArrayStorage {
-            data: [[x, y, z, w]],
-        })
+        Self::from_data([[x, y, z, w]])
     }
 }
 
@@ -242,15 +258,15 @@ mod tests {
 
     #[test]
     fn vec_mul() {
-        type RVec4<T> = RowVector<Owned<T, 1, 4>, T, 4>;
+        type RVec4<T> = RowVector<T, 4>;
 
         let rv1: RVec4<f32> = [[1.0], [0.0], [0.0], [0.0]].into();
 
         let cv1: Vec4<f32> = [1.0, 1.0, 1.0, 1.0].into();
 
-        let r1: Matrix<Owned<f32, 1, 1>, f32, 1, 1> = &rv1 * &cv1;
+        let r1: Matrix<f32, 1, 1> = &rv1 * &cv1;
 
-        let res = Matrix::from_storage(ArrayStorage { data: [[1.0]] });
+        let res = Matrix::from_data([[1.0]]);
 
         assert_eq!(r1, res);
     }
@@ -265,7 +281,7 @@ mod tests {
 
     #[test]
     fn vec_check_unit_impls() {
-        // Test if all units are implemented for the types.
+        // Test if all units are implemented for the ctypes.
         // The test is considered as "ok" if it compiles.
         let _: Vec2<f32> = Vec2::unit_x();
         let _: Vec2<f32> = Vec2::unit_y();

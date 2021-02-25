@@ -1,7 +1,6 @@
 use crate::{
     angle::{Angle, AngleConst},
     scalar::{Cos, Sin},
-    storage::{Allocator, DefaultAllocator},
     unit::Unit,
 };
 
@@ -9,13 +8,12 @@ use std::ops::{Add, Div, Mul, MulAssign, Neg, Rem, Sub};
 
 use crate::{
     matn::MatN,
-    matrix::{Matrix, Owned},
+    matrix::Matrix,
     scalar::{One, Zero},
-    storage::{ArrayStorage, Storage, StorageMut},
     vector::Vec3,
 };
 
-pub type Mat4<T, S = Owned<T, 4, 4>> = MatN<T, S, 4>;
+pub type Mat4<T> = MatN<T, 4>;
 
 impl<T> Mat4<T> {
     #[rustfmt::skip]
@@ -26,40 +24,38 @@ impl<T> Mat4<T> {
         c0r2: T, c1r2: T, c2r2: T, c3r2: T,
         c0r3: T, c1r3: T, c2r3: T, c3r3: T,
     ) -> Self {
-        Self::from_storage(ArrayStorage {
-            data: [
-                [c0r0, c0r1, c0r2, c0r3],
-                [c1r0, c1r1, c1r2, c1r3],
-                [c2r0, c2r1, c2r2, c2r3],
-                [c3r0, c3r1, c3r2, c3r3],
-            ],
-        })
+        Self::from_data([
+            [c0r0, c0r1, c0r2, c0r3],
+            [c1r0, c1r1, c1r2, c1r3],
+            [c2r0, c2r1, c2r2, c2r3],
+            [c3r0, c3r1, c3r2, c3r3],
+        ])
     }
 
-    pub fn new_scaling(factor: T) -> Self
+    pub fn scale(factor: T) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,
     {
-        let mut matrix = &Matrix::identity() * factor;
-        unsafe { *matrix.storage.get_unchecked_mut(3, 3) = T::one() };
+        let mut matrix = &Self::identity() * factor;
+        unsafe { *matrix.get_unchecked_mut((3, 3)) = T::one() };
         matrix
     }
 
-    pub fn new_translate(direction: Vec3<T>) -> Self
+    pub fn translate(direction: Vec3<T>) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,
     {
         let mut matrix = Matrix::identity();
         unsafe {
-            *matrix.storage.get_unchecked_mut(0, 3) = direction.storage.get_unchecked(0, 0).clone();
-            *matrix.storage.get_unchecked_mut(1, 3) = direction.storage.get_unchecked(1, 0).clone();
-            *matrix.storage.get_unchecked_mut(2, 3) = direction.storage.get_unchecked(2, 0).clone();
+            *matrix.get_unchecked_mut((0, 3)) = direction.get_unchecked((0, 0)).clone();
+            *matrix.get_unchecked_mut((1, 3)) = direction.get_unchecked((1, 0)).clone();
+            *matrix.get_unchecked_mut((2, 3)) = direction.get_unchecked((2, 0)).clone();
         };
 
         matrix
     }
 
-    pub fn from_axis_angle<RS>(axis: &Unit<Vec3<T, RS>>, angle: Angle<T>) -> Self
+    pub fn from_axis_angle(axis: &Unit<Vec3<T>>, angle: Angle<T>) -> Self
     where
         T: Clone
             + AngleConst
@@ -73,7 +69,6 @@ impl<T> Mat4<T> {
             + Rem<T, Output = T>
             + Sin<Output = T>
             + Cos<Output = T>,
-        RS: Storage<T, 3, 1>,
     {
         let rad = angle.to_rad_clamped();
         if rad == T::zero() {
@@ -131,115 +126,115 @@ impl<T> Mat4<T> {
         let mut out = Self::zero();
 
         unsafe {
-            let m = *(self.storage.data.as_ptr() as *const [T; 16]);
+            let m = *(self.data.as_ptr() as *const [T; 16]);
 
-            *out.storage.get_unchecked_mut(0, 0) =
+            *out.get_unchecked_mut((0, 0)) =
                 m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15]
                     + m[9] * m[7] * m[14]
                     + m[13] * m[6] * m[11]
                     - m[13] * m[7] * m[10];
 
-            *out.storage.get_unchecked_mut(1, 0) =
+            *out.get_unchecked_mut((1, 0)) =
                 -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15]
                     - m[9] * m[3] * m[14]
                     - m[13] * m[2] * m[11]
                     + m[13] * m[3] * m[10];
 
-            *out.storage.get_unchecked_mut(2, 0) =
+            *out.get_unchecked_mut((2, 0)) =
                 m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15]
                     + m[5] * m[3] * m[14]
                     + m[13] * m[2] * m[7]
                     - m[13] * m[3] * m[6];
 
-            *out.storage.get_unchecked_mut(3, 0) =
+            *out.get_unchecked_mut((3, 0)) =
                 -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11]
                     - m[5] * m[3] * m[10]
                     - m[9] * m[2] * m[7]
                     + m[9] * m[3] * m[6];
 
-            *out.storage.get_unchecked_mut(0, 1) =
+            *out.get_unchecked_mut((0, 1)) =
                 -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15]
                     - m[8] * m[7] * m[14]
                     - m[12] * m[6] * m[11]
                     + m[12] * m[7] * m[10];
 
-            *out.storage.get_unchecked_mut(1, 1) =
+            *out.get_unchecked_mut((1, 1)) =
                 m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15]
                     + m[8] * m[3] * m[14]
                     + m[12] * m[2] * m[11]
                     - m[12] * m[3] * m[10];
 
-            *out.storage.get_unchecked_mut(2, 1) =
+            *out.get_unchecked_mut((2, 1)) =
                 -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15]
                     - m[4] * m[3] * m[14]
                     - m[12] * m[2] * m[7]
                     + m[12] * m[3] * m[6];
 
-            *out.storage.get_unchecked_mut(3, 1) =
+            *out.get_unchecked_mut((3, 1)) =
                 m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11]
                     + m[4] * m[3] * m[10]
                     + m[8] * m[2] * m[7]
                     - m[8] * m[3] * m[6];
 
-            *out.storage.get_unchecked_mut(0, 2) =
+            *out.get_unchecked_mut((0, 2)) =
                 m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15]
                     + m[8] * m[7] * m[13]
                     + m[12] * m[5] * m[11]
                     - m[12] * m[7] * m[9];
 
-            *out.storage.get_unchecked_mut(1, 2) =
+            *out.get_unchecked_mut((1, 2)) =
                 -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15]
                     - m[8] * m[3] * m[13]
                     - m[12] * m[1] * m[11]
                     + m[12] * m[3] * m[9];
 
-            *out.storage.get_unchecked_mut(2, 2) =
+            *out.get_unchecked_mut((2, 2)) =
                 m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15]
                     + m[4] * m[3] * m[13]
                     + m[12] * m[1] * m[7]
                     - m[12] * m[3] * m[5];
 
-            *out.storage.get_unchecked_mut(0, 3) =
+            *out.get_unchecked_mut((0, 3)) =
                 -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14]
                     - m[8] * m[6] * m[13]
                     - m[12] * m[5] * m[10]
                     + m[12] * m[6] * m[9];
 
-            *out.storage.get_unchecked_mut(3, 2) =
+            *out.get_unchecked_mut((3, 2)) =
                 -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11]
                     - m[4] * m[3] * m[9]
                     - m[8] * m[1] * m[7]
                     + m[8] * m[3] * m[5];
 
-            *out.storage.get_unchecked_mut(1, 3) =
+            *out.get_unchecked_mut((1, 3)) =
                 m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14]
                     + m[8] * m[2] * m[13]
                     + m[12] * m[1] * m[10]
                     - m[12] * m[2] * m[9];
 
-            *out.storage.get_unchecked_mut(2, 3) =
+            *out.get_unchecked_mut((2, 3)) =
                 -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14]
                     - m[4] * m[2] * m[13]
                     - m[12] * m[1] * m[6]
                     + m[12] * m[2] * m[5];
 
-            *out.storage.get_unchecked_mut(3, 3) =
+            *out.get_unchecked_mut((3, 3)) =
                 m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10]
                     + m[4] * m[2] * m[9]
                     + m[8] * m[1] * m[6]
                     - m[8] * m[2] * m[5];
 
-            let det = m[0] * *out.storage.get_unchecked(0, 0)
-                + m[1] * *out.storage.get_unchecked(0, 1)
-                + m[2] * *out.storage.get_unchecked(0, 2)
-                + m[3] * *out.storage.get_unchecked(0, 3);
+            let det = m[0] * *out.get_unchecked((0, 0))
+                + m[1] * *out.get_unchecked((0, 1))
+                + m[2] * *out.get_unchecked((0, 2))
+                + m[3] * *out.get_unchecked((0, 3));
 
             if det != T::zero() {
                 let inv_det = T::one() / det;
 
                 for j in 0..4 {
                     for i in 0..4 {
-                        *out.storage.get_unchecked_mut(i, j) *= inv_det;
+                        *out.get_unchecked_mut((i, j)) *= inv_det;
                     }
                 }
                 Some(out)
@@ -252,49 +247,43 @@ impl<T> Mat4<T> {
 
 // TODO: make generic for Zero + Sin + Cos
 impl Mat4<f32> {
-    pub fn new_rotation_x(angle: Angle<f32>) -> Self {
+    pub fn rotation_x(angle: Angle<f32>) -> Self {
         let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 
-        Self::from_storage(ArrayStorage {
-            data: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, cos, -sin, 0.0],
-                [0.0, sin, cos, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-        })
+        Self::from_data([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, cos, -sin, 0.0],
+            [0.0, sin, cos, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
     }
 
-    pub fn new_rotation_y(angle: Angle<f32>) -> Self {
+    pub fn rotation_y(angle: Angle<f32>) -> Self {
         let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 
-        Self::from_storage(ArrayStorage {
-            data: [
-                [cos, 0.0, sin, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [-sin, 0.0, cos, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-        })
+        Self::from_data([
+            [cos, 0.0, sin, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [-sin, 0.0, cos, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
     }
 
-    pub fn new_rotation_z(angle: Angle<f32>) -> Self {
+    pub fn rotation_z(angle: Angle<f32>) -> Self {
         let rad = angle.to_rad_clamped();
         let sin = rad.sin();
         let cos = rad.cos();
 
-        Self::from_storage(ArrayStorage {
-            data: [
-                [cos, sin, 0.0, 0.0],
-                [-sin, cos, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-        })
+        Self::from_data([
+            [cos, sin, 0.0, 0.0],
+            [-sin, cos, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
     }
 }
 
@@ -307,7 +296,7 @@ mod tests {
 
     #[test]
     fn mat4_scaling() {
-        let is = Mat4::new_scaling(4.2);
+        let is = Mat4::scale(4.2);
         let should = Mat4::new(
             4.2, 0.0, 0.0, 0.0,
             0.0, 4.2, 0.0, 0.0,
@@ -320,7 +309,7 @@ mod tests {
 
     #[test]
     fn mat4_translate() {
-        let is = Mat4::new_translate(Vec3::new(0.2, 1.7, 7.0));
+        let is = Mat4::translate(Vec3::new(0.2, 1.7, 7.0));
         let should = Mat4::new(
             1.0, 0.0, 0.0, 0.2,
             0.0, 1.0, 0.0, 1.7,
@@ -346,7 +335,7 @@ mod tests {
 
     #[test]
     fn mat4_try_inverse() {
-        let is = Mat4::new_scaling(2.0);
+        let is = Mat4::scale(2.0);
         let should = Mat4::new(
             0.5, 0.0, 0.0, 0.0,
             0.0, 0.5, 0.0, 0.0,

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::vulkan::error::VulkanError;
 use crate::{utils::color::Color, vulkan::buffer};
 use ash::{version::DeviceV1_0, vk};
-use math::prelude::*;
+use crystal::prelude::*;
 
 pub struct Model<V, I> {
     vertices: Vec<V>,

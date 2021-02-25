@@ -1,4 +1,4 @@
-use math::prelude::*;
+use crystal::prelude::*;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mesh {

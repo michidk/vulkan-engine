@@ -3,6 +3,7 @@
 #![feature(array_methods)]
 
 mod angle;
+mod index;
 mod mat3;
 mod mat4;
 mod matn;
@@ -10,11 +11,11 @@ mod matrix;
 mod norm;
 mod quaternion;
 mod scalar;
-mod storage;
-#[cfg(test)]
-mod test_util;
 mod unit;
 mod vector;
+
+#[cfg(test)]
+mod test_util;
 
 pub mod prelude {
     pub use crate::angle::{Angle, IntoAngle};

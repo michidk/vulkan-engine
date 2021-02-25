@@ -13,6 +13,11 @@ pub enum DescriptorData {
         offset: vk::DeviceSize,
         size: vk::DeviceSize,
     },
+    DynamicUniformBuffer {
+        buffer: vk::Buffer,
+        offset: vk::DeviceSize,
+        size: vk::DeviceSize,
+    },
     ImageSampler {
         image: vk::ImageView,
         layout: vk::ImageLayout,
@@ -47,12 +52,20 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
     pub fn new(device: ash::Device) -> Result<DescriptorManager<HISTORY_SIZE>, vk::Result> {
         let pool_sizes = [
             vk::DescriptorPoolSize::builder()
-                .descriptor_count(4096)
+                .descriptor_count(1024)
                 .ty(vk::DescriptorType::UNIFORM_BUFFER)
                 .build(),
             vk::DescriptorPoolSize::builder()
-                .descriptor_count(4096)
+                .descriptor_count(1024)
                 .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .build(),
+            vk::DescriptorPoolSize::builder()
+                .descriptor_count(1024)
+                .ty(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+                .build(),
+            vk::DescriptorPoolSize::builder()
+                .descriptor_count(1024)
+                .ty(vk::DescriptorType::STORAGE_BUFFER)
                 .build(),
         ];
         let pool_info = vk::DescriptorPoolCreateInfo::builder()
@@ -148,6 +161,27 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                     set_writes.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                            .dst_binding(index as u32)
+                            .dst_set(new_set)
+                            .buffer_info(slice::from_ref(buffer_infos.last().unwrap()))
+                            .build(),
+                    );
+                }
+                DescriptorData::DynamicUniformBuffer {
+                    buffer,
+                    offset,
+                    size,
+                } => {
+                    buffer_infos.push(
+                        vk::DescriptorBufferInfo::builder()
+                            .buffer(*buffer)
+                            .offset(*offset)
+                            .range(*size)
+                            .build(),
+                    );
+                    set_writes.push(
+                        vk::WriteDescriptorSet::builder()
+                            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
                             .dst_binding(index as u32)
                             .dst_set(new_set)
                             .buffer_info(slice::from_ref(buffer_infos.last().unwrap()))

@@ -1,6 +1,6 @@
 use crystal::prelude::*;
 
-use super::buffer;
+use super::{CamData, buffer::{self, MutableBuffer}};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -17,9 +17,13 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut buffer::BufferWrapper) {
-        let data: [[[f32; 4]; 4]; 2] = [self.view_matrix.into(), self.projection_matrix.into()];
-        buffer.fill(allocator, &data).unwrap();
+    pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut buffer::PerFrameUniformBuffer<CamData>) {
+        let data = CamData {
+            view_matrix: self.view_matrix.into(),
+            projection_matrix: self.projection_matrix.into()
+        };
+
+        buffer.set_data(allocator, &data).unwrap();
     }
 
     fn update_projection_matrix(&mut self) {

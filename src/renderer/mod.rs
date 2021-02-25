@@ -18,18 +18,9 @@ use ash::{
 };
 use crystal::prelude::*;
 
-use self::{
-    buffer::BufferWrapper,
-    debug::DebugMessenger,
-    descriptor_manager::DescriptorManager,
-    instance_device_queues::{QueueFamilies, Queues},
-    model::{DefaultModel, TextureQuadModel},
-    pools_and_commandbuffers::PoolsWrapper,
-    renderpass_and_pipeline::PipelineWrapper,
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-    texture::TextureStorage,
-};
+use buffer::{MutableBuffer, VulkanBuffer};
+
+use self::{buffer::{BufferWrapper, PerFrameUniformBuffer}, debug::DebugMessenger, descriptor_manager::DescriptorManager, instance_device_queues::{QueueFamilies, Queues}, model::{DefaultModel, TextureQuadModel}, pools_and_commandbuffers::PoolsWrapper, renderpass_and_pipeline::PipelineWrapper, surface::SurfaceWrapper, swapchain::SwapchainWrapper, texture::TextureStorage};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RendererError {
@@ -334,6 +325,11 @@ pub fn screenshot(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+pub struct CamData {
+    pub view_matrix: [[f32; 4]; 4],
+    pub projection_matrix: [[f32; 4]; 4],
+}
+
 #[allow(dead_code)]
 pub struct Renderer {
     pub window: winit::window::Window,
@@ -342,7 +338,7 @@ pub struct Renderer {
     debug: std::mem::ManuallyDrop<DebugMessenger>,
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
-    physical_device_properties: vk::PhysicalDeviceProperties,
+    pub physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
     pub queues: Queues,
     pub device: ash::Device,
@@ -354,7 +350,7 @@ pub struct Renderer {
     pub allocator: vk_mem::Allocator,
     pub models: Vec<DefaultModel>,
     pub texture_quads: Vec<TextureQuadModel>,
-    pub uniform_buffer: BufferWrapper,
+    pub uniform_buffer: PerFrameUniformBuffer<CamData>,
     pub light_buffer: BufferWrapper,
     pub texture_storage: TextureStorage,
     descriptor_manager: DescriptorManager<8>,
@@ -410,15 +406,7 @@ impl Renderer {
             swapchain.framebuffers.len(),
         )?;
 
-        let mut uniform_buffer = BufferWrapper::new(
-            &allocator,
-            128,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-        )?;
-        let camera_transform: [[[f32; 4]; 4]; 2] =
-            [Mat4::identity().into(), Mat4::identity().into()];
-        uniform_buffer.fill(&allocator, &camera_transform)?;
+        let mut uniform_buffer = PerFrameUniformBuffer::<CamData>::new(&physical_device_properties, &allocator, 4, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
 
         let layout_camera = pipeline.descriptor_set_layouts[0];
 
@@ -515,8 +503,8 @@ impl Renderer {
                 self.pipeline.pipeline,
             );
 
-            let cam_set_data = vec![descriptor_manager::DescriptorData::UniformBuffer {
-                buffer: self.uniform_buffer.buffer,
+            let cam_set_data = vec![descriptor_manager::DescriptorData::DynamicUniformBuffer {
+                buffer: self.uniform_buffer.get_buffer(),
                 offset: 0,
                 size: self.uniform_buffer.get_size(),
             }];
@@ -542,7 +530,9 @@ impl Renderer {
                     cam_set, light_set,
                     // self.descriptor_sets_texture[index],
                 ],
-                &[],
+                &[
+                    self.uniform_buffer.get_offset() as u32
+                ],
             );
 
             for m in &self.models {
@@ -606,7 +596,7 @@ impl Drop for Renderer {
 
             self.texture_storage.cleanup(&self.device, &self.allocator);
 
-            self.uniform_buffer.cleanup(&self.allocator);
+            self.uniform_buffer.destroy(&self.allocator);
             self.light_buffer.cleanup(&self.allocator);
 
             // if we fail to destroy the buffer continue to destory as many things

@@ -1,6 +1,96 @@
-use std::ops::Deref;
+use std::{mem, ops::Deref};
 
 use ash::vk;
+
+pub trait VulkanBuffer {
+    fn get_size(&self) -> u64;
+    fn get_buffer(&self) -> vk::Buffer;
+    fn get_offset(&self) -> vk::DeviceSize;
+}
+
+pub trait MutableBuffer<T: Sized> : VulkanBuffer {
+    fn set_data(&mut self, allocator: &vk_mem::Allocator, data: &T) -> Result<(), vk_mem::error::Error>;
+}
+
+pub trait ResizableBuffer<T> : MutableBuffer<T> {
+    fn resize(new_size: u64) -> Result<(), vk_mem::error::Error>;
+}
+
+pub struct PerFrameUniformBuffer<T: Sized> {
+    buffer: vk::Buffer,
+    allocation: vk_mem::Allocation,
+    data_size: u64,
+    aligned_data_size: u64,
+    num_frames: u64,
+    current_frame: u64,
+    mapping: *mut T,
+}
+
+impl<T: Sized> PerFrameUniformBuffer<T> {
+    pub fn new(phys_props: &vk::PhysicalDeviceProperties, allocator: &vk_mem::Allocator, num_frames: u64, buffer_usage: vk::BufferUsageFlags) -> Result<Self, vk_mem::error::Error> {
+        let alignment = phys_props.limits.min_uniform_buffer_offset_alignment;
+        let data_size = mem::size_of::<T>() as u64;
+        let aligned_data_size = (data_size + alignment - 1) / alignment * alignment;
+        
+        let buffer_info = vk::BufferCreateInfo::builder()
+            .size(aligned_data_size * num_frames)
+            .usage(buffer_usage)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .build();
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::CpuToGpu,
+            ..Default::default()
+        };
+
+        let (buffer, allocation, _) = allocator.create_buffer(&buffer_info, &alloc_info)?;
+
+        let mapping = allocator.map_memory(&allocation)? as *mut T;
+
+        Ok(Self{
+            buffer,
+            allocation,
+            data_size,
+            aligned_data_size,
+            num_frames,
+            current_frame: 0,
+            mapping
+        })
+    }
+
+    pub fn destroy(&self, allocator: &vk_mem::Allocator) {
+        allocator.unmap_memory(&self.allocation);
+        allocator.destroy_buffer(self.buffer, &self.allocation);
+    }
+}
+
+impl<T: Sized> VulkanBuffer for PerFrameUniformBuffer<T> {
+    fn get_size(&self) -> u64 {
+        self.data_size
+    }
+
+    fn get_buffer(&self) -> vk::Buffer {
+        self.buffer
+    }
+
+    fn get_offset(&self) -> vk::DeviceSize {
+        self.aligned_data_size * self.current_frame
+    }
+}
+
+impl<T: Sized> MutableBuffer<T> for PerFrameUniformBuffer<T> {
+    fn set_data(&mut self, _: &vk_mem::Allocator, data: &T) -> Result<(), vk_mem::Error> {
+        self.current_frame = (self.current_frame + 1) % self.num_frames;
+
+        let offset = self.current_frame * self.aligned_data_size;
+
+        unsafe { 
+            let ptr = (self.mapping as *mut u8).offset(offset as isize) as *mut T;
+            ptr.copy_from_nonoverlapping(data, 1); 
+        }
+
+        Ok(())
+    }
+}
 
 #[allow(dead_code)]
 pub struct BufferWrapper {

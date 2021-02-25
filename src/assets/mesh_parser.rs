@@ -4,7 +4,6 @@ use std::{num, path::Path};
 
 use crate::scene::model::mesh;
 
-
 #[derive(Debug, Default, PartialEq)]
 pub struct Vertex {
     position: [f32; 3],

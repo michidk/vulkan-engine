@@ -4,7 +4,7 @@
 
 pub mod assets;
 pub mod core;
+pub mod engine;
 pub mod scene;
 pub mod utils;
-pub mod engine;
 pub mod vulkan;

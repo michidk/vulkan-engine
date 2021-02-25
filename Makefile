@@ -9,7 +9,7 @@ build:
 	cargo +nightly build --example brdf
 
 shaders:
-	ve_shader ./shaders/* -o ./assets/shaders/
+	ve_shader "./shaders/*" -o ./assets/shaders/
 
 build-release-windows: shaders build
 	xcopy /s /y "assets\*" ".\out\assets\*"

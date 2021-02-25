@@ -1,14 +1,13 @@
 use std::{
     marker::PhantomData,
-    ops::{Add, AddAssign, Div, Mul, Rem, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, Sub},
 };
 
 use crate::{
     angle::{Angle, AngleConst},
     matrix::Matrix,
     norm::Normed,
-    scalar::Zero,
-    scalar::{One, Scalar},
+    scalar::{One, Scalar, Sqrt, Zero},
     unit::Unit,
 };
 
@@ -50,7 +49,7 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn unit_x() -> Self
     where
         Self: VecLenCmp<VecLen0, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
@@ -62,7 +61,7 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn unit_y() -> Self
     where
         Self: VecLenCmp<VecLen1, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
@@ -74,7 +73,7 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn unit_z() -> Self
     where
         Self: VecLenCmp<VecLen2, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
@@ -86,7 +85,7 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn unit_w() -> Self
     where
         Self: VecLenCmp<VecLen3, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One,
     {
         let mut zero = Matrix::zero();
         unsafe {
@@ -98,7 +97,6 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn x(&self) -> &T
     where
         Self: VecLenCmp<VecLen0, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
         unsafe { self.get_unchecked((0, 0)) }
     }
@@ -106,7 +104,6 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn y(&self) -> &T
     where
         Self: VecLenCmp<VecLen1, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
         unsafe { self.get_unchecked((1, 0)) }
     }
@@ -114,7 +111,6 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn z(&self) -> &T
     where
         Self: VecLenCmp<VecLen2, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
         unsafe { self.get_unchecked((2, 0)) }
     }
@@ -122,9 +118,36 @@ impl<T, const R: usize> ColVector<T, R> {
     pub fn w(&self) -> &T
     where
         Self: VecLenCmp<VecLen3, Cmp = Greater>,
-        T: Clone + Zero + One + Mul<T, Output = T>,
     {
         unsafe { self.get_unchecked((3, 0)) }
+    }
+
+    pub fn x_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen0, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((0, 0)) }
+    }
+
+    pub fn y_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen1, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((1, 0)) }
+    }
+
+    pub fn z_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen2, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((2, 0)) }
+    }
+
+    pub fn w_mut(&mut self) -> &mut T
+    where
+        Self: VecLenCmp<VecLen3, Cmp = Greater>,
+    {
+        unsafe { self.get_unchecked_mut((3, 0)) }
     }
 }
 
@@ -146,30 +169,42 @@ impl<T, const R: usize> ColVector<T, R> {
     }
 }
 
-impl<const R: usize> Normed for ColVector<f32, R> {
-    type Norm = f32;
+impl<T, const R: usize> Normed for ColVector<T, R>
+where
+    T: Clone
+        + Zero
+        + Sqrt<Output = T>
+        + Add<T, Output = T>
+        + AddAssign<T>
+        + Mul<T, Output = T>
+        + MulAssign<T>
+        + DivAssign<T>,
+{
+    type Norm = T;
 
     fn norm(&self) -> Self::Norm {
-        let mut value = 0.0;
-        for row_idx in 0..R {
-            value += unsafe { *self.get_unchecked((row_idx, 0)) }.powi(2);
-        }
-        value.sqrt()
+        self.norm_squared().sqrt()
     }
 
     fn norm_squared(&self) -> Self::Norm {
-        self.norm().powi(2)
+        let mut value = T::zero();
+        for row_idx in 0..R {
+            value += unsafe {
+                self.get_unchecked((row_idx, 0)).clone() * self.get_unchecked((row_idx, 0)).clone()
+            };
+        }
+        value
     }
 
     fn scale_mut(&mut self, n: Self::Norm) {
         for row_idx in 0..R {
-            unsafe { *self.get_unchecked_mut((row_idx, 0)) *= n };
+            unsafe { *self.get_unchecked_mut((row_idx, 0)) *= n.clone() };
         }
     }
 
     fn unscale_mut(&mut self, n: Self::Norm) {
         for row_idx in 0..R {
-            unsafe { *self.get_unchecked_mut((row_idx, 0)) /= n };
+            unsafe { *self.get_unchecked_mut((row_idx, 0)) /= n.clone() };
         }
     }
 }

@@ -9,7 +9,7 @@ use vulkan_engine::{
     scene::{
         camera::Camera,
         light::{DirectionalLight, PointLight},
-        model::model::{DefaultModel, InstanceData},
+        model::{DefaultModel, InstanceData},
     },
     utils::color::Color,
 };

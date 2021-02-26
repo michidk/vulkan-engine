@@ -4,7 +4,7 @@ use std::process::exit;
 use log::error;
 use vulkan_engine::{
     core::window::{self, Dimensions},
-    engine::{self, Engine, EngineInit},
+    engine::{self, EngineInit},
 };
 
 fn main() {

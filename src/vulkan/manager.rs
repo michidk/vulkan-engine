@@ -11,10 +11,7 @@ use self::queue::QueueFamilies;
 use super::renderpass;
 use crate::{
     engine::Info,
-    scene::{
-        light::LightManager,
-        model::model::{DefaultModel, TextureQuadModel},
-    },
+    scene::model::{DefaultModel, TextureQuadModel},
 };
 
 use super::{
@@ -29,11 +26,13 @@ use super::{
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
+    #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
     debug: std::mem::ManuallyDrop<DebugMessenger>,
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
+    #[allow(dead_code)]
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
     pub queues: Queues,
@@ -405,7 +404,6 @@ impl VulkanManager {
                 }
             }
         };
-
     }
 }
 

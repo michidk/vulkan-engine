@@ -38,10 +38,12 @@ pub fn start(engine_init: EngineInit) -> ! {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *controlflow = winit::event_loop::ControlFlow::Exit,
+            #[allow(unused_variables)]
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 ..
             } => {}
+            #[allow(unused_variables)]
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {

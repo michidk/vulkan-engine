@@ -30,7 +30,7 @@ impl SwapchainWrapper {
         physical_device: vk::PhysicalDevice,
         logical_device: &ash::Device,
         surface: &surface::SurfaceWrapper,
-        queue_families: &queue::QueueFamilies,
+        #[allow(unused_variables)] queue_families: &queue::QueueFamilies,
         allocator: &vk_mem::Allocator,
     ) -> Result<SwapchainWrapper, VulkanError> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;

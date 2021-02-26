@@ -41,15 +41,8 @@ check:
 test:
 	cargo +nightly test --all
 
-# clippy is broken right now, use clippy-hack or clean before
-clippy: claen
+clippy:
 	cargo +nightly clippy -- -D warnings
-	cargo +nightly clippy --all-targets -- -D warnings
-
-clippy-hack:
-	# hack to update files so that clippy/cargo does not use cached versions
-	find -name "*.rs" -not -path "./target/*" -exec touch "{}" +
-	cargo +nightly clippy --all-targets -- -D warnings
 
 fmt:
 	cargo +nightly fmt --all -- --check
@@ -59,9 +52,6 @@ lint: fmt clippy
 # utility
 ## can i commit?
 cic: test lint
-
-## cic hack
-cicl: test fmt clippy-hack
 
 prepare-release-windows:
 	mkdir "assets\shaders"

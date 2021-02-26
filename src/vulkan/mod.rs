@@ -11,11 +11,7 @@ mod swapchain;
 
 use std::ffi::CString;
 
-use ash::{
-    extensions::ext,
-    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
-    vk,
-};
+use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, FenceCreateInfo, SemaphoreCreateInfo}};
 
 use crate::{
     engine::Info,
@@ -61,12 +57,18 @@ pub struct VulkanManager {
     desc_layout_camera: vk::DescriptorSetLayout,
     desc_layout_lights: vk::DescriptorSetLayout,
     pub descriptor_manager: DescriptorManager<8>,
+    max_frames_in_flight: u8,
+    pub current_frame_index: u8,
+    image_acquire_semaphores: Vec<vk::Semaphore>,
+    render_finished_semaphores: Vec<vk::Semaphore>,
+    frame_resource_fences: Vec<vk::Fence>,
 }
 
 impl VulkanManager {
     pub fn new(
         engine_info: Info,
         window: winit::window::Window,
+        max_frames_in_flight: u8
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let entry = ash::Entry::new()?;
 
@@ -106,12 +108,12 @@ impl VulkanManager {
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
-            queue::create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
+            queue::create_commandbuffers(&logical_device, &pools, max_frames_in_flight as usize)?;
 
         let uniform_buffer = PerFrameUniformBuffer::new(
             &physical_device_properties,
             &allocator,
-            4,
+            max_frames_in_flight as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
 
@@ -127,6 +129,19 @@ impl VulkanManager {
         light_buffer.fill(&allocator, &[0.0, 0.0])?;
 
         let descriptor_manager = DescriptorManager::new(logical_device.clone())?;
+
+        let sem_info = vk::SemaphoreCreateInfo::builder().build();
+        let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED).build();
+
+        let mut image_acquire_semaphores = Vec::with_capacity(max_frames_in_flight as usize);
+        let mut render_finished_semaphores = Vec::with_capacity(max_frames_in_flight as usize);
+        let mut frame_resource_fences = Vec::with_capacity(max_frames_in_flight as usize);
+
+        for _ in 0..max_frames_in_flight {
+            image_acquire_semaphores.push(unsafe { logical_device.create_semaphore(&sem_info, None)? });
+            render_finished_semaphores.push(unsafe { logical_device.create_semaphore(&sem_info, None)? });
+            frame_resource_fences.push(unsafe { logical_device.create_fence(&fence_info, None)? });
+        }
 
         Ok(Self {
             window,
@@ -152,7 +167,16 @@ impl VulkanManager {
             desc_layout_camera,
             desc_layout_lights,
             descriptor_manager,
+            max_frames_in_flight,
+            current_frame_index: 0,
+            image_acquire_semaphores,
+            render_finished_semaphores,
+            frame_resource_fences
         })
+    }
+
+    pub fn get_current_frame_index(&self) -> u8 {
+        return self.current_frame_index;
     }
 
     fn init_instance(
@@ -196,8 +220,15 @@ impl VulkanManager {
         unsafe { entry.create_instance(&instance_create_info, None) }
     }
 
-    pub fn update_commandbuffer(&mut self, index: usize) -> Result<(), vk::Result> {
-        let commandbuffer = self.commandbuffers[index];
+    pub fn next_frame(&mut self) -> u32 {
+        self.current_frame_index = (self.current_frame_index + 1) % self.max_frames_in_flight;
+        self.descriptor_manager.next_frame();
+
+        self.swapchain.aquire_next_image(self.image_acquire_semaphores[self.current_frame_index as usize])
+    }
+
+    pub fn update_commandbuffer(&mut self, swapchain_image_index: usize) -> Result<(), vk::Result> {
+        let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
         unsafe {
             self.device
@@ -219,7 +250,7 @@ impl VulkanManager {
         ];
         let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
             .render_pass(self.renderpass)
-            .framebuffer(self.swapchain.framebuffers[index])
+            .framebuffer(self.swapchain.framebuffers[swapchain_image_index])
             .render_area(vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: self.swapchain.extent,
@@ -265,7 +296,7 @@ impl VulkanManager {
                     desc_set_lights,
                     // self.descriptor_sets_texture[index],
                 ],
-                &[self.uniform_buffer.get_offset() as u32],
+                &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
             );
             for m in &self.models {
                 m.draw(&self.device, commandbuffer);
@@ -307,23 +338,23 @@ impl VulkanManager {
         unsafe {
             self.device
                 .wait_for_fences(
-                    &[self.swapchain.may_begin_drawing[self.swapchain.current_image]],
+                    &[self.frame_resource_fences[self.current_frame_index as usize]],
                     true,
                     std::u64::MAX,
                 )
                 .expect("fence-waiting");
             self.device
-                .reset_fences(&[self.swapchain.may_begin_drawing[self.swapchain.current_image]])
+                .reset_fences(&[self.frame_resource_fences[self.current_frame_index as usize]])
                 .expect("resetting fences");
         }
     }
 
     /// submits queued commands
-    pub fn submit(&self, image_index: u32) -> [vk::Semaphore; 1] {
-        let semaphores_available = [self.swapchain.image_available[self.swapchain.current_image]];
+    pub fn submit(&self, image_index: u32) {
+        let semaphores_available = [self.image_acquire_semaphores[self.current_frame_index as usize]];
         let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let semaphores_finished = [self.swapchain.rendering_finished[self.swapchain.current_image]];
-        let commandbuffers = [self.commandbuffers[image_index as usize]];
+        let semaphores_finished = [self.render_finished_semaphores[self.current_frame_index as usize]];
+        let commandbuffers = [self.commandbuffers[self.current_frame_index as usize]];
         let submit_info = [vk::SubmitInfo::builder()
             .wait_semaphores(&semaphores_available)
             .wait_dst_stage_mask(&waiting_stages)
@@ -335,20 +366,19 @@ impl VulkanManager {
                 .queue_submit(
                     self.queues.graphics_queue,
                     &submit_info,
-                    self.swapchain.may_begin_drawing[self.swapchain.current_image],
+                    self.frame_resource_fences[self.current_frame_index as usize],
                 )
                 .expect("queue submission");
         };
-
-        semaphores_finished
     }
 
     /// add present command to queue
-    pub fn present(&mut self, image_index: u32, semaphores_finished: &[vk::Semaphore]) {
+    pub fn present(&mut self, image_index: u32) {
         let swapchains = [self.swapchain.swapchain];
         let indices = [image_index];
+        let wait_semaphores = [self.render_finished_semaphores[self.current_frame_index as usize]];
         let present_info = vk::PresentInfoKHR::builder()
-            .wait_semaphores(semaphores_finished)
+            .wait_semaphores(&wait_semaphores)
             .swapchains(&swapchains)
             .image_indices(&indices);
         unsafe {
@@ -379,6 +409,16 @@ impl Drop for VulkanManager {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
+            for s in &self.image_acquire_semaphores {
+                unsafe { self.device.destroy_semaphore(*s, None); }
+            }
+            for s in &self.render_finished_semaphores {
+                unsafe { self.device.destroy_semaphore(*s, None); }
+            }
+            for f in &self.frame_resource_fences {
+                unsafe { self.device.destroy_fence(*f, None); }
+            }
 
             self.descriptor_manager.destroy();
 

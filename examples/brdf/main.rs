@@ -127,5 +127,6 @@ fn setup(engine: &mut Engine) {
     camera.update_buffer(
         &engine.vulkan_manager.allocator,
         &mut engine.vulkan_manager.uniform_buffer,
+        0
     );
 }

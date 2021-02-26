@@ -17,11 +17,7 @@ pub struct SwapchainWrapper {
     pub framebuffers: Vec<vk::Framebuffer>,
     pub surface_format: vk::SurfaceFormatKHR,
     pub extent: vk::Extent2D,
-    pub image_available: Vec<vk::Semaphore>,
-    pub rendering_finished: Vec<vk::Semaphore>,
-    pub may_begin_drawing: Vec<vk::Fence>,
     pub amount_of_images: u32,
-    pub current_image: usize,
 }
 
 impl SwapchainWrapper {
@@ -119,21 +115,6 @@ impl SwapchainWrapper {
             .subresource_range(*subresource_range);
         let depth_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
-        let mut image_available = vec![];
-        let mut rendering_finished = vec![];
-        let mut may_begin_drawing = vec![];
-        let semaphoreinfo = vk::SemaphoreCreateInfo::builder();
-        let fenceinfo = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
-        for _ in 0..amount_of_images {
-            let semaphore_available =
-                unsafe { logical_device.create_semaphore(&semaphoreinfo, None) }?;
-            let semaphore_finished =
-                unsafe { logical_device.create_semaphore(&semaphoreinfo, None) }?;
-            image_available.push(semaphore_available);
-            rendering_finished.push(semaphore_finished);
-            let fence = unsafe { logical_device.create_fence(&fenceinfo, None) }?;
-            may_begin_drawing.push(fence);
-        }
 
         Ok(SwapchainWrapper {
             swapchain_loader,
@@ -148,21 +129,17 @@ impl SwapchainWrapper {
             surface_format,
             extent,
             amount_of_images,
-            current_image: 0,
-            image_available,
-            rendering_finished,
-            may_begin_drawing,
         })
     }
 
     // TODO: handle error
-    pub fn aquire_next_image(&self) -> u32 {
+    pub fn aquire_next_image(&self, signal_semaphore: vk::Semaphore) -> u32 {
         let (image_index, _) = unsafe {
             self.swapchain_loader
                 .acquire_next_image(
                     self.swapchain,
                     std::u64::MAX,
-                    self.image_available[self.current_image],
+                    signal_semaphore,
                     vk::Fence::null(),
                 )
                 .expect("image acquisition trouble")
@@ -189,24 +166,10 @@ impl SwapchainWrapper {
         Ok(())
     }
 
-    /// select next image
-    pub fn swap(&mut self) {
-        self.current_image = (self.current_image + 1) % self.amount_of_images as usize;
-    }
-
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
         logical_device.destroy_image_view(self.depth_imageview, None);
         allocator.destroy_image(self.depth_image, &self.depth_image_allocation);
 
-        for fence in &self.may_begin_drawing {
-            logical_device.destroy_fence(*fence, None);
-        }
-        for semaphore in &self.image_available {
-            logical_device.destroy_semaphore(*semaphore, None);
-        }
-        for semaphore in &self.rendering_finished {
-            logical_device.destroy_semaphore(*semaphore, None);
-        }
         for fb in &self.framebuffers {
             logical_device.destroy_framebuffer(*fb, None);
         }

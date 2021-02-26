@@ -5,7 +5,7 @@ use ash::vk;
 pub trait VulkanBuffer {
     fn get_size(&self) -> u64;
     fn get_buffer(&self) -> vk::Buffer;
-    fn get_offset(&self) -> vk::DeviceSize;
+    fn get_offset(&self, current_frame_index: u8) -> vk::DeviceSize;
 }
 
 pub trait MutableBuffer<T: Sized>: VulkanBuffer {
@@ -13,6 +13,7 @@ pub trait MutableBuffer<T: Sized>: VulkanBuffer {
         &mut self,
         allocator: &vk_mem::Allocator,
         data: &T,
+        current_frame_index: u8
     ) -> Result<(), vk_mem::error::Error>;
 }
 
@@ -26,7 +27,6 @@ pub struct PerFrameUniformBuffer<T: Sized> {
     data_size: u64,
     aligned_data_size: u64,
     num_frames: u64,
-    current_frame: u64,
     mapping: *mut T,
 }
 
@@ -61,7 +61,6 @@ impl<T: Sized> PerFrameUniformBuffer<T> {
             data_size,
             aligned_data_size,
             num_frames,
-            current_frame: 0,
             mapping,
         })
     }
@@ -81,16 +80,16 @@ impl<T: Sized> VulkanBuffer for PerFrameUniformBuffer<T> {
         self.buffer
     }
 
-    fn get_offset(&self) -> vk::DeviceSize {
-        self.aligned_data_size * self.current_frame
+    fn get_offset(&self, current_frame_index: u8) -> vk::DeviceSize {
+        self.aligned_data_size * current_frame_index as u64
     }
 }
 
 impl<T: Sized> MutableBuffer<T> for PerFrameUniformBuffer<T> {
-    fn set_data(&mut self, _: &vk_mem::Allocator, data: &T) -> Result<(), vk_mem::Error> {
-        self.current_frame = (self.current_frame + 1) % self.num_frames;
+    fn set_data(&mut self, _: &vk_mem::Allocator, data: &T, current_frame_index: u8) -> Result<(), vk_mem::Error> {
 
-        let offset = self.current_frame * self.aligned_data_size;
+
+        let offset = current_frame_index as u64 * self.aligned_data_size;
 
         unsafe {
             let ptr = (self.mapping as *mut u8).offset(offset as isize) as *mut T;

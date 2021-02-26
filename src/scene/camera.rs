@@ -26,12 +26,13 @@ impl Camera {
         &self,
         allocator: &vk_mem::Allocator,
         buffer: &mut buffer::PerFrameUniformBuffer<CamData>,
+        current_frame_index: u8
     ) {
         let cam_data = CamData {
             view_matrix: self.view_matrix.into(),
             projection_matrix: self.projection_matrix.into(),
         };
-        buffer.set_data(allocator, &cam_data).unwrap();
+        buffer.set_data(allocator, &cam_data, current_frame_index).unwrap();
     }
 
     fn update_projection_matrix(&mut self) {

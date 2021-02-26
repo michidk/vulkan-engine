@@ -22,7 +22,7 @@ impl EngineInit {
         let eventloop = winit::event_loop::EventLoop::new();
         let window = info.window_info.into_window(&eventloop)?;
 
-        let vulkan_manager = VulkanManager::new(info, window)?;
+        let vulkan_manager = VulkanManager::new(info, window, 3)?;
         let gameloop = GameLoop::new();
 
         Ok(Self {

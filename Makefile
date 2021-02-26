@@ -41,7 +41,8 @@ check:
 test:
 	cargo +nightly test --all
 
-clippy:
+# clippy is broken right now, use clippy-hack or clean before
+clippy: claen
 	cargo +nightly clippy -- -D warnings
 	cargo +nightly clippy --all-targets -- -D warnings
 

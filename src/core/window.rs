@@ -82,6 +82,7 @@ pub fn start(engine_init: EngineInit) -> ! {
             },
             Event::MainEventsCleared => {}
             Event::RedrawRequested(_) => {
+                println!("test");
                 engine
                     .gameloop
                     .update(&mut engine.vulkan_manager, &engine.scene);

@@ -1,2 +1,2 @@
-pub mod mesh_parser;
+pub mod mesh;
 pub mod shader;

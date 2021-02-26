@@ -17,13 +17,7 @@ use ash::{
     vk,
 };
 
-use crate::{
-    engine::Info,
-    scene::{
-        camera,
-        model::{DefaultModel, TextureQuadModel},
-    },
-};
+use crate::{engine::Info, scene::camera};
 
 use self::{
     buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
@@ -54,8 +48,6 @@ pub struct VulkanManager {
     pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: vk_mem::Allocator,
-    pub models: Vec<DefaultModel>,
-    pub texture_quads: Vec<TextureQuadModel>,
     pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
     pub light_buffer: BufferWrapper,
     desc_layout_camera: vk::DescriptorSetLayout,
@@ -145,8 +137,6 @@ impl VulkanManager {
             pools,
             commandbuffers,
             allocator,
-            models: Vec::new(),
-            texture_quads: Vec::new(),
             uniform_buffer,
             light_buffer,
             desc_layout_camera,
@@ -267,12 +257,7 @@ impl VulkanManager {
                 ],
                 &[self.uniform_buffer.get_offset() as u32],
             );
-            for m in &self.models {
-                m.draw(&self.device, commandbuffer);
-            }
-            for m in &self.texture_quads {
-                m.draw(&self.device, commandbuffer);
-            }
+
             self.device.cmd_end_render_pass(commandbuffer);
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -384,15 +369,6 @@ impl Drop for VulkanManager {
 
             self.uniform_buffer.destroy(&self.allocator);
             self.light_buffer.cleanup(&self.allocator);
-
-            // if we fail to destroy the buffer continue to destory as many things
-            // as possible
-            for m in &mut self.models {
-                m.cleanup(&self.allocator);
-            }
-            for m in &mut self.texture_quads {
-                m.cleanup(&self.allocator);
-            }
 
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);

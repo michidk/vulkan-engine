@@ -28,10 +28,6 @@ impl GameLoop {
             .update_buffer(&vk.allocator, &mut vk.light_buffer)
             .expect("Something went wrong when updating light");
 
-        // camera.update_buffer(&vk.allocator, &mut &vk.uniform_buffer);
-        for m in &mut vk.models {
-            m.update_instance_buffer(&vk.allocator).unwrap();
-        }
         vk.update_commandbuffer(image_index as usize)
             .expect("updating the command buffer");
 

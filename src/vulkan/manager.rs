@@ -336,7 +336,8 @@ impl VulkanManager {
 
     pub fn wait_for_fence(&self) {
         unsafe {
-            self.device
+            self
+                .device
                 .wait_for_fences(
                     &[self.swapchain.may_begin_drawing[self.swapchain.current_image]],
                     true,

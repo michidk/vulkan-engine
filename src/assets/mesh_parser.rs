@@ -81,11 +81,13 @@ impl MeshBuilder {
         self.curr_submesh.faces.push(face);
     }
 
-    pub fn build_mesh(mut self) -> Result<mesh::Mesh, ParserError> {
-        self.mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
+    pub fn build_mesh(self) -> Result<mesh::Mesh, ParserError> {
+        let mut mesh = self.mesh;
+        let (uvs, normals) = (mesh.uvs, mesh.normals);
+        mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
 
         let mut vertices: Vec<mesh::Vertex> = Vec::new();
-        for vertex in self.mesh.vertices {
+        for vertex in mesh.vertices {
             vertices.push(mesh::Vertex {
                 position: vertex.position.into(),
                 color: vertex.color.map(Into::into),
@@ -95,7 +97,7 @@ impl MeshBuilder {
         }
 
         let mut submeshes: Vec<mesh::Submesh> = Vec::new();
-        for submesh in self.mesh.submeshes {
+        for submesh in mesh.submeshes {
             let mut faces: Vec<mesh::Face> = Vec::new();
             for mut face in submesh.faces {
                 // set uv and normal if they appear on a face
@@ -105,18 +107,10 @@ impl MeshBuilder {
                     let vertex = &mut vertices[face.face_i[i].vert_i - 1];
 
                     // get uv values from current face index
-                    let uv = if let Some(x) = face.face_i[i].uv_i {
-                        Some(self.mesh.uvs[x - 1].into())
-                    } else {
-                        None
-                    };
+                    let uv = face.face_i[i].uv_i.map(|x| uvs[x - 1].into());
 
                     // get normal values from current face index
-                    let normal = if let Some(x) = face.face_i[i].normal_i {
-                        Some(self.mesh.normals[x - 1].into())
-                    } else {
-                        None
-                    };
+                    let normal = face.face_i[i].uv_i.map(|x| normals[x - 1].into());
 
                     // assign if empty, create new vertex if not (and assign face index to it)
                     if vertex.uv.is_none() && vertex.normal.is_none() {
@@ -156,7 +150,7 @@ impl MeshBuilder {
         }
 
         Ok(mesh::Mesh {
-            name: self.mesh.name,
+            name: mesh.name,
             vertices,
             submeshes,
         })

@@ -2,14 +2,14 @@
 
 ## TODO's
 
-- restructure project
-- rework math lib @Shemnei
 - implement smart buffers @Rob
 - fix all unwraps and implement proper error handling
 - check //TO DO:
 - rework textures
 - check access modifier (especially package ones)
 - put example resources into example itself, and build a seperate output folder for each example
+- get resizing working again
+- introduce fps counter
 
 ## FPS (release build; fullscreen)
 

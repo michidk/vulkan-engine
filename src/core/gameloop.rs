@@ -21,12 +21,11 @@ impl GameLoop {
         let image_index = vk.swapchain.aquire_next_image();
         vk.wait_for_fence();
 
+        vk.descriptor_manager.next_frame();
+
         scene
             .light_manager
-            .update_buffer(
-                &vk.allocator,
-                &mut vk.light_buffer
-            )
+            .update_buffer(&vk.allocator, &mut vk.light_buffer)
             .expect("Something went wrong when updating light");
 
         // camera.update_buffer(&vk.allocator, &mut &vk.uniform_buffer);

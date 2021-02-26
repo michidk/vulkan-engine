@@ -1,10 +1,10 @@
 use crystal::prelude::*;
 
-use crate::vulkan::buffer::{self, MutableBuffer, PerFrameUniformBuffer};
+use crate::vulkan::buffer::{self, MutableBuffer};
 
 pub struct CamData {
     pub view_matrix: [[f32; 4]; 4],
-    pub projection_matrix: [[f32; 4]; 4]
+    pub projection_matrix: [[f32; 4]; 4],
 }
 
 #[allow(dead_code)]
@@ -22,12 +22,16 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn update_buffer(&self, allocator: &vk_mem::Allocator, buffer: &mut buffer::PerFrameUniformBuffer<CamData>) {
+    pub fn update_buffer(
+        &self,
+        allocator: &vk_mem::Allocator,
+        buffer: &mut buffer::PerFrameUniformBuffer<CamData>,
+    ) {
         let cam_data = CamData {
             view_matrix: self.view_matrix.into(),
-            projection_matrix: self.projection_matrix.into()
+            projection_matrix: self.projection_matrix.into(),
         };
-        buffer.set_data(allocator, &cam_data);
+        buffer.set_data(allocator, &cam_data).unwrap();
     }
 
     fn update_projection_matrix(&mut self) {

@@ -1,5 +1,6 @@
 pub(crate) mod buffer;
 mod debug;
+mod descriptor_manager;
 mod device;
 pub mod error;
 mod pipeline;
@@ -7,7 +8,6 @@ mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
-mod descriptor_manager;
 
 use std::ffi::CString;
 
@@ -16,11 +16,24 @@ use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk,
 };
-use crystal::prelude::Mat4;
 
-use crate::{engine::Info, scene::{camera, model::{DefaultModel, TextureQuadModel}}};
+use crate::{
+    engine::Info,
+    scene::{
+        camera,
+        model::{DefaultModel, TextureQuadModel},
+    },
+};
 
-use self::{buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, pipeline::PipelineWrapper, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper};
+use self::{
+    buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
+    debug::DebugMessenger,
+    descriptor_manager::{DescriptorData, DescriptorManager},
+    pipeline::PipelineWrapper,
+    queue::{PoolsWrapper, QueueFamilies, Queues},
+    surface::SurfaceWrapper,
+    swapchain::SwapchainWrapper,
+};
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
@@ -47,7 +60,7 @@ pub struct VulkanManager {
     pub light_buffer: BufferWrapper,
     desc_layout_camera: vk::DescriptorSetLayout,
     desc_layout_lights: vk::DescriptorSetLayout,
-    descriptor_manager: DescriptorManager<8>
+    pub descriptor_manager: DescriptorManager<8>,
 }
 
 impl VulkanManager {
@@ -95,7 +108,12 @@ impl VulkanManager {
         let commandbuffers =
             queue::create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
 
-        let mut uniform_buffer = PerFrameUniformBuffer::new(&physical_device_properties, &allocator, 4, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
+        let uniform_buffer = PerFrameUniformBuffer::new(
+            &physical_device_properties,
+            &allocator,
+            4,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )?;
 
         let desc_layout_camera = pipeline.descriptor_set_layouts[0];
         let desc_layout_lights = pipeline.descriptor_set_layouts[1];
@@ -133,7 +151,7 @@ impl VulkanManager {
             light_buffer,
             desc_layout_camera,
             desc_layout_lights,
-            descriptor_manager
+            descriptor_manager,
         })
     }
 
@@ -208,23 +226,23 @@ impl VulkanManager {
             })
             .clear_values(&clearvalues);
 
-        let desc_values_camera = [
-            DescriptorData::DynamicUniformBuffer {
-                buffer: self.uniform_buffer.get_buffer(),
-                offset: 0,
-                size: self.uniform_buffer.get_size(),
-            }
-        ];
-        let desc_set_camera = self.descriptor_manager.get_descriptor_set(self.desc_layout_camera, &desc_values_camera)?;
+        let desc_values_camera = [DescriptorData::DynamicUniformBuffer {
+            buffer: self.uniform_buffer.get_buffer(),
+            offset: 0,
+            size: self.uniform_buffer.get_size(),
+        }];
+        let desc_set_camera = self
+            .descriptor_manager
+            .get_descriptor_set(self.desc_layout_camera, &desc_values_camera)?;
 
-        let desc_values_lights = [
-            DescriptorData::StorageBuffer {
-                buffer: self.light_buffer.buffer,
-                offset: 0,
-                size: self.light_buffer.get_size(),
-            }
-        ];
-        let desc_set_lights = self.descriptor_manager.get_descriptor_set(self.desc_layout_lights, &desc_values_lights)?;
+        let desc_values_lights = [DescriptorData::StorageBuffer {
+            buffer: self.light_buffer.buffer,
+            offset: 0,
+            size: self.light_buffer.get_size(),
+        }];
+        let desc_set_lights = self
+            .descriptor_manager
+            .get_descriptor_set(self.desc_layout_lights, &desc_values_lights)?;
 
         unsafe {
             self.device.cmd_begin_render_pass(
@@ -247,9 +265,7 @@ impl VulkanManager {
                     desc_set_lights,
                     // self.descriptor_sets_texture[index],
                 ],
-                &[
-                    self.uniform_buffer.get_offset() as u32
-                ],
+                &[self.uniform_buffer.get_offset() as u32],
             );
             for m in &self.models {
                 m.draw(&self.device, commandbuffer);

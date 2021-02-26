@@ -6,6 +6,7 @@ use std::{
 
 use ash::{version::DeviceV1_0, vk};
 
+#[allow(dead_code)]
 #[derive(Hash, Copy, Clone, PartialEq, Eq)]
 pub enum DescriptorData {
     UniformBuffer {
@@ -32,7 +33,6 @@ pub enum DescriptorData {
 
 struct DescriptorSetData {
     data_hash: u64,
-    layout: vk::DescriptorSetLayout,
     frame_index: u16,
     set: vk::DescriptorSet,
 }
@@ -241,7 +241,6 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                 hash,
                 DescriptorSetData {
                     data_hash: hash,
-                    layout,
                     frame_index: self.frame_index,
                     set: new_set,
                 }

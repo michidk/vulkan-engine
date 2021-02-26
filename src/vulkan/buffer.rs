@@ -8,11 +8,15 @@ pub trait VulkanBuffer {
     fn get_offset(&self) -> vk::DeviceSize;
 }
 
-pub trait MutableBuffer<T: Sized> : VulkanBuffer {
-    fn set_data(&mut self, allocator: &vk_mem::Allocator, data: &T) -> Result<(), vk_mem::error::Error>;
+pub trait MutableBuffer<T: Sized>: VulkanBuffer {
+    fn set_data(
+        &mut self,
+        allocator: &vk_mem::Allocator,
+        data: &T,
+    ) -> Result<(), vk_mem::error::Error>;
 }
 
-pub trait ResizableBuffer<T> : MutableBuffer<T> {
+pub trait ResizableBuffer<T>: MutableBuffer<T> {
     fn resize(new_size: u64) -> Result<(), vk_mem::error::Error>;
 }
 
@@ -27,11 +31,16 @@ pub struct PerFrameUniformBuffer<T: Sized> {
 }
 
 impl<T: Sized> PerFrameUniformBuffer<T> {
-    pub fn new(phys_props: &vk::PhysicalDeviceProperties, allocator: &vk_mem::Allocator, num_frames: u64, buffer_usage: vk::BufferUsageFlags) -> Result<Self, vk_mem::error::Error> {
+    pub fn new(
+        phys_props: &vk::PhysicalDeviceProperties,
+        allocator: &vk_mem::Allocator,
+        num_frames: u64,
+        buffer_usage: vk::BufferUsageFlags,
+    ) -> Result<Self, vk_mem::error::Error> {
         let alignment = phys_props.limits.min_uniform_buffer_offset_alignment;
         let data_size = mem::size_of::<T>() as u64;
         let aligned_data_size = (data_size + alignment - 1) / alignment * alignment;
-        
+
         let buffer_info = vk::BufferCreateInfo::builder()
             .size(aligned_data_size * num_frames)
             .usage(buffer_usage)
@@ -46,14 +55,14 @@ impl<T: Sized> PerFrameUniformBuffer<T> {
 
         let mapping = allocator.map_memory(&allocation)? as *mut T;
 
-        Ok(Self{
+        Ok(Self {
             buffer,
             allocation,
             data_size,
             aligned_data_size,
             num_frames,
             current_frame: 0,
-            mapping
+            mapping,
         })
     }
 
@@ -83,9 +92,9 @@ impl<T: Sized> MutableBuffer<T> for PerFrameUniformBuffer<T> {
 
         let offset = self.current_frame * self.aligned_data_size;
 
-        unsafe { 
+        unsafe {
             let ptr = (self.mapping as *mut u8).offset(offset as isize) as *mut T;
-            ptr.copy_from_nonoverlapping(data, 1); 
+            ptr.copy_from_nonoverlapping(data, 1);
         }
 
         Ok(())

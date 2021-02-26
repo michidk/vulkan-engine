@@ -9,9 +9,9 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub(crate) fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
+    pub(crate) fn new() -> Self {
+        Self {
             light_manager: LightManager::default(),
-        })
+        }
     }
 }

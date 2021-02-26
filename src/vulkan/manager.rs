@@ -336,16 +336,14 @@ impl VulkanManager {
 
     pub fn wait_for_fence(&self) {
         unsafe {
-            &self
-                .device
+            self.device
                 .wait_for_fences(
                     &[self.swapchain.may_begin_drawing[self.swapchain.current_image]],
                     true,
                     std::u64::MAX,
                 )
                 .expect("fence-waiting");
-            &self
-                .device
+            self.device
                 .reset_fences(&[self.swapchain.may_begin_drawing[self.swapchain.current_image]])
                 .expect("resetting fences");
         }
@@ -364,8 +362,7 @@ impl VulkanManager {
             .signal_semaphores(&semaphores_finished)
             .build()];
         unsafe {
-            &self
-                .device
+            self.device
                 .queue_submit(
                     self.queues.graphics_queue,
                     &submit_info,

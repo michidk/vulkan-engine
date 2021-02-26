@@ -17,13 +17,13 @@ pub struct EngineInit {
 
 impl EngineInit {
     pub fn new(info: Info) -> Result<Self, Box<dyn std::error::Error>> {
-        let scene = Scene::new()?;
+        let scene = Scene::new();
 
         let eventloop = winit::event_loop::EventLoop::new();
         let window = info.window_info.into_window(&eventloop)?;
 
         let vulkan_manager = VulkanManager::new(info, window)?;
-        let gameloop = GameLoop::new()?;
+        let gameloop = GameLoop::new();
 
         Ok(Self {
             eventloop,

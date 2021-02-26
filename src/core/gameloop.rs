@@ -3,8 +3,8 @@ use crate::{scene::Scene, vulkan::manager::VulkanManager};
 pub struct GameLoop {}
 
 impl GameLoop {
-    pub(crate) fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {})
+    pub(crate) fn new() -> Self {
+        Self {}
     }
 
     pub(crate) fn init(&self) {}
@@ -35,7 +35,7 @@ impl GameLoop {
         for m in &mut vk.models {
             m.update_instance_buffer(&vk.allocator).unwrap();
         }
-        &vk.update_commandbuffer(image_index as usize)
+        vk.update_commandbuffer(image_index as usize)
             .expect("updating the command buffer");
 
         // finanlize renderpass

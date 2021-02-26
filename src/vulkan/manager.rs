@@ -406,8 +406,6 @@ impl VulkanManager {
             }
         };
 
-        self.swapchain.current_image =
-            (self.swapchain.current_image + 1) % self.swapchain.amount_of_images as usize;
     }
 }
 

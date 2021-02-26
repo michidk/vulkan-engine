@@ -42,5 +42,6 @@ impl GameLoop {
 
         let semaphores_finished = vk.submit(image_index);
         vk.present(image_index, &semaphores_finished);
+        vk.swapchain.swap();
     }
 }

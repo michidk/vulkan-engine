@@ -189,6 +189,11 @@ impl SwapchainWrapper {
         Ok(())
     }
 
+    /// select next image
+    pub fn swap(&mut self) {
+        self.current_image = (self.current_image + 1) % self.amount_of_images as usize;
+    }
+
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
         logical_device.destroy_image_view(self.depth_imageview, None);
         allocator.destroy_image(self.depth_image, &self.depth_image_allocation);

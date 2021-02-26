@@ -1,4 +1,9 @@
-use crate::{scene::Scene, vulkan::VulkanManager};
+use crystal::prelude::Vec3;
+
+use crate::{
+    scene::{camera::Camera, Scene},
+    vulkan::VulkanManager,
+};
 
 pub struct GameLoop {}
 
@@ -20,6 +25,14 @@ impl GameLoop {
         // prepare for render
         let image_index = vk.swapchain.aquire_next_image();
         vk.wait_for_fence();
+
+        // TODO: move out of gameloop
+        let camera = Camera::builder()
+            .position(Vec3::new(0.0, 0.0, -5.0))
+            .aspect(vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32)
+            .build();
+
+        camera.update_buffer(&vk.allocator, &mut vk.uniform_buffer);
 
         vk.descriptor_manager.next_frame();
 

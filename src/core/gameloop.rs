@@ -1,4 +1,4 @@
-use crate::{scene::Scene, vulkan::manager::VulkanManager};
+use crate::{scene::Scene, vulkan::VulkanManager};
 
 pub struct GameLoop {}
 

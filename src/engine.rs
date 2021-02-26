@@ -1,7 +1,7 @@
 use crate::{
     core::{gameloop::GameLoop, window},
     scene::Scene,
-    vulkan::manager::VulkanManager,
+    vulkan::VulkanManager,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]

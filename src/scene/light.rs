@@ -1,4 +1,3 @@
-use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::Vec3;
 
 use crate::vulkan::buffer::BufferWrapper;
@@ -51,10 +50,8 @@ impl LightManager {
 
     pub fn update_buffer(
         &self,
-        logical_device: &ash::Device,
         allocator: &vk_mem::Allocator,
         buffer: &mut BufferWrapper,
-        descriptor_sets_light: &mut [vk::DescriptorSet],
     ) -> Result<(), vk_mem::error::Error> {
         if !self.is_dirty {
             return Ok(());
@@ -92,22 +89,6 @@ impl LightManager {
             data.push(0.0);
         }
         buffer.fill(allocator, &data)?;
-        for descset in descriptor_sets_light {
-            let buffer_infos = [vk::DescriptorBufferInfo {
-                buffer: buffer.buffer,
-                offset: 0,
-                range: 4 * data.len() as u64,
-            }];
-            let desc_sets_write = [vk::WriteDescriptorSet::builder()
-                .dst_set(*descset)
-                .dst_binding(0)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&buffer_infos)
-                .build()];
-            unsafe {
-                logical_device.update_descriptor_sets(&desc_sets_write, &[]);
-            }
-        }
         Ok(())
     }
 }

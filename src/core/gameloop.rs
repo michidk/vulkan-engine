@@ -24,10 +24,8 @@ impl GameLoop {
         scene
             .light_manager
             .update_buffer(
-                &vk.device,
                 &vk.allocator,
-                &mut vk.light_buffer,
-                &mut vk.descriptor_sets_light,
+                &mut vk.light_buffer
             )
             .expect("Something went wrong when updating light");
 

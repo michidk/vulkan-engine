@@ -186,7 +186,7 @@ impl PipelineWrapper {
 
         let descriptorset_layout_binding_descs0 = [vk::DescriptorSetLayoutBinding::builder()
             .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
             .descriptor_count(1)
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .build()];

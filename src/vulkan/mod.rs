@@ -7,6 +7,7 @@ mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
+mod descriptor_manager;
 
 use std::ffi::CString;
 
@@ -17,19 +18,9 @@ use ash::{
 };
 use crystal::prelude::Mat4;
 
-use crate::{
-    engine::Info,
-    scene::model::{DefaultModel, TextureQuadModel},
-};
+use crate::{engine::Info, scene::{camera, model::{DefaultModel, TextureQuadModel}}};
 
-use self::{
-    buffer::BufferWrapper,
-    debug::DebugMessenger,
-    pipeline::PipelineWrapper,
-    queue::{PoolsWrapper, QueueFamilies, Queues},
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-};
+use self::{buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, pipeline::PipelineWrapper, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper};
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
@@ -52,11 +43,11 @@ pub struct VulkanManager {
     pub allocator: vk_mem::Allocator,
     pub models: Vec<DefaultModel>,
     pub texture_quads: Vec<TextureQuadModel>,
-    pub uniform_buffer: BufferWrapper,
-    descriptor_pool: vk::DescriptorPool,
-    descriptor_sets_camera: Vec<vk::DescriptorSet>,
-    pub descriptor_sets_light: Vec<vk::DescriptorSet>,
+    pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
     pub light_buffer: BufferWrapper,
+    desc_layout_camera: vk::DescriptorSetLayout,
+    desc_layout_lights: vk::DescriptorSetLayout,
+    descriptor_manager: DescriptorManager<8>
 }
 
 impl VulkanManager {
@@ -104,54 +95,10 @@ impl VulkanManager {
         let commandbuffers =
             queue::create_commandbuffers(&logical_device, &pools, swapchain.framebuffers.len())?;
 
-        let mut uniform_buffer = BufferWrapper::new(
-            &allocator,
-            128,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-        )?;
-        let camera_transform: [[[f32; 4]; 4]; 2] =
-            [Mat4::identity().into(), Mat4::identity().into()];
-        uniform_buffer.fill(&allocator, &camera_transform)?;
+        let mut uniform_buffer = PerFrameUniformBuffer::new(&physical_device_properties, &allocator, 4, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
 
-        let pool_sizes = [
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: swapchain.amount_of_images,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: swapchain.amount_of_images,
-            },
-        ];
-        let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
-            .max_sets(2 * swapchain.amount_of_images)
-            .pool_sizes(&pool_sizes);
-        let descriptor_pool =
-            unsafe { logical_device.create_descriptor_pool(&descriptor_pool_info, None) }?;
-
-        let desc_layouts_camera =
-            vec![pipeline.descriptor_set_layouts[0]; swapchain.amount_of_images as usize];
-        let descriptor_set_allocate_info_camera = vk::DescriptorSetAllocateInfo::builder()
-            .descriptor_pool(descriptor_pool)
-            .set_layouts(&desc_layouts_camera);
-        let descriptor_sets_camera = unsafe {
-            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_camera)
-        }?;
-        for descset in &descriptor_sets_camera {
-            let buffer_infos = [vk::DescriptorBufferInfo {
-                buffer: uniform_buffer.buffer,
-                offset: 0,
-                range: 128,
-            }];
-            let desc_set_write = [vk::WriteDescriptorSet::builder()
-                .dst_set(*descset)
-                .dst_binding(0)
-                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-                .buffer_info(&buffer_infos)
-                .build()];
-            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
-        }
+        let desc_layout_camera = pipeline.descriptor_set_layouts[0];
+        let desc_layout_lights = pipeline.descriptor_set_layouts[1];
 
         let mut light_buffer = BufferWrapper::new(
             &allocator,
@@ -161,29 +108,7 @@ impl VulkanManager {
         )?;
         light_buffer.fill(&allocator, &[0.0, 0.0])?;
 
-        // let descriptor_sets_light = vec![];
-        let desc_layouts_light =
-            vec![pipeline.descriptor_set_layouts[1]; swapchain.amount_of_images as usize];
-        let descriptor_set_allocate_info_light = vk::DescriptorSetAllocateInfo::builder()
-            .descriptor_pool(descriptor_pool)
-            .set_layouts(&desc_layouts_light);
-        let descriptor_sets_light = unsafe {
-            logical_device.allocate_descriptor_sets(&descriptor_set_allocate_info_light)
-        }?;
-        for descset in &descriptor_sets_light {
-            let buffer_infos = [vk::DescriptorBufferInfo {
-                buffer: light_buffer.buffer,
-                offset: 0,
-                range: 8,
-            }];
-            let desc_set_write = [vk::WriteDescriptorSet::builder()
-                .dst_set(*descset)
-                .dst_binding(0)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&buffer_infos)
-                .build()];
-            unsafe { logical_device.update_descriptor_sets(&desc_set_write, &[]) };
-        }
+        let descriptor_manager = DescriptorManager::new(logical_device.clone())?;
 
         Ok(Self {
             window,
@@ -205,10 +130,10 @@ impl VulkanManager {
             models: Vec::new(),
             texture_quads: Vec::new(),
             uniform_buffer,
-            descriptor_pool,
-            descriptor_sets_camera,
-            descriptor_sets_light,
             light_buffer,
+            desc_layout_camera,
+            desc_layout_lights,
+            descriptor_manager
         })
     }
 
@@ -282,6 +207,25 @@ impl VulkanManager {
                 extent: self.swapchain.extent,
             })
             .clear_values(&clearvalues);
+
+        let desc_values_camera = [
+            DescriptorData::DynamicUniformBuffer {
+                buffer: self.uniform_buffer.get_buffer(),
+                offset: 0,
+                size: self.uniform_buffer.get_size(),
+            }
+        ];
+        let desc_set_camera = self.descriptor_manager.get_descriptor_set(self.desc_layout_camera, &desc_values_camera)?;
+
+        let desc_values_lights = [
+            DescriptorData::StorageBuffer {
+                buffer: self.light_buffer.buffer,
+                offset: 0,
+                size: self.light_buffer.get_size(),
+            }
+        ];
+        let desc_set_lights = self.descriptor_manager.get_descriptor_set(self.desc_layout_lights, &desc_values_lights)?;
+
         unsafe {
             self.device.cmd_begin_render_pass(
                 commandbuffer,
@@ -299,11 +243,13 @@ impl VulkanManager {
                 self.pipeline.layout,
                 0,
                 &[
-                    self.descriptor_sets_camera[index],
-                    self.descriptor_sets_light[index],
+                    desc_set_camera,
+                    desc_set_lights,
                     // self.descriptor_sets_texture[index],
                 ],
-                &[],
+                &[
+                    self.uniform_buffer.get_offset() as u32
+                ],
             );
             for m in &self.models {
                 m.draw(&self.device, commandbuffer);
@@ -418,9 +364,9 @@ impl Drop for VulkanManager {
                 .device_wait_idle()
                 .expect("something wrong while waiting");
 
-            self.device
-                .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.uniform_buffer.cleanup(&self.allocator);
+            self.descriptor_manager.destroy();
+
+            self.uniform_buffer.destroy(&self.allocator);
             self.light_buffer.cleanup(&self.allocator);
 
             // if we fail to destroy the buffer continue to destory as many things

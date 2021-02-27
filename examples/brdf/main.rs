@@ -3,16 +3,7 @@ use std::process::exit;
 
 use crystal::prelude::{Mat4, Vec3};
 use log::error;
-use vulkan_engine::{
-    core::window::{self, Dimensions},
-    engine::{self, Engine, EngineInit},
-    scene::{
-        camera::Camera,
-        light::{DirectionalLight, PointLight},
-        model::{DefaultModel, InstanceData},
-    },
-    utils::color::Color,
-};
+use vulkan_engine::{core::window::{self, Dimensions}, engine::{self, Engine, EngineInit}, scene::{camera::Camera, light::{DirectionalLight, PointLight}, model::Material}, utils::color::Color};
 
 fn main() {
     // setting up logger
@@ -76,45 +67,18 @@ fn setup(engine: &mut Engine) {
         luminous_flux: Vec3::new(100.0, 100.0, 100.0),
     });
 
-    let mut model = DefaultModel::sphere(4);
 
-    for i in 0..10 {
-        for j in 0..10 {
-            model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-                &Mat4::translate(Vec3::new(i as f32 - 5.0, -j as f32 + 5.0, 10.0))
-                    * &Mat4::scale(0.5),
-                Color::rgb_f32(1.0, 0.86, 0.57),
-                i as f32 * 0.1,
-                j as f32 * 0.1,
-            ));
-        }
-    }
+    // let mat = Material::new(
+    //     "brdf",
+    //     ShaderData<2> {
+    //         [
+    //             ShaderDataType::Uniform(),
+    //             ShaderDataType::Uniform(),
+    //         ]
+    //     }
+    // );
 
-    for i in 0..10 {
-        model.insert_visibly(InstanceData::from_matrix_color_metallic_roughness(
-            &Mat4::translate(Vec3::new(i as f32 - 5.0, -6.0, 10.0)) * &Mat4::scale(0.5),
-            Color::rgb_f32(
-                1.0 * i as f32 * 0.1,
-                0.0 * i as f32 * 0.1,
-                0.0 * i as f32 * 0.1,
-            ),
-            0.5,
-            0.5,
-        ));
-    }
-
-    model
-        .update_vertex_buffer(&engine.vulkan_manager.allocator)
-        .unwrap();
-    model
-        .update_index_buffer(&engine.vulkan_manager.allocator)
-        .unwrap();
-    model
-        .update_instance_buffer(&engine.vulkan_manager.allocator)
-        .unwrap();
-
-    engine.vulkan_manager.models.push(model);
-
+    // setup camera
     let camera = Camera::builder()
         //.fovy(30.0.deg())
         .position(Vec3::new(0.0, 0.0, -5.0))

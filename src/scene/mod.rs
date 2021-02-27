@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod light;
 pub mod model;
+pub mod transform;
 
 use self::model::Model;
 use self::{light::LightManager};

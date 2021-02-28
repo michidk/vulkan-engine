@@ -28,7 +28,7 @@ impl GameLoop {
 
         // TODO: move out of gameloop
         let camera = Camera::builder()
-            .position(Vec3::new(0.0, 0.0, -5.0))
+            .position(Vec3::new(0.0, 0.0, 0.0))
             .aspect(vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32)
             .build();
 
@@ -39,7 +39,7 @@ impl GameLoop {
             .update_buffer(&vk.allocator, &mut vk.light_buffer)
             .expect("Something went wrong when updating light");
 
-        vk.update_commandbuffer(image_index as usize)
+        vk.update_commandbuffer(image_index as usize, scene)
             .expect("updating the command buffer");
 
         // finanlize renderpass

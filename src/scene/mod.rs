@@ -2,6 +2,7 @@ pub mod camera;
 pub mod light;
 pub mod model;
 pub mod transform;
+pub mod material;
 
 use self::model::Model;
 use self::{light::LightManager};
@@ -21,7 +22,7 @@ impl Scene {
         }
     }
 
-    pub fn add(mut self, model: Model) {
+    pub fn add(&mut self, model: Model) {
         self.models.push(model);
     }
 }

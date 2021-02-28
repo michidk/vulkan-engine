@@ -1,6 +1,6 @@
 pub(crate) mod buffer;
 mod debug;
-mod descriptor_manager;
+pub mod descriptor_manager;
 mod device;
 pub mod error;
 mod pipeline;
@@ -9,17 +9,16 @@ mod renderpass;
 mod surface;
 mod swapchain;
 
-use std::ffi::CString;
+use std::{collections::BTreeMap, ffi::CString};
 
 use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, FenceCreateInfo, SemaphoreCreateInfo}};
 
-use crate::{engine::Info, scene::camera};
+use crate::{engine::Info, scene::{self, Scene, camera, material::Material}};
 
 use self::{
     buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
     debug::DebugMessenger,
     descriptor_manager::{DescriptorData, DescriptorManager},
-    pipeline::PipelineWrapper,
     queue::{PoolsWrapper, QueueFamilies, Queues},
     surface::SurfaceWrapper,
     swapchain::SwapchainWrapper,
@@ -39,15 +38,14 @@ pub struct VulkanManager {
     pub queues: Queues,
     pub device: ash::Device,
     pub swapchain: SwapchainWrapper,
-    renderpass: vk::RenderPass,
-    pipeline: PipelineWrapper,
+    pub renderpass: vk::RenderPass,
     pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: vk_mem::Allocator,
     pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
     pub light_buffer: BufferWrapper,
-    desc_layout_camera: vk::DescriptorSetLayout,
-    desc_layout_lights: vk::DescriptorSetLayout,
+    pub desc_layout_frame_data: vk::DescriptorSetLayout,
+    pipeline_layout_frame_data: vk::PipelineLayout,
     pub descriptor_manager: DescriptorManager<8>,
     max_frames_in_flight: u8,
     pub current_frame_index: u8,
@@ -96,7 +94,6 @@ impl VulkanManager {
         let format = surface.choose_format(physical_device)?.format;
         let renderpass = renderpass::init_renderpass(&logical_device, format)?;
         swapchain.create_framebuffers(&logical_device, renderpass)?;
-        let pipeline = PipelineWrapper::init(&logical_device, &swapchain, &renderpass)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
@@ -109,8 +106,30 @@ impl VulkanManager {
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
 
-        let desc_layout_camera = pipeline.descriptor_set_layouts[0];
-        let desc_layout_lights = pipeline.descriptor_set_layouts[1];
+        let desc_layout_frame_data_bindings = [
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX)
+                .build(),
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build()
+        ];
+        let desc_layout_frame_data_info = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&desc_layout_frame_data_bindings)
+            .build();
+        let desc_layout_frame_data = unsafe {logical_device.create_descriptor_set_layout(&desc_layout_frame_data_info, None)? };
+
+        let pipeline_layout_frame_data_bindings = [desc_layout_frame_data];
+        let pipeline_layout_frame_data_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&pipeline_layout_frame_data_bindings)
+            .build();
+        let pipeline_layout_frame_data = unsafe { logical_device.create_pipeline_layout(&pipeline_layout_frame_data_info, None)? };
 
         let mut light_buffer = BufferWrapper::new(
             &allocator,
@@ -148,14 +167,13 @@ impl VulkanManager {
             device: logical_device,
             swapchain,
             renderpass,
-            pipeline,
             pools,
             commandbuffers,
             allocator,
             uniform_buffer,
             light_buffer,
-            desc_layout_camera,
-            desc_layout_lights,
+            desc_layout_frame_data,
+            pipeline_layout_frame_data,
             descriptor_manager,
             max_frames_in_flight,
             current_frame_index: 0,
@@ -217,7 +235,7 @@ impl VulkanManager {
         self.swapchain.aquire_next_image(self.image_acquire_semaphores[self.current_frame_index as usize])
     }
 
-    pub fn update_commandbuffer(&mut self, swapchain_image_index: usize) -> Result<(), vk::Result> {
+    pub fn update_commandbuffer(&mut self, swapchain_image_index: usize, scene: &Scene) -> Result<(), vk::Result> {
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
         unsafe {
@@ -247,23 +265,32 @@ impl VulkanManager {
             })
             .clear_values(&clearvalues);
 
-        let desc_values_camera = [DescriptorData::DynamicUniformBuffer {
-            buffer: self.uniform_buffer.get_buffer(),
-            offset: 0,
-            size: self.uniform_buffer.get_size(),
-        }];
+        let desc_values_frame_data = [
+            DescriptorData::DynamicUniformBuffer {
+                buffer: self.uniform_buffer.get_buffer(),
+                offset: 0,
+                size: self.uniform_buffer.get_size(),
+            },
+            DescriptorData::StorageBuffer {
+                buffer: self.light_buffer.buffer,
+                offset: 0,
+                size: self.light_buffer.get_size(),
+            }
+        ];
         let desc_set_camera = self
             .descriptor_manager
-            .get_descriptor_set(self.desc_layout_camera, &desc_values_camera)?;
+            .get_descriptor_set(self.desc_layout_frame_data, &desc_values_frame_data)?;
 
-        let desc_values_lights = [DescriptorData::StorageBuffer {
-            buffer: self.light_buffer.buffer,
-            offset: 0,
-            size: self.light_buffer.get_size(),
-        }];
-        let desc_set_lights = self
-            .descriptor_manager
-            .get_descriptor_set(self.desc_layout_lights, &desc_values_lights)?;
+        unsafe {
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer, 
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout_frame_data,
+                0,
+                &[desc_set_camera],
+                &[self.uniform_buffer.get_offset(self.current_frame_index) as u32]
+            );
+        }
 
         unsafe {
             self.device.cmd_begin_render_pass(
@@ -271,7 +298,8 @@ impl VulkanManager {
                 &renderpass_begininfo,
                 vk::SubpassContents::INLINE,
             );
-            self.device.cmd_bind_pipeline(
+
+            /*self.device.cmd_bind_pipeline(
                 commandbuffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline,
@@ -290,8 +318,31 @@ impl VulkanManager {
             );
 
             self.device.cmd_end_render_pass(commandbuffer);
+            self.device.end_command_buffer(commandbuffer)?;*/
+        }
+
+        for obj in &scene.models {
+            unsafe {
+                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, obj.material.get_pipeline());
+
+                let mat_desc_data = obj.material.get_descriptor_data();
+                let mat_desc_set = self.descriptor_manager.get_descriptor_set(obj.material.get_descriptor_set_layout(), mat_desc_data)?;
+                self.device.cmd_bind_descriptor_sets(commandbuffer, vk::PipelineBindPoint::GRAPHICS, obj.material.get_pipeline_layout(), 1, &[mat_desc_set], &[]);
+
+                self.device.cmd_bind_vertex_buffers(commandbuffer, 0, &[obj.mesh.vertex_buffer, obj.mesh.instance_buffer], &[0, 0]);
+                self.device.cmd_bind_index_buffer(commandbuffer, obj.mesh.index_buffer, 0, vk::IndexType::UINT32);
+
+                for sm in &obj.mesh.submeshes {
+                    self.device.cmd_draw_indexed(commandbuffer, sm.1, 1, sm.0, 0, 0);
+                }
+            }
+        }
+
+        unsafe {
+            self.device.cmd_end_render_pass(commandbuffer);
             self.device.end_command_buffer(commandbuffer)?;
         }
+
         Ok(())
     }
 
@@ -314,8 +365,8 @@ impl VulkanManager {
         )?;
         self.swapchain
             .create_framebuffers(&self.device, self.renderpass)?;
-        self.pipeline.cleanup(&self.device);
-        self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
+        //self.pipeline.cleanup(&self.device);
+        //self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
         Ok(())
     }
 
@@ -396,13 +447,13 @@ impl Drop for VulkanManager {
                 .expect("something wrong while waiting");
 
             for s in &self.image_acquire_semaphores {
-                unsafe { self.device.destroy_semaphore(*s, None); }
+                self.device.destroy_semaphore(*s, None);
             }
             for s in &self.render_finished_semaphores {
-                unsafe { self.device.destroy_semaphore(*s, None); }
+                self.device.destroy_semaphore(*s, None);
             }
             for f in &self.frame_resource_fences {
-                unsafe { self.device.destroy_fence(*f, None); }
+                self.device.destroy_fence(*f, None);
             }
 
             self.descriptor_manager.destroy();
@@ -411,7 +462,7 @@ impl Drop for VulkanManager {
             self.light_buffer.cleanup(&self.allocator);
 
             self.pools.cleanup(&self.device);
-            self.pipeline.cleanup(&self.device);
+            //self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
             // --segfault
             self.swapchain.cleanup(&self.device, &self.allocator);

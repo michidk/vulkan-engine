@@ -209,6 +209,12 @@ where
     }
 }
 
+impl<T> Vec2<T> {
+    pub const fn new(x: T, y: T) -> Self {
+        Self::from_data([[x, y]])
+    }
+}
+
 impl<T> Vec3<T> {
     pub const fn new(x: T, y: T, z: T) -> Self {
         Self::from_data([[x, y, z]])

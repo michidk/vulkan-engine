@@ -1,14 +1,13 @@
-pub mod material;
+use std::rc::Rc;
+
+use self::{mesh::Mesh};
+
+use super::{material::MaterialInterface, transform::Transform};
+
 pub mod mesh;
 
-use crate::{assets::mesh::Mesh, utils::color::Color};
-
-use self::material::Material;
-
-use super::transform::Transform;
-
 pub struct Model {
-    material: Material,
-    mesh: Mesh,
-    transform: Transform,
+    pub material: Rc<dyn MaterialInterface>,
+    pub mesh: Rc<Mesh>,
+    pub transform: Transform,
 }

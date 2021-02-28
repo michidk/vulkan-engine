@@ -4,57 +4,50 @@
 
 //# TYPE VERTEX
 layout (location = 0) in vec3 i_position;
-layout (location = 1) in vec3 i_normal;
-layout (location = 2) in mat4 i_modelMatrix;
-layout (location = 6) in mat4 i_inverseModelMatrix;
-layout (location = 10) in vec4 i_color;
-layout (location = 11) in float i_metallic;
-layout (location = 12) in float i_roughness;
+//layout (location = 1) in vec3 i_color;
+layout (location = 2) in vec3 i_normal;
+//layout (location = 3) in vec2 i_uv;
+layout (location = 4) in mat4 i_modelMatrix;
+layout (location = 8) in mat4 i_inverseModelMatrix;
 
-layout (set = 0, binding = 0) uniform UniformBufferObject {
+layout (set = 0, binding = 0) uniform FrameData {
     mat4 view_matrix;
     mat4 projection_matrix;
-} ubo;
+    vec3 cam_pos;
+} u_FrameData;
 
-layout (location = 0) out vec4 o_color;
 layout (location = 1) out vec3 o_normal;
 layout (location = 2) out vec4 o_worldPos;
 layout (location = 3) out vec3 o_cameraCoordinates;
-layout (location = 4) out float o_metallic;
-layout (location = 5) out float o_roughness;
 
 void main() {
     o_worldPos = i_modelMatrix * vec4(i_position, 1.0);
-    gl_Position = ubo.projection_matrix * ubo.view_matrix * o_worldPos;
-    o_color = i_color;
-    o_normal = transpose(mat3(i_inverseModelMatrix)) * i_normal;
-    o_cameraCoordinates =
-        - ubo.view_matrix[3][0] * vec3(ubo.view_matrix[0][0], ubo.view_matrix[1][0], ubo.view_matrix[2][0])
-        - ubo.view_matrix[3][1] * vec3(ubo.view_matrix[0][1], ubo.view_matrix[1][1], ubo.view_matrix[2][1])
-        - ubo.view_matrix[3][2] * vec3(ubo.view_matrix[0][0], ubo.view_matrix[1][2], ubo.view_matrix[2][2]);
-    o_metallic = i_metallic;
-    o_roughness = i_roughness;
+    gl_Position = u_FrameData.projection_matrix * u_FrameData.view_matrix * o_worldPos;
+    o_normal = mat3(transpose(i_inverseModelMatrix)) * i_normal;
+    o_cameraCoordinates = u_FrameData.cam_pos;
 }
 
 
 //# TYPE FRAGMENT
-layout (location = 0) in vec4 i_color; // TODO: rename to albedo
 layout (location = 1) in vec3 i_normal;
 layout (location = 2) in vec4 i_worldpos;
 layout (location = 3) in vec3 i_cameraCoordinates;
-layout (location = 4) in float i_metallic;
-layout (location = 5) in float i_roughness;
 
 layout (location = 0) out vec4 o_color;
 
 const float PI = 3.1415926535897932384626433832795;
 
-readonly layout (set = 1, binding = 0) buffer StorageBufferObject {
+readonly layout (set = 0, binding = 1) buffer LightBuffer {
     float numDirectional;
     float numPoint;
     vec3 data[];
-} sbo;
+} u_LightBuffer;
 
+layout (set = 1, binding = 0) uniform MaterialData {
+    vec4 color;
+    float metallic;
+    float roughness;
+} u_MaterialData;
 
 // normal distribution function: Trowbridge-Reitz GGX
 float distributionGGX(vec3 normal, vec3 halfVector, float roughness) {
@@ -99,11 +92,11 @@ vec3 computeRadiance(vec3 irradiance, vec3 lightDirection, vec3 normal, vec3 cam
     float hDotV = max(dot(halfVector, cameraDirection), 0.0);
     float nDotV = max(dot(normal, cameraDirection), 0.0);
 
-    vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(i_metallic)); // base relectivity: use 0.04 for non-metallic/dialectic materials else use the surface color
+    vec3 f0 = mix(vec3(0.04), surfaceColor, vec3(u_MaterialData.metallic)); // base relectivity: use 0.04 for non-metallic/dialectic materials else use the surface color
     vec3 f = schlick(f0, hDotV);
 
-    float ndf = distributionGGX(normal, halfVector, i_roughness);
-    float geometry = geometrySmith(nDotV, nDotL, i_roughness);
+    float ndf = distributionGGX(normal, halfVector, u_MaterialData.roughness);
+    float geometry = geometrySmith(nDotV, nDotL, u_MaterialData.roughness);
 
     // Cook-Torrance BRDF
     vec3 numerator = ndf * geometry * f;
@@ -112,9 +105,9 @@ vec3 computeRadiance(vec3 irradiance, vec3 lightDirection, vec3 normal, vec3 cam
 
     vec3 kS = f; // energy of light that gets reflected
     vec3 kD = vec3(1.0) - kS; // remaining light that gets refracted
-    kD *= 1.0 - i_metallic; // metalls don't refract, so set it to 0 if it's a metal
+    kD *= 1.0 - u_MaterialData.metallic; // metalls don't refract, so set it to 0 if it's a metal
 
-    return (kD * i_color.xyz / PI + specular) * irradiance * nDotL;
+    return (kD * surfaceColor / PI + specular) * irradiance * nDotL;
 }
 
 void main() {
@@ -122,28 +115,28 @@ void main() {
     vec3 i_normal = normalize(i_normal);
     vec3 directionToCamera = normalize(i_cameraCoordinates - i_worldpos.xyz);
 
-    int number_directional = int(sbo.numDirectional);
-    int number_point = int(sbo.numPoint);
+    int number_directional = int(u_LightBuffer.numDirectional);
+    int number_point = int(u_LightBuffer.numPoint);
 
     // directional lights
     for (int i = 0; i < number_directional; i++) {
-        vec3 directionToLight = sbo.data[2 * i]; // direction to light
-        vec3 irradiance = sbo.data[2 * i + 1]; // light color in lx (= lm/m^2), values from https://en.wikipedia.org/wiki/Lux#Illuminance
+        vec3 directionToLight = u_LightBuffer.data[2 * i]; // direction to light
+        vec3 irradiance = u_LightBuffer.data[2 * i + 1]; // light color in lx (= lm/m^2), values from https://en.wikipedia.org/wiki/Lux#Illuminance
 
-        radiance += computeRadiance(irradiance, normalize(directionToLight), i_normal, directionToCamera, i_color.xyz);
+        radiance += computeRadiance(irradiance, normalize(directionToLight), i_normal, directionToCamera, u_MaterialData.color.xyz);
     }
 
     // point lights
     for (int i = 0; i < number_point; i++) {
-        vec3 lightPosition = sbo.data[2 * i + 2 * number_directional]; // light position
-        vec3 luminousFlux = sbo.data[2 * i + 1 + 2 * number_directional]; // light color in lm, values from https://en.wikipedia.org/wiki/Luminous_flux#Examples
+        vec3 lightPosition = u_LightBuffer.data[2 * i + 2 * number_directional]; // light position
+        vec3 luminousFlux = u_LightBuffer.data[2 * i + 1 + 2 * number_directional]; // light color in lm, values from https://en.wikipedia.org/wiki/Luminous_flux#Examples
 
         // light fall-off
         vec3 directionToLight = normalize(lightPosition - i_worldpos.xyz);
         float d = length(i_worldpos.xyz - lightPosition);
         vec3 irradiance = luminousFlux / (4 * PI * d * d);
 
-        radiance += computeRadiance(irradiance, directionToLight, i_normal, directionToCamera, i_color.xyz);
+        radiance += computeRadiance(irradiance, directionToLight, i_normal, directionToCamera, u_MaterialData.color.xyz);
     };
 
     radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping

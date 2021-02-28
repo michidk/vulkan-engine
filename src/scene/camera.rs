@@ -5,6 +5,7 @@ use crate::vulkan::buffer::{self, MutableBuffer};
 pub struct CamData {
     pub view_matrix: [[f32; 4]; 4],
     pub projection_matrix: [[f32; 4]; 4],
+    pub pos: [[f32; 3]; 1],
 }
 
 #[allow(dead_code)]
@@ -31,6 +32,7 @@ impl Camera {
         let cam_data = CamData {
             view_matrix: self.view_matrix.into(),
             projection_matrix: self.projection_matrix.into(),
+            pos: self.position.into(),
         };
         buffer.set_data(allocator, &cam_data, current_frame_index).unwrap();
     }

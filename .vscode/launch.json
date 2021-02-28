@@ -11,12 +11,12 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=vulkan_engine",
+                    "--example=brdf",
                     "--package=vulkan_engine"
                 ],
                 "filter": {
-                    "name": "vulkan_engine",
-                    "kind": "bin"
+                    "name": "brdf",
+                    "kind": "example"
                 }
             },
             "args": [],

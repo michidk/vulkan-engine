@@ -174,7 +174,7 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
     }];
     let scissors = [vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
-        extent: vk::Extent2D { width, height },
+        extent: vk::Extent2D { width: i32::MAX as u32, height: i32::MAX as u32 },
     }];
 
     let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
@@ -203,6 +203,12 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
         .depth_test_enable(true)
         .depth_write_enable(true)
         .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL);
+
+    let dynamic_states = [vk::DynamicState::VIEWPORT];
+    let dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
+        .dynamic_states(&dynamic_states)
+        .build();
+
     let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
         .stages(&shader_stages)
         .vertex_input_state(&vertex_input_info)
@@ -214,6 +220,7 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
         .color_blend_state(&colourblend_info)
         .layout(layout)
         .render_pass(renderpass)
+        .dynamic_state(&dynamic_state)
         .subpass(0);
     let graphicspipeline = unsafe {
         device

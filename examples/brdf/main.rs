@@ -55,7 +55,8 @@ fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
-        &engine.vulkan_manager.device, 
+        engine.vulkan_manager.device.clone(), 
+        (*engine.vulkan_manager.allocator).clone(),
         "shaders/brdf",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
@@ -69,8 +70,7 @@ fn setup(engine: &mut Engine) {
                 metallic: 0.0,
                 roughness: 0.1
             }
-        },
-        &engine.vulkan_manager.allocator
+        }
     ).unwrap();
 
     let mesh_data = MeshData {
@@ -107,7 +107,7 @@ fn setup(engine: &mut Engine) {
 
     let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
     let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = mesh_data.bake(&engine.vulkan_manager.allocator, transform, inv_transform).unwrap();
+    let mesh = mesh_data.bake((*engine.vulkan_manager.allocator).clone(), transform, inv_transform).unwrap();
 
     let model = Model {
         material: brdf_material0,

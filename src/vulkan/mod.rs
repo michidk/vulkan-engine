@@ -9,11 +9,11 @@ mod renderpass;
 mod surface;
 mod swapchain;
 
-use std::{collections::BTreeMap, ffi::CString};
+use std::{ffi::CString, rc::Rc};
 
-use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, FenceCreateInfo, SemaphoreCreateInfo}};
+use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk};
 
-use crate::{engine::Info, scene::{self, Scene, camera, material::Material}};
+use crate::{engine::Info, scene::{Scene, camera}};
 
 use self::{
     buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
@@ -29,6 +29,9 @@ pub struct VulkanManager {
     #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
+    pub allocator: std::mem::ManuallyDrop<Rc<vk_mem::Allocator>>,
+    pub device: Rc<ash::Device>,
+
     debug: std::mem::ManuallyDrop<DebugMessenger>,
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
@@ -36,12 +39,10 @@ pub struct VulkanManager {
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
     pub queues: Queues,
-    pub device: ash::Device,
     pub swapchain: SwapchainWrapper,
     pub renderpass: vk::RenderPass,
     pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
-    pub allocator: vk_mem::Allocator,
     pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
     pub light_buffer: BufferWrapper,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
@@ -164,12 +165,12 @@ impl VulkanManager {
             physical_device_properties,
             queue_families,
             queues,
-            device: logical_device,
+            device: Rc::new(logical_device),
             swapchain,
             renderpass,
             pools,
             commandbuffers,
-            allocator,
+            allocator: std::mem::ManuallyDrop::new(Rc::new(allocator)),
             uniform_buffer,
             light_buffer,
             desc_layout_frame_data,
@@ -325,6 +326,16 @@ impl VulkanManager {
             unsafe {
                 self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, obj.material.get_pipeline());
 
+                let vp = vk::Viewport {
+                    x: 0.0,
+                    y: self.swapchain.extent.height as f32,
+                    width: self.swapchain.extent.width as f32,
+                    height: -(self.swapchain.extent.height as f32),
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                };
+                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+
                 let mat_desc_data = obj.material.get_descriptor_data();
                 let mat_desc_set = self.descriptor_manager.get_descriptor_set(obj.material.get_descriptor_set_layout(), mat_desc_data)?;
                 self.device.cmd_bind_descriptor_sets(commandbuffer, vk::PipelineBindPoint::GRAPHICS, obj.material.get_pipeline_layout(), 1, &[mat_desc_set], &[]);
@@ -365,8 +376,6 @@ impl VulkanManager {
         )?;
         self.swapchain
             .create_framebuffers(&self.device, self.renderpass)?;
-        //self.pipeline.cleanup(&self.device);
-        //self.pipeline = PipelineWrapper::init(&self.device, &self.swapchain, &self.renderpass)?;
         Ok(())
     }
 
@@ -437,6 +446,10 @@ impl VulkanManager {
             }
         };
     }
+
+    pub fn wait_idle(&self) {
+        unsafe { self.device.device_wait_idle().expect("device_wait_idle() failed"); }
+    }
 }
 
 impl Drop for VulkanManager {
@@ -466,7 +479,12 @@ impl Drop for VulkanManager {
             self.device.destroy_render_pass(self.renderpass, None);
             // --segfault
             self.swapchain.cleanup(&self.device, &self.allocator);
-            self.allocator.destroy();
+            
+            self.device.destroy_descriptor_set_layout(self.desc_layout_frame_data, None);
+            self.device.destroy_pipeline_layout(self.pipeline_layout_frame_data, None);
+
+            std::mem::ManuallyDrop::drop(&mut self.allocator);
+
             self.device.destroy_device(None);
             // --segfault
             std::mem::ManuallyDrop::drop(&mut self.surface);

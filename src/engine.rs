@@ -53,3 +53,9 @@ impl Engine {
         self.gameloop.init();
     }
 }
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        self.vulkan_manager.wait_idle();
+    }
+}

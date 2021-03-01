@@ -1,5 +1,5 @@
 use std::{marker::PhantomData, rc::Rc};
-use ash::vk;
+use ash::{version::DeviceV1_0, vk};
 
 pub use vulkan_engine_derive::MaterialBindingVertex;
 pub use vulkan_engine_derive::MaterialBindingFragment;
@@ -52,6 +52,8 @@ pub trait MaterialData {
 }
 
 pub struct MaterialPipeline<T: MaterialData> {
+    device: Rc<ash::Device>,
+    allocator: Rc<vk_mem::Allocator>,
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
@@ -59,12 +61,14 @@ pub struct MaterialPipeline<T: MaterialData> {
 }
 
 impl<T: MaterialData> MaterialPipeline<T> {
-    pub fn new(device: &ash::Device, shader: &str, frame_data_layout: vk::DescriptorSetLayout, renderpass: vk::RenderPass, width: u32, height: u32) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
-        let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(device, &T::get_material_layout())?;
-        let pipeline_layout = material_compiler::compile_pipeline_layout(device, &[frame_data_layout, descriptor_set_layout])?;
-        let pipeline = material_compiler::compile_pipeline(device, pipeline_layout, shader, renderpass, width, height)?;
+    pub fn new(device: Rc<ash::Device>, allocator: Rc<vk_mem::Allocator>, shader: &str, frame_data_layout: vk::DescriptorSetLayout, renderpass: vk::RenderPass, width: u32, height: u32) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
+        let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(device.as_ref(), &T::get_material_layout())?;
+        let pipeline_layout = material_compiler::compile_pipeline_layout(device.as_ref(), &[frame_data_layout, descriptor_set_layout])?;
+        let pipeline = material_compiler::compile_pipeline(device.as_ref(), pipeline_layout, shader, renderpass, width, height)?;
 
         Ok(Rc::new(MaterialPipeline {
+            device,
+            allocator,
             pipeline,
             pipeline_layout,
             descriptor_set_layout,
@@ -72,8 +76,8 @@ impl<T: MaterialData> MaterialPipeline<T> {
         }))
     }
 
-    pub fn create_material(self: &Rc<Self>, data: T, allocator: &vk_mem::Allocator) -> Result<Rc<Material<T>>, MaterialError> {
-        let (resources, allocations) = material_compiler::compile_resources(&data, allocator)?;
+    pub fn create_material(self: &Rc<Self>, data: T) -> Result<Rc<Material<T>>, MaterialError> {
+        let (resources, allocations) = material_compiler::compile_resources(&data, self.allocator.as_ref())?;
 
         Ok(Rc::new(Material {
             pipeline: self.clone(),
@@ -83,10 +87,38 @@ impl<T: MaterialData> MaterialPipeline<T> {
     }
 }
 
+impl<T: MaterialData> Drop for MaterialPipeline<T> {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.device.destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+        }
+    }
+}
+
 pub struct Material<T: MaterialData> {
     pipeline: Rc<MaterialPipeline<T>>,
     resources: Vec<DescriptorData>,
     allocations: Vec<vk_mem::Allocation>,
+}
+
+impl<T: MaterialData> Drop for Material<T> {
+    fn drop(&mut self) {
+        unsafe {
+            for r in &self.resources {
+                match r {
+                    DescriptorData::UniformBuffer { buffer, ..} => {
+                        self.pipeline.device.destroy_buffer(*buffer, None);
+                    }
+                    _ => { }
+                }
+            }
+            for a in &self.allocations {
+                self.pipeline.allocator.free_memory(a);
+            }
+        }
+    }
 }
 
 pub trait MaterialInterface {

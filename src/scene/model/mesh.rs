@@ -1,10 +1,10 @@
 use std::{mem::size_of, rc::Rc};
 
-use ash::{Instance, vk};
+use ash::vk;
 use crystal::prelude::*;
 
-#[derive(Debug)]
 pub struct Mesh {
+    allocator: Rc<vk_mem::Allocator>,
     pub vertex_buffer: vk::Buffer,
     pub vertex_buffer_alloc: vk_mem::Allocation,
     pub instance_buffer: vk::Buffer,
@@ -12,6 +12,14 @@ pub struct Mesh {
     pub index_buffer: vk::Buffer,
     pub index_buffer_alloc: vk_mem::Allocation,
     pub submeshes: Vec<(u32, u32)>,
+}
+
+impl Drop for Mesh {
+    fn drop(&mut self) {
+        self.allocator.destroy_buffer(self.vertex_buffer, &self.vertex_buffer_alloc);
+        self.allocator.destroy_buffer(self.instance_buffer, &self.instance_buffer_alloc);
+        self.allocator.destroy_buffer(self.index_buffer, &self.index_buffer_alloc);
+    }
 }
 
 #[repr(C)]
@@ -39,7 +47,7 @@ pub struct MeshData {
 }
 
 impl MeshData {
-    pub fn bake(&self, allocator: &vk_mem::Allocator, transform: Mat4<f32>, inv_transform: Mat4<f32>) -> Result<Rc<Mesh>, vk_mem::Error> {
+    pub fn bake(&self, allocator: Rc<vk_mem::Allocator>, transform: Mat4<f32>, inv_transform: Mat4<f32>) -> Result<Rc<Mesh>, vk_mem::Error> {
         let vertex_buffer_size = self.vertices.len() * size_of::<Vertex>();
         let vertex_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -108,6 +116,7 @@ impl MeshData {
         }
 
         Ok(Rc::new(Mesh {
+            allocator,
             vertex_buffer,
             vertex_buffer_alloc,
             instance_buffer,

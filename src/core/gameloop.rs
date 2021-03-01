@@ -32,7 +32,11 @@ impl GameLoop {
             .aspect(vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32)
             .build();
 
-        camera.update_buffer(&vk.allocator, &mut vk.uniform_buffer, vk.current_frame_index);
+        camera.update_buffer(
+            &vk.allocator,
+            &mut vk.uniform_buffer,
+            vk.current_frame_index,
+        );
 
         scene
             .light_manager
@@ -43,7 +47,7 @@ impl GameLoop {
             .expect("updating the command buffer");
 
         // finanlize renderpass
-        vk.submit(image_index);
+        vk.submit();
         vk.present(image_index);
     }
 }

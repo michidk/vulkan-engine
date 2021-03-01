@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use self::{mesh::Mesh};
+use self::mesh::Mesh;
 
 use super::{material::MaterialInterface, transform::Transform};
 

@@ -16,9 +16,12 @@ pub struct Mesh {
 
 impl Drop for Mesh {
     fn drop(&mut self) {
-        self.allocator.destroy_buffer(self.vertex_buffer, &self.vertex_buffer_alloc);
-        self.allocator.destroy_buffer(self.instance_buffer, &self.instance_buffer_alloc);
-        self.allocator.destroy_buffer(self.index_buffer, &self.index_buffer_alloc);
+        self.allocator
+            .destroy_buffer(self.vertex_buffer, &self.vertex_buffer_alloc);
+        self.allocator
+            .destroy_buffer(self.instance_buffer, &self.instance_buffer_alloc);
+        self.allocator
+            .destroy_buffer(self.index_buffer, &self.index_buffer_alloc);
     }
 }
 
@@ -47,7 +50,12 @@ pub struct MeshData {
 }
 
 impl MeshData {
-    pub fn bake(&self, allocator: Rc<vk_mem::Allocator>, transform: Mat4<f32>, inv_transform: Mat4<f32>) -> Result<Rc<Mesh>, vk_mem::Error> {
+    pub fn bake(
+        &self,
+        allocator: Rc<vk_mem::Allocator>,
+        transform: Mat4<f32>,
+        inv_transform: Mat4<f32>,
+    ) -> Result<Rc<Mesh>, vk_mem::Error> {
         let vertex_buffer_size = self.vertices.len() * size_of::<Vertex>();
         let vertex_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -58,7 +66,8 @@ impl MeshData {
             usage: vk_mem::MemoryUsage::CpuToGpu,
             ..Default::default()
         };
-        let (vertex_buffer, vertex_buffer_alloc, _) = allocator.create_buffer(&vertex_buffer_info, &vertex_buffer_alloc_info)?;
+        let (vertex_buffer, vertex_buffer_alloc, _) =
+            allocator.create_buffer(&vertex_buffer_info, &vertex_buffer_alloc_info)?;
 
         let instance_buffer_size = size_of::<Mat4<f32>>() * 2;
         let instance_buffer_info = vk::BufferCreateInfo::builder()
@@ -70,7 +79,8 @@ impl MeshData {
             usage: vk_mem::MemoryUsage::CpuToGpu,
             ..Default::default()
         };
-        let (instance_buffer, instance_buffer_alloc, _) = allocator.create_buffer(&instance_buffer_info, &instance_buffer_alloc_info)?;
+        let (instance_buffer, instance_buffer_alloc, _) =
+            allocator.create_buffer(&instance_buffer_info, &instance_buffer_alloc_info)?;
 
         let mut index_buffer_size = 0u64;
         for sm in &self.submeshes {
@@ -85,7 +95,8 @@ impl MeshData {
             usage: vk_mem::MemoryUsage::CpuToGpu,
             ..Default::default()
         };
-        let (index_buffer, index_buffer_alloc, _) = allocator.create_buffer(&index_buffer_info, &index_buffer_alloc_info)?;
+        let (index_buffer, index_buffer_alloc, _) =
+            allocator.create_buffer(&index_buffer_info, &index_buffer_alloc_info)?;
 
         let map = allocator.map_memory(&vertex_buffer_alloc)? as *mut Vertex;
         unsafe {
@@ -103,7 +114,10 @@ impl MeshData {
         let map = allocator.map_memory(&index_buffer_alloc)? as *mut Face;
         let mut offset = 0usize;
         for sm in &self.submeshes {
-            unsafe { map.add(offset).copy_from_nonoverlapping(sm.faces.as_ptr(), sm.faces.len()) };
+            unsafe {
+                map.add(offset)
+                    .copy_from_nonoverlapping(sm.faces.as_ptr(), sm.faces.len())
+            };
             offset += sm.faces.len();
         }
         allocator.unmap_memory(&index_buffer_alloc);

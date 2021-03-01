@@ -2,7 +2,7 @@
 
 use proc_macro::{Diagnostic, TokenStream};
 use quote::quote_spanned;
-use syn::{DeriveInput, spanned::Spanned};
+use syn::{spanned::Spanned, DeriveInput};
 
 #[proc_macro_derive(MaterialBindingFragment)]
 pub fn derive_material_binding_fragment(target: TokenStream) -> TokenStream {
@@ -28,7 +28,12 @@ pub fn derive_material_binding_fragment(target: TokenStream) -> TokenStream {
         };
         gen.into()
     } else {
-        Diagnostic::spanned(ast.span().unwrap(), proc_macro::Level::Error, "#[derive(MaterialBindingFragment)] can only be used on structs").emit();
+        Diagnostic::spanned(
+            ast.span().unwrap(),
+            proc_macro::Level::Error,
+            "#[derive(MaterialBindingFragment)] can only be used on structs",
+        )
+        .emit();
         TokenStream::new()
     }
 }
@@ -41,21 +46,28 @@ pub fn derive_material_binding_vertex(target: TokenStream) -> TokenStream {
         let name = &ast.ident;
 
         let gen = quote_spanned! {ast.span()=>
-            fn get_material_binding() -> ::vulkan_engine::scene::material::MaterialDataBinding {
-                ::vulkan_engine::scene::material::MaterialDataBinding {
-                    binding_type: ::vulkan_engine::scene::material::MaterialDataBindingType::Uniform,
-                    binding_stage: ::vulkan_engine::scene::material::MaterialDataBindingStage::Vertex,
+            impl ::vulkan_engine::scene::material::MaterialBinding for #name {
+                fn get_material_binding() -> ::vulkan_engine::scene::material::MaterialDataBinding {
+                    ::vulkan_engine::scene::material::MaterialDataBinding {
+                        binding_type: ::vulkan_engine::scene::material::MaterialDataBindingType::Uniform,
+                        binding_stage: ::vulkan_engine::scene::material::MaterialDataBindingStage::Vertex,
+                    }
                 }
-            }
-            fn get_material_resource_helper(&self) -> ::vulkan_engine::scene::material::MaterialResourceHelper {
-                ::vulkan_engine::scene::material::MaterialResourceHelper::UniformBuffer(
-                    unsafe { ::std::slice::from_raw_parts(self as *const #name as *const u8, size_of::<Self>()) }
-                )
+                fn get_material_resource_helper(&self) -> ::vulkan_engine::scene::material::MaterialResourceHelper {
+                    ::vulkan_engine::scene::material::MaterialResourceHelper::UniformBuffer(
+                        unsafe { ::std::slice::from_raw_parts(self as *const #name as *const u8, size_of::<Self>()) }
+                    )
+                }
             }
         };
         gen.into()
     } else {
-        Diagnostic::spanned(ast.span().unwrap(), proc_macro::Level::Error, "#[derive(MaterialBindingVertex)] can only be used on structs").emit();
+        Diagnostic::spanned(
+            ast.span().unwrap(),
+            proc_macro::Level::Error,
+            "#[derive(MaterialBindingFragment)] can only be used on structs",
+        )
+        .emit();
         TokenStream::new()
     }
 }
@@ -86,7 +98,7 @@ pub fn derive_material_data(target: TokenStream) -> TokenStream {
         }
 
         let gen = quote_spanned! {ast.span()=>
-            impl ::vulkan_engine::scene::material::MaterialData for BrdfMaterialData {
+            impl ::vulkan_engine::scene::material::MaterialData for #name {
                 fn get_material_layout() -> ::vulkan_engine::scene::material::MaterialDataLayout {
                     ::vulkan_engine::scene::material::MaterialDataLayout {
                         bindings: vec! [
@@ -103,7 +115,12 @@ pub fn derive_material_data(target: TokenStream) -> TokenStream {
         };
         gen.into()
     } else {
-        Diagnostic::spanned(ast.span().unwrap(), proc_macro::Level::Error, "#[derive(MaterialData)] can only be used on structs").emit();
+        Diagnostic::spanned(
+            ast.span().unwrap(),
+            proc_macro::Level::Error,
+            "#[derive(MaterialData)] can only be used on structs",
+        )
+        .emit();
         TokenStream::new()
     }
 }

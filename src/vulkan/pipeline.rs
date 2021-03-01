@@ -459,6 +459,7 @@ impl PipelineWrapper {
         })
     }
 
+    #[allow(dead_code)]
     pub fn cleanup(&self, logical_device: &ash::Device) {
         unsafe {
             for dsl in &self.descriptor_set_layouts {

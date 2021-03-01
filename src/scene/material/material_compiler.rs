@@ -3,18 +3,27 @@ use ash::{version::DeviceV1_0, vk};
 use super::{MaterialData, MaterialDataLayout};
 use crate::{assets::shader, vulkan::descriptor_manager::DescriptorData};
 
-pub fn compile_descriptor_set_layout(device: &ash::Device, layout: &MaterialDataLayout) -> Result<vk::DescriptorSetLayout, vk::Result> {
+pub fn compile_descriptor_set_layout(
+    device: &ash::Device,
+    layout: &MaterialDataLayout,
+) -> Result<vk::DescriptorSetLayout, vk::Result> {
     let mut bindings = Vec::with_capacity(layout.bindings.len());
     for (i, b) in layout.bindings.iter().enumerate() {
         let stage;
         match &b.binding_stage {
-            super::MaterialDataBindingStage::Vertex => { stage = vk::ShaderStageFlags::VERTEX; }
-            super::MaterialDataBindingStage::Fragment => { stage = vk::ShaderStageFlags::FRAGMENT; }
+            super::MaterialDataBindingStage::Vertex => {
+                stage = vk::ShaderStageFlags::VERTEX;
+            }
+            super::MaterialDataBindingStage::Fragment => {
+                stage = vk::ShaderStageFlags::FRAGMENT;
+            }
         }
 
         let vk_type;
         match &b.binding_type {
-            super::MaterialDataBindingType::Uniform => { vk_type = vk::DescriptorType::UNIFORM_BUFFER; }
+            super::MaterialDataBindingType::Uniform => {
+                vk_type = vk::DescriptorType::UNIFORM_BUFFER;
+            }
         }
 
         bindings.push(
@@ -23,7 +32,7 @@ pub fn compile_descriptor_set_layout(device: &ash::Device, layout: &MaterialData
                 .descriptor_count(1)
                 .descriptor_type(vk_type)
                 .stage_flags(stage)
-                .build()
+                .build(),
         );
     }
 
@@ -35,21 +44,34 @@ pub fn compile_descriptor_set_layout(device: &ash::Device, layout: &MaterialData
     Ok(set_layout)
 }
 
-pub fn compile_pipeline_layout(device: &ash::Device, layouts: &[vk::DescriptorSetLayout]) -> Result<vk::PipelineLayout, vk::Result> {
+pub fn compile_pipeline_layout(
+    device: &ash::Device,
+    layouts: &[vk::DescriptorSetLayout],
+) -> Result<vk::PipelineLayout, vk::Result> {
     let layout_info = vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(layouts)
         .build();
     unsafe { device.create_pipeline_layout(&layout_info, None) }
 }
 
-pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader: &str, renderpass: vk::RenderPass, width: u32, height: u32) -> Result<vk::Pipeline, vk::Result> {
+pub fn compile_pipeline(
+    device: &ash::Device,
+    layout: vk::PipelineLayout,
+    shader: &str,
+    renderpass: vk::RenderPass,
+    width: u32,
+    height: u32,
+) -> Result<vk::Pipeline, vk::Result> {
     let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
     let vertexshader_createinfo =
-        shader::load("brdf", shader::ShaderKind::Vertex, &mut vertexshader_code);
+        shader::load(shader, shader::ShaderKind::Vertex, &mut vertexshader_code);
     let vertexshader_module =
         unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
-    let fragmentshader_createinfo =
-        shader::load("brdf", shader::ShaderKind::Fragment, &mut fragmentshader_code);
+    let fragmentshader_createinfo = shader::load(
+        shader,
+        shader::ShaderKind::Fragment,
+        &mut fragmentshader_code,
+    );
     let fragmentshader_module =
         unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
     drop(vertexshader_code);
@@ -144,7 +166,7 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
             location: 11,
             offset: 112,
             format: vk::Format::R32G32B32A32_SFLOAT,
-        }
+        },
     ];
     let vertex_binding_descs = [
         vk::VertexInputBindingDescription {
@@ -174,7 +196,10 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
     }];
     let scissors = [vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
-        extent: vk::Extent2D { width: i32::MAX as u32, height: i32::MAX as u32 },
+        extent: vk::Extent2D {
+            width: i32::MAX as u32,
+            height: i32::MAX as u32,
+        },
     }];
 
     let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
@@ -224,11 +249,7 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
         .subpass(0);
     let graphicspipeline = unsafe {
         device
-            .create_graphics_pipelines(
-                vk::PipelineCache::null(),
-                &[pipeline_info.build()],
-                None,
-            )
+            .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
             .expect("A problem with the pipeline creation")
     }[0];
     unsafe {
@@ -238,12 +259,15 @@ pub fn compile_pipeline(device: &ash::Device, layout: vk::PipelineLayout, shader
     Ok(graphicspipeline)
 }
 
-pub fn compile_resources<T: MaterialData>(resources: &T, allocator: &vk_mem::Allocator) -> Result<(Vec<DescriptorData>, Vec<vk_mem::Allocation>), vk_mem::Error> {
+pub fn compile_resources<T: MaterialData>(
+    resources: &T,
+    allocator: &vk_mem::Allocator,
+) -> Result<(Vec<DescriptorData>, Vec<vk_mem::Allocation>), vk_mem::Error> {
     let helpers = resources.get_material_resource_helpers();
 
     let mut resources = Vec::with_capacity(helpers.len());
     let mut allocations = Vec::with_capacity(helpers.len());
-    
+
     for res in helpers {
         match res {
             super::MaterialResourceHelper::UniformBuffer(data) => {
@@ -259,12 +283,14 @@ pub fn compile_resources<T: MaterialData>(resources: &T, allocator: &vk_mem::All
                 let (buffer, alloc, _) = allocator.create_buffer(&buffer_info, &alloc_info)?;
 
                 let map = allocator.map_memory(&alloc)?;
-                unsafe { map.copy_from_nonoverlapping(data.as_ptr(), data.len()); }
+                unsafe {
+                    map.copy_from_nonoverlapping(data.as_ptr(), data.len());
+                }
                 allocator.unmap_memory(&alloc);
 
                 allocations.push(alloc);
                 resources.push(DescriptorData::UniformBuffer {
-                    buffer: buffer,
+                    buffer,
                     offset: 0,
                     size: data.len() as u64,
                 });

@@ -1,11 +1,11 @@
 pub mod camera;
 pub mod light;
+pub mod material;
 pub mod model;
 pub mod transform;
-pub mod material;
 
+use self::light::LightManager;
 use self::model::Model;
-use self::{light::LightManager};
 
 pub struct Scene {
     pub light_manager: LightManager,

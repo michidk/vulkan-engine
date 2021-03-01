@@ -1,8 +1,8 @@
-use std::{marker::PhantomData, rc::Rc};
 use ash::{version::DeviceV1_0, vk};
+use std::{marker::PhantomData, rc::Rc};
 
-pub use vulkan_engine_derive::MaterialBindingVertex;
 pub use vulkan_engine_derive::MaterialBindingFragment;
+pub use vulkan_engine_derive::MaterialBindingVertex;
 pub use vulkan_engine_derive::MaterialData;
 
 use crate::vulkan::descriptor_manager::DescriptorData;
@@ -21,7 +21,7 @@ pub enum MaterialError {
 
 pub enum MaterialDataBindingStage {
     Vertex,
-    Fragment
+    Fragment,
 }
 
 pub enum MaterialDataBindingType {
@@ -37,7 +37,7 @@ pub enum MaterialResourceHelper<'a> {
     UniformBuffer(&'a [u8]),
 }
 
-pub struct MaterialDataLayout{
+pub struct MaterialDataLayout {
     pub bindings: Vec<MaterialDataBinding>,
 }
 
@@ -61,10 +61,31 @@ pub struct MaterialPipeline<T: MaterialData> {
 }
 
 impl<T: MaterialData> MaterialPipeline<T> {
-    pub fn new(device: Rc<ash::Device>, allocator: Rc<vk_mem::Allocator>, shader: &str, frame_data_layout: vk::DescriptorSetLayout, renderpass: vk::RenderPass, width: u32, height: u32) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
-        let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(device.as_ref(), &T::get_material_layout())?;
-        let pipeline_layout = material_compiler::compile_pipeline_layout(device.as_ref(), &[frame_data_layout, descriptor_set_layout])?;
-        let pipeline = material_compiler::compile_pipeline(device.as_ref(), pipeline_layout, shader, renderpass, width, height)?;
+    pub fn new(
+        device: Rc<ash::Device>,
+        allocator: Rc<vk_mem::Allocator>,
+        shader: &str,
+        frame_data_layout: vk::DescriptorSetLayout,
+        renderpass: vk::RenderPass,
+        width: u32,
+        height: u32,
+    ) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
+        let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(
+            device.as_ref(),
+            &T::get_material_layout(),
+        )?;
+        let pipeline_layout = material_compiler::compile_pipeline_layout(
+            device.as_ref(),
+            &[frame_data_layout, descriptor_set_layout],
+        )?;
+        let pipeline = material_compiler::compile_pipeline(
+            device.as_ref(),
+            pipeline_layout,
+            shader,
+            renderpass,
+            width,
+            height,
+        )?;
 
         Ok(Rc::new(MaterialPipeline {
             device,
@@ -72,12 +93,13 @@ impl<T: MaterialData> MaterialPipeline<T> {
             pipeline,
             pipeline_layout,
             descriptor_set_layout,
-            phantom: PhantomData
+            phantom: PhantomData,
         }))
     }
 
     pub fn create_material(self: &Rc<Self>, data: T) -> Result<Rc<Material<T>>, MaterialError> {
-        let (resources, allocations) = material_compiler::compile_resources(&data, self.allocator.as_ref())?;
+        let (resources, allocations) =
+            material_compiler::compile_resources(&data, self.allocator.as_ref())?;
 
         Ok(Rc::new(Material {
             pipeline: self.clone(),
@@ -91,8 +113,10 @@ impl<T: MaterialData> Drop for MaterialPipeline<T> {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
-            self.device.destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+            self.device
+                .destroy_pipeline_layout(self.pipeline_layout, None);
+            self.device
+                .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
         }
     }
 }
@@ -107,11 +131,8 @@ impl<T: MaterialData> Drop for Material<T> {
     fn drop(&mut self) {
         unsafe {
             for r in &self.resources {
-                match r {
-                    DescriptorData::UniformBuffer { buffer, ..} => {
-                        self.pipeline.device.destroy_buffer(*buffer, None);
-                    }
-                    _ => { }
+                if let DescriptorData::UniformBuffer { buffer, .. } = r {
+                    self.pipeline.device.destroy_buffer(*buffer, None);
                 }
             }
             for a in &self.allocations {

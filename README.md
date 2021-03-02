@@ -17,7 +17,7 @@ Currently implemented features are:
 
 ## Screenshots
 
-BRDF testing: ![brdf testing](./.github/images/brdf.png)
+BRDF testing: ![brdf testing](./.github/images/examples/brdf.png)
 
 ## Building
 

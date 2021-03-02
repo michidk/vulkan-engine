@@ -18,16 +18,8 @@ use vulkan_engine::{
     },
 };
 
-#[repr(C)]
-#[derive(MaterialBindingFragment)]
-struct VertexColorData {
-    color: Vec4<f32>,
-}
-
 #[derive(MaterialData)]
-struct VertexMaterialData {
-    color_data: VertexColorData,
-}
+struct VertexMaterialData {}
 
 fn main() {
     // setting up logger
@@ -74,32 +66,26 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.swapchain.extent.height,
     )
     .unwrap();
-    let material0 = pipeline
-        .create_material(VertexMaterialData {
-            color_data: VertexColorData {
-                color: Vec4::new(0.5, 0.5, 0.5, 1.0),
-            },
-        })
-        .unwrap();
+    let material0 = pipeline.create_material(VertexMaterialData {}).unwrap();
 
     // create triangle
     let mesh_data = MeshData {
         vertices: vec![
             Vertex {
                 position: Vec3::new(-1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
+                color: Vec3::new(1.0, 0.0, 0.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
                 uv: Vec2::new(0.0, 0.0),
             },
             Vertex {
                 position: Vec3::new(1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
+                color: Vec3::new(0.0, 1.0, 0.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
                 uv: Vec2::new(0.0, 0.0),
             },
             Vertex {
                 position: Vec3::new(0.0, 1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
+                color: Vec3::new(0.0, 0.0, 1.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
                 uv: Vec2::new(0.0, 0.0),
             },
@@ -128,12 +114,6 @@ fn setup(engine: &mut Engine) {
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     });
-
-    // let lights = &mut scene.light_manager;
-    // lights.add_light(DirectionalLight {
-    //     direction: Vec3::new(0., -1., 0.),
-    //     illuminance: Vec3::new(10.1, 10.1, 10.1),
-    // });
 
     // setup camera
     Camera::builder()

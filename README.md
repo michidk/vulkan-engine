@@ -17,8 +17,16 @@ Currently implemented features are:
 
 ## Screenshots
 
-BRDF testing: ![brdf testing](./.github/images/examples/brdf.png)
+BRDF testing:
+![brdf testing](./.github/images/examples/brdf.png)
 
+## Examples
+
+Examples are in the `/examples` folder. They can be run with `cargo +nightly run --example <name>`.
+| Name | Description |
+| ---- | ----------- |
+| minimal | Displays a triangle using vertex colors |
+| brdf | Renders using physically-based rendering |
 ## Building
 
 ### Prerequisites
@@ -32,7 +40,7 @@ BRDF testing: ![brdf testing](./.github/images/examples/brdf.png)
 
 You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`.
 
-Compile the shaders with `make shaders`. Then build with `make build` or run with `make run`.
+Compile the shaders with `make shaders`. Then build with `make build` or run an exmaple with `make run`.
 
 ## Resources
 

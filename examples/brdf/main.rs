@@ -1,4 +1,4 @@
-use std::{mem::size_of, process::exit};
+use std::process::exit;
 
 /// Renders a brdf example
 use crystal::prelude::{Mat4, Quaternion, Vec2, Vec3, Vec4};

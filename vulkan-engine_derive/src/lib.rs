@@ -21,7 +21,7 @@ pub fn derive_material_binding_fragment(target: TokenStream) -> TokenStream {
                 }
                 fn get_material_resource_helper(&self) -> ::vulkan_engine::scene::material::MaterialResourceHelper {
                     ::vulkan_engine::scene::material::MaterialResourceHelper::UniformBuffer(
-                        unsafe { ::std::slice::from_raw_parts(self as *const #name as *const u8, size_of::<Self>()) }
+                        unsafe { ::std::slice::from_raw_parts(self as *const #name as *const u8, ::std::mem::size_of::<Self>()) }
                     )
                 }
             }

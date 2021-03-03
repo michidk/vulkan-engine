@@ -43,9 +43,9 @@ fn main() {
                 width: 1920,
                 height: 1080,
             },
-            title: "Vulkan BRDF Example",
+            title: "Vulkan Mesh Example",
         },
-        app_name: "Vulkan BRDF Example",
+        app_name: "Vulkan Mesh Example",
     };
 
     // setup engine
@@ -87,32 +87,16 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = MeshData {
-        vertices: vec![
-            Vertex {
-                position: Vec3::new(-1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(0.0, 1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-        ],
-        submeshes: vec![Submesh {
-            faces: vec![Face { indices: [0, 1, 2] }],
-        }],
-    };
+    let mesh_data = vulkan_engine::assets::obj::parse("./assets/hide/airboat.obj")
+        .unwrap()
+        .build_mesh()
+        .unwrap();
 
+    // let transform = &Mat4::translate(Vec3::new(0.0, 0.0, 5.0))
+    //     * &Mat4::from_axis_angle(
+    //         &Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
+    //         Angle::from_deg(180.0),
+    //     );
     let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
     let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
     let mesh = mesh_data
@@ -128,7 +112,10 @@ fn setup(engine: &mut Engine) {
         mesh: mesh,
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+            rotation: Quaternion::from_axis_angle(
+                Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
+                Angle::from_deg(180.0),
+            ),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     };
@@ -138,11 +125,11 @@ fn setup(engine: &mut Engine) {
     // setup scene
     let lights = &mut scene.light_manager;
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., 1., 0.),
+        direction: Vec3::new(-1., 1., -1.),
         illuminance: Vec3::new(10.1, 10.1, 10.1),
     });
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., -1., 0.),
+        direction: Vec3::new(0., 1., 0.),
         illuminance: Vec3::new(1.6, 1.6, 1.6),
     });
     lights.add_light(PointLight {

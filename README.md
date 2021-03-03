@@ -2,7 +2,7 @@
 
 ![Continuous integration](https://github.com/michidk/vulkan-renderer/workflows/Continuous%20Integration/badge.svg)
 
-This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309) and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
+This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309), and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
 
 ## Goal
 
@@ -11,9 +11,11 @@ The goal is to build a somewhat useable game engine and a demo using it. While w
 ## Features
 
 Currently implemented features are:
-- Own math library
-- Custom shader format ([ve-shader](https://github.com/michidk/ve-shader))
 - BRDF rendering
+- `.obj` parser
+- Runs on both Linux and Windows
+- Own math library (named `Crystal`)
+- Custom shader format ([ve-shader](https://github.com/michidk/ve-shader))
 
 ## Screenshots
 
@@ -27,6 +29,8 @@ Examples are in the `/examples` folder. They can be run with `cargo +nightly run
 | ---- | ----------- |
 | minimal | Displays a triangle using vertex colors |
 | brdf | Renders using physically-based rendering |
+| mesh | Loads and renders a custom mesh |
+
 ## Building
 
 ### Prerequisites

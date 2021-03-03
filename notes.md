@@ -2,14 +2,14 @@
 
 ## TODO's
 
-- implement smart buffers @Rob
 - fix all unwraps and implement proper error handling
-- check //TO DO:
 - rework textures
 - check access modifier (especially package ones)
 - put example resources into example itself, and build a seperate output folder for each example
-- get resizing working again
 - introduce fps counter
+- create methods to load default shaders and meshes
+- BRDF example: displays spheres again
+- calculate normals, for models, having none
 
 ## FPS (release build; fullscreen)
 

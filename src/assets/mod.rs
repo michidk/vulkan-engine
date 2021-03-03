@@ -1,2 +1,2 @@
-//pub mod mesh;
+pub mod obj;
 pub mod shader;

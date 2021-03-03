@@ -1,7 +1,7 @@
 /// A minimal example that just initializes the engine but does not display anything
 use std::process::exit;
 
-use crystal::prelude::{Mat4, Quaternion, Vec2, Vec3, Vec4};
+use crystal::prelude::*;
 use log::error;
 use vulkan_engine::{
     core::window::{self, Dimensions},

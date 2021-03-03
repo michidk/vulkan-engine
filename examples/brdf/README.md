@@ -1,5 +1,5 @@
-# BRDF Example
+# Mesh Example
 
-This example renders a few spheres with different material properties using physically-based rendering.
+This example renders a custom mesh loaded from a `.obj` file.
 
-![triangle](/.github/images/examples/brdf.png)
+![triangle](/.github/images/examples/mesh.png)

@@ -87,7 +87,7 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = vulkan_engine::assets::obj::parse("./assets/hide/airboat.obj")
+    let mesh_data = vulkan_engine::assets::obj::parse("./assets/models/polygon.obj")
         .unwrap()
         .build_mesh()
         .unwrap();

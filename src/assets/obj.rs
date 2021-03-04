@@ -1,5 +1,4 @@
 /// Parses `.obj` files
-
 use std::fs;
 use std::io::{self, BufRead};
 use std::{num, path::Path};
@@ -47,7 +46,6 @@ pub struct ObjMeshBuilder {
     curr_submesh: ObjSubmesh,
 }
 
-
 impl ObjMeshBuilder {
     fn set_group(&mut self, name: &str) {
         if self.curr_submesh.faces.is_empty() {
@@ -91,6 +89,7 @@ impl ObjMeshBuilder {
         let (uvs, normals) = (mesh.uvs, mesh.normals);
         mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
 
+        // dont do, only create for refereced verticies
         let mut vertices: Vec<mesh::Vertex> = Vec::new();
         for vertex in mesh.vertices {
             vertices.push(mesh::Vertex {
@@ -100,6 +99,8 @@ impl ObjMeshBuilder {
                 uv: Vec2::new(0.0, 0.0),
             })
         }
+
+        // hashmap: vertex als key, index of verticies vector as value
 
         let mut submeshes: Vec<mesh::Submesh> = Vec::new();
         for submesh in mesh.submeshes {
@@ -111,21 +112,29 @@ impl ObjMeshBuilder {
                     let vertex = &mut vertices[face.face_i[i].vert_i - 1];
 
                     // get uv values from current face index or default as vec
-                    let uv = face.face_i[i].uv_i.map(|x| uvs[x - 1]).unwrap_or_else(|| [0.0, 0.0]).into();
+                    let uv = face.face_i[i].uv_i.map(|x| uvs[x - 1]);
 
                     // get normal values from current face index or default as vec
-                    let normal = face.face_i[i].uv_i.map(|x| normals[x - 1]).unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
+                    let normal = face.face_i[i].normal_i.map(|x| normals[x - 1]);
 
                     // create new vertex if not same (and assign face index to it)
+                    // TODO: problem with comparing
+
+                    // if vertex.normal != normal {
+                    //     println!("")
+                    // }
+
+                    // flaw: only works once
                     if vertex.uv != uv || vertex.normal != normal {
+                        println!("{:?} - {:?}", vertex.normal, normal);
                         let mut new_vertex = vertex.clone();
                         new_vertex.uv = uv;
                         new_vertex.normal = normal;
                         vertices.push(new_vertex);
                         face.face_i[i].vert_i = vertices.len();
                     } else {
-                        vertex.uv = uv;
-                        vertex.normal = normal;
+                        vertex.uv = uv.unwrap_or_else(|| [0.0, 0.0]).into();
+                        vertex.normal = normal.unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
                     }
                 }
 
@@ -193,7 +202,7 @@ pub fn parse(filepath: &str) -> Result<ObjMeshBuilder, ParserError> {
 fn parse_token(token: &str, value: &str, builder: &mut ObjMeshBuilder) -> Result<(), ParserError> {
     match token {
         // comment
-        "#" => log::info!("Comment: {:?}", value.get(2..).unwrap_or("")),
+        "#" => log::info!("Comment: {:?}", value),
         // material
         "mtllib" => log::warn!(".mtl materials are not implemented yet"),
         // name
@@ -310,8 +319,8 @@ mod test {
     use std::num::ParseIntError;
 
     use super::{
-        parse_face, parse_token, parse_triplet, parse_vertex, ObjFace, ObjFaceIndex, ObjMeshBuilder,
-        ParserError, ObjVertex,
+        parse_face, parse_token, parse_triplet, parse_vertex, ObjFace, ObjFaceIndex,
+        ObjMeshBuilder, ObjVertex, ParserError,
     };
 
     #[test]

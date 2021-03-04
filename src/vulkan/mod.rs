@@ -9,7 +9,7 @@ mod renderpass;
 mod surface;
 mod swapchain;
 
-use std::{ffi::CString, rc::Rc};
+use std::{ffi::CString, mem::size_of, rc::Rc, slice};
 
 use ash::{
     extensions::ext,
@@ -17,10 +17,7 @@ use ash::{
     vk,
 };
 
-use crate::{
-    engine::Info,
-    scene::{camera, Scene},
-};
+use crate::{engine::Info, scene::{Scene, camera, transform::TransformData}};
 
 use self::{
     buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
@@ -355,14 +352,23 @@ impl VulkanManager {
                 self.device.cmd_bind_vertex_buffers(
                     commandbuffer,
                     0,
-                    &[obj.mesh.vertex_buffer, obj.mesh.instance_buffer],
-                    &[0, 0],
+                    &[obj.mesh.vertex_buffer],
+                    &[0],
                 );
                 self.device.cmd_bind_index_buffer(
                     commandbuffer,
                     obj.mesh.index_buffer,
                     0,
                     vk::IndexType::UINT32,
+                );
+
+                let transform_data = obj.transform.get_transform_data();
+                self.device.cmd_push_constants(
+                    commandbuffer, 
+                    obj.material.get_pipeline_layout(),
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    slice::from_raw_parts(&transform_data as *const TransformData as *const u8, size_of::<TransformData>())
                 );
 
                 for sm in &obj.mesh.submeshes {

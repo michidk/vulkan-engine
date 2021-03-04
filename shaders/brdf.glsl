@@ -7,8 +7,6 @@ layout (location = 0) in vec3 i_position;
 //layout (location = 1) in vec3 i_color;
 layout (location = 2) in vec3 i_normal;
 //layout (location = 3) in vec2 i_uv;
-layout (location = 4) in mat4 i_modelMatrix;
-layout (location = 8) in mat4 i_inverseModelMatrix;
 
 layout (set = 0, binding = 0) uniform FrameData {
     mat4 view_matrix;
@@ -16,14 +14,19 @@ layout (set = 0, binding = 0) uniform FrameData {
     vec3 cam_pos;
 } u_FrameData;
 
+layout (push_constant) uniform TransformData {
+    mat4 modelMatrix;
+    mat4 invModelMatrix;
+} u_TransformData;
+
 layout (location = 1) out vec3 o_normal;
 layout (location = 2) out vec4 o_worldPos;
 layout (location = 3) out vec3 o_cameraCoordinates;
 
 void main() {
-    o_worldPos = i_modelMatrix * vec4(i_position, 1.0);
+    o_worldPos = u_TransformData.modelMatrix * vec4(i_position, 1.0);
     gl_Position = u_FrameData.projection_matrix * u_FrameData.view_matrix * o_worldPos;
-    o_normal = mat3(transpose(i_inverseModelMatrix)) * i_normal;
+    o_normal = mat3(transpose(u_TransformData.invModelMatrix)) * i_normal;
     o_cameraCoordinates = u_FrameData.cam_pos;
 }
 

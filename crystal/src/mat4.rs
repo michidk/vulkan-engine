@@ -1,8 +1,4 @@
-use crate::{
-    angle::{Angle, AngleConst},
-    scalar::{Cos, Sin},
-    unit::Unit,
-};
+use crate::{angle::{Angle, AngleConst}, prelude::Quaternion, scalar::{Cos, Sin}, unit::Unit};
 
 use std::ops::{Add, Div, Mul, MulAssign, Neg, Rem, Sub};
 
@@ -32,13 +28,25 @@ impl<T> Mat4<T> {
         ])
     }
 
-    pub fn scale(factor: T) -> Self
+    pub fn scale_uniform(factor: T) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,
     {
         let mut matrix = &Self::identity() * factor;
         unsafe { *matrix.get_unchecked_mut((3, 3)) = T::one() };
         matrix
+    }
+
+    pub fn scale(scale: Vec3<T>) -> Self
+    where
+        T: Copy + Clone + Zero + One + Mul<T, Output = T>
+    {
+        Self::new(
+            *scale.x(), T::zero(), T::zero(), T::zero(),
+            T::zero(), *scale.y(), T::zero(), T::zero(),
+            T::zero(), T::zero(), *scale.z(), T::zero(),
+            T::zero(), T::zero(), T::zero(), T::one()
+        )
     }
 
     pub fn translate(direction: Vec3<T>) -> Self
@@ -283,6 +291,48 @@ impl Mat4<f32> {
             [-sin, cos, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
+        ])
+    }
+}
+
+impl From<Quaternion<f32>> for Mat4<f32> {
+    fn from(q: Quaternion<f32>) -> Self {
+        let xy = q.x() * q.y();
+        let xz = q.x() * q.z();
+        let xw = q.x() * q.w();
+        let yz = q.y() * q.z();
+        let yw = q.y() * q.w();
+        let zw = q.z() * q.w();
+        let x2 = q.x() * q.x();
+        let y2 = q.y() * q.y();
+        let z2 = q.z() * q.z();
+        let w2 = q.w() * q.w();
+
+        Self::from_data([
+            [
+                2.0 * (x2 + w2) - 1.0,
+                2.0 * (xy + zw),
+                2.0 * (xz - yw),
+                0.0
+            ],
+            [
+                2.0 * (xy - zw),
+                2.0 * (y2 + w2) - 1.0,
+                2.0 * (xw + yz),
+                0.0
+            ],
+            [
+                2.0 * (xz + yw),
+                2.0 * (yz - xw),
+                2.0 * (z2 + w2) - 1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ]
         ])
     }
 }

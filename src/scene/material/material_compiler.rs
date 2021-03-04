@@ -48,8 +48,17 @@ pub fn compile_pipeline_layout(
     device: &ash::Device,
     layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout, vk::Result> {
+    // all devices must at least support 128 bytes of push constants, so this is safe
+    let push_constants = [
+        vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .offset(0)
+            .size(128)
+            .build()
+    ];
     let layout_info = vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(layouts)
+        .push_constant_ranges(&push_constants)
         .build();
     unsafe { device.create_pipeline_layout(&layout_info, None) }
 }
@@ -116,69 +125,14 @@ pub fn compile_pipeline(
             location: 3,
             offset: 36,
             format: vk::Format::R32G32_SFLOAT,
-        },
-        // model matrix
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 4,
-            offset: 0,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 5,
-            offset: 16,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 6,
-            offset: 32,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 7,
-            offset: 48,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        // inverse model matrix
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 8,
-            offset: 64,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 9,
-            offset: 80,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 10,
-            offset: 96,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 1,
-            location: 11,
-            offset: 112,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-        },
+        }
     ];
     let vertex_binding_descs = [
         vk::VertexInputBindingDescription {
             binding: 0,
             stride: 44,
             input_rate: vk::VertexInputRate::VERTEX,
-        },
-        vk::VertexInputBindingDescription {
-            binding: 1,
-            stride: 128,
-            input_rate: vk::VertexInputRate::INSTANCE,
-        },
+        }
     ];
     let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
         .vertex_attribute_descriptions(&vertex_attrib_descs)

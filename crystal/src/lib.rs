@@ -13,7 +13,8 @@ mod quaternion;
 mod scalar;
 mod unit;
 mod vector;
-#[cfg(feature = "serde_serialize")]
+
+#[cfg(feature = "serde-serialize")]
 mod serde;
 
 #[cfg(test)]

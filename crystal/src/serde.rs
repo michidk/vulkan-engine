@@ -55,7 +55,7 @@ where
     type Value = Matrix<T, R, C>;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(format!("an {}x{} matrix", R, C).as_str())
+        formatter.write_str(format!("an {}x{} matrix", C, R).as_str())
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -98,18 +98,34 @@ mod tests {
 
     use super::*;
     use crate::mat4::Mat4;
+    use crate::vector::Vec3;
 
     #[test]
     fn mat4_serde_ident() -> Result<(), Box<dyn std::error::Error>> {
-        let mat4_ident: Mat4<f32> = Mat4::identity();
+        let mat4: Mat4<f32> = Mat4::identity();
 
-        let encoded = bincode::serialize(&mat4_ident)?;
+        let encoded = bincode::serialize(&mat4)?;
 
         println!("{:?}", encoded);
 
         let decoded = bincode::deserialize(&encoded[..])?;
 
-        MatrixCmp::<f32>::DEFAULT.eq(&mat4_ident, &decoded);
+        MatrixCmp::<f32>::DEFAULT.eq(&mat4, &decoded);
+
+        Ok(())
+    }
+
+    #[test]
+    fn vec3_serde_ident() -> Result<(), Box<dyn std::error::Error>> {
+        let vec3: Vec3<f32> = Vec3::unit_x();
+
+        let encoded = bincode::serialize(&vec3)?;
+
+        println!("{:?}", encoded);
+
+        let decoded = bincode::deserialize(&encoded[..])?;
+
+        MatrixCmp::<f32>::DEFAULT.eq(&vec3, &decoded);
 
         Ok(())
     }

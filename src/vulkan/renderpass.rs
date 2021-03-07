@@ -109,9 +109,9 @@ pub fn init_renderpass(
         vk::SubpassDependency::builder()
             .src_subpass(0)
             .dst_subpass(1)
-            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-            .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::FRAGMENT_SHADER)
-            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+            .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::FRAGMENT_SHADER)
+            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::INPUT_ATTACHMENT_READ)
             .build()
     ];

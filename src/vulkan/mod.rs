@@ -694,7 +694,8 @@ impl Drop for VulkanManager {
             self.light_buffer.cleanup(&self.allocator);
 
             self.pools.cleanup(&self.device);
-            //self.pipeline.cleanup(&self.device);
+            
+            self.device.destroy_pipeline(self.resolve_pipeline, None);
             self.device.destroy_render_pass(self.renderpass, None);
             // --segfault
             self.swapchain.cleanup(&self.device, &self.allocator);

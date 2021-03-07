@@ -256,6 +256,7 @@ impl SwapchainWrapper {
 
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
         logical_device.destroy_image_view(self.depth_imageview, None);
+        logical_device.destroy_image_view(self.depth_imageview_depth_only, None);
         allocator.destroy_image(self.depth_image, &self.depth_image_allocation);
 
         logical_device.destroy_image_view(self.g0_imageview, None);

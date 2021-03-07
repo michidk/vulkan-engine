@@ -22,7 +22,7 @@ impl<T, const R: usize, const C: usize> Matrix<T, R, C> {
         (R, C)
     }
 
-    unsafe fn uninitialized() -> Matrix<T, R, C> {
+    pub(crate) unsafe fn uninitialized() -> Matrix<T, R, C> {
         Self::from_data(std::mem::MaybeUninit::uninit().assume_init())
     }
 

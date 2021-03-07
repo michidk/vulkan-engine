@@ -67,9 +67,7 @@ pub fn compile_pipeline(
     device: &ash::Device,
     layout: vk::PipelineLayout,
     shader: &str,
-    renderpass: vk::RenderPass,
-    width: u32,
-    height: u32,
+    renderpass: vk::RenderPass
 ) -> Result<vk::Pipeline, vk::Result> {
     let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
     let vertexshader_createinfo =
@@ -140,14 +138,17 @@ pub fn compile_pipeline(
 
     let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
         .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
-    let viewports = [vk::Viewport {
-        x: 0.,
-        y: height as f32,
-        width: width as f32,
-        height: -(height as f32),
-        min_depth: 0.,
-        max_depth: 1.,
-    }];
+
+    let viewports = [
+        vk::Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }
+    ];
     let scissors = [vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: vk::Extent2D {
@@ -157,8 +158,8 @@ pub fn compile_pipeline(
     }];
 
     let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
-        .viewports(&viewports)
-        .scissors(&scissors);
+        .scissors(&scissors)
+        .viewports(&viewports);
     let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
         .line_width(1.0)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
@@ -166,22 +167,44 @@ pub fn compile_pipeline(
         .polygon_mode(vk::PolygonMode::FILL);
     let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
         .rasterization_samples(vk::SampleCountFlags::TYPE_1);
-    let colourblend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
-        .blend_enable(false)
-        .color_write_mask(
-            vk::ColorComponentFlags::R
-                | vk::ColorComponentFlags::G
-                | vk::ColorComponentFlags::B
-                | vk::ColorComponentFlags::A,
-        )
-        .build()];
+    let colourblend_attachments = [
+        vk::PipelineColorBlendAttachmentState::builder()
+            .blend_enable(false)
+            .color_write_mask(
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
+            )
+            .build(),
+        vk::PipelineColorBlendAttachmentState::builder()
+            .blend_enable(false)
+            .color_write_mask(
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
+            )
+            .build()
+    ];
     let colourblend_info =
         vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
-
+    
+    let stencil_front = vk::StencilOpState::builder()
+        .fail_op(vk::StencilOp::KEEP)
+        .depth_fail_op(vk::StencilOp::KEEP)
+        .pass_op(vk::StencilOp::REPLACE)
+        .compare_op(vk::CompareOp::ALWAYS)
+        .write_mask(u32::MAX)
+        .reference(1)
+        .build();
     let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
         .depth_test_enable(true)
         .depth_write_enable(true)
-        .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL);
+        .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+        .stencil_test_enable(true)
+        .front(stencil_front)
+        .build();
 
     let dynamic_states = [vk::DynamicState::VIEWPORT];
     let dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()

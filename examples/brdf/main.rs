@@ -70,11 +70,9 @@ fn setup(engine: &mut Engine) {
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
-        "brdf",
+        "material_solid_color",
         engine.vulkan_manager.desc_layout_frame_data,
-        engine.vulkan_manager.renderpass,
-        engine.vulkan_manager.swapchain.extent.width,
-        engine.vulkan_manager.swapchain.extent.height,
+        engine.vulkan_manager.renderpass
     )
     .unwrap();
     let brdf_material0 = brdf_pipeline

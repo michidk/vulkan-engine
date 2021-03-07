@@ -67,8 +67,6 @@ impl<T: MaterialData> MaterialPipeline<T> {
         shader: &str,
         frame_data_layout: vk::DescriptorSetLayout,
         renderpass: vk::RenderPass,
-        width: u32,
-        height: u32,
     ) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
         let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(
             device.as_ref(),
@@ -83,8 +81,6 @@ impl<T: MaterialData> MaterialPipeline<T> {
             pipeline_layout,
             shader,
             renderpass,
-            width,
-            height,
         )?;
 
         Ok(Rc::new(MaterialPipeline {

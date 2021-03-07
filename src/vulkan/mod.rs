@@ -17,7 +17,7 @@ use ash::{
     vk,
 };
 
-use crate::{engine::Info, scene::{Scene, camera, transform::TransformData}};
+use crate::{assets::shader, engine::Info, scene::{Scene, camera, transform::TransformData}};
 
 use self::{
     buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
@@ -57,6 +57,7 @@ pub struct VulkanManager {
     image_acquire_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     frame_resource_fences: Vec<vk::Fence>,
+    resolve_pipeline: vk::Pipeline,
 }
 
 impl VulkanManager {
@@ -112,15 +113,38 @@ impl VulkanManager {
         )?;
 
         let desc_layout_frame_data_bindings = [
+            // CamData
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(0)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
                 .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::VERTEX)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .build(),
+            // LightData
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(1)
                 .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // AlbedoRoughnessTex
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // NormalMetallicTex
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(3)
+                .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // DepthTex
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(4)
+                .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
@@ -132,9 +156,17 @@ impl VulkanManager {
             logical_device.create_descriptor_set_layout(&desc_layout_frame_data_info, None)?
         };
 
+        let pipeline_layout_frame_data_push_constants = [
+            vk::PushConstantRange::builder()
+                .stage_flags(vk::ShaderStageFlags::VERTEX)
+                .offset(0)
+                .size(128)
+                .build()
+        ];
         let pipeline_layout_frame_data_bindings = [desc_layout_frame_data];
         let pipeline_layout_frame_data_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&pipeline_layout_frame_data_bindings)
+            .push_constant_ranges(&pipeline_layout_frame_data_push_constants)
             .build();
         let pipeline_layout_frame_data = unsafe {
             logical_device.create_pipeline_layout(&pipeline_layout_frame_data_info, None)?
@@ -167,6 +199,8 @@ impl VulkanManager {
             frame_resource_fences.push(unsafe { logical_device.create_fence(&fence_info, None)? });
         }
 
+        let resolve_pipeline = Self::compile_resolve_pipeline("deferred_brdf", &logical_device, pipeline_layout_frame_data, renderpass)?;
+
         Ok(Self {
             window,
             entry,
@@ -193,7 +227,128 @@ impl VulkanManager {
             image_acquire_semaphores,
             render_finished_semaphores,
             frame_resource_fences,
+            resolve_pipeline
         })
+    }
+
+    fn compile_resolve_pipeline(shader: &str, device: &ash::Device, frame_data_layout: vk::PipelineLayout, renderpass: vk::RenderPass) -> Result<vk::Pipeline, vk::Result> {
+        let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
+        let vertexshader_createinfo =
+            shader::load(shader, shader::ShaderKind::Vertex, &mut vertexshader_code);
+        let vertexshader_module =
+            unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
+        let fragmentshader_createinfo = shader::load(
+            shader,
+            shader::ShaderKind::Fragment,
+            &mut fragmentshader_code,
+        );
+        let fragmentshader_module =
+            unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
+        drop(vertexshader_code);
+        drop(fragmentshader_code);
+        let mainfunctionname = std::ffi::CString::new("main").unwrap();
+
+        let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::VERTEX)
+            .module(vertexshader_module)
+            .name(&mainfunctionname);
+        let fragmentshader_stage = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::FRAGMENT)
+            .module(fragmentshader_module)
+            .name(&mainfunctionname);
+        let shader_stages = [vertexshader_stage.build(), fragmentshader_stage.build()];
+
+        let vertex_attrib_descs = [];
+        let vertex_binding_descs = [];
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_attribute_descriptions(&vertex_attrib_descs)
+            .vertex_binding_descriptions(&vertex_binding_descs);
+
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+            .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
+        let scissors = [vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: vk::Extent2D {
+                width: i32::MAX as u32,
+                height: i32::MAX as u32,
+            },
+        }];
+        let viewports = [
+            vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }
+        ];
+
+        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+            .scissors(&scissors)
+            .viewports(&viewports);
+        let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
+            .line_width(1.0)
+            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+            .cull_mode(vk::CullModeFlags::BACK)
+            .polygon_mode(vk::PolygonMode::FILL);
+        let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
+            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+        let colourblend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
+            .blend_enable(false)
+            .color_write_mask(
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
+            )
+            .build()];
+        let colourblend_info =
+            vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
+        
+        let stencil_front = vk::StencilOpState::builder()
+            .fail_op(vk::StencilOp::KEEP)
+            .pass_op(vk::StencilOp::KEEP)
+            .depth_fail_op(vk::StencilOp::KEEP)
+            .compare_op(vk::CompareOp::EQUAL)
+            .write_mask(0xFFFFFFFF)
+            .reference(1)
+            .build();
+        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(false)
+            .depth_write_enable(false)
+            .stencil_test_enable(true)
+            .front(stencil_front)
+            .build();
+
+        let dynamic_states = [vk::DynamicState::VIEWPORT];
+        let dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
+            .dynamic_states(&dynamic_states)
+            .build();
+
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
+            .stages(&shader_stages)
+            .vertex_input_state(&vertex_input_info)
+            .input_assembly_state(&input_assembly_info)
+            .viewport_state(&viewport_info)
+            .rasterization_state(&rasterizer_info)
+            .multisample_state(&multisampler_info)
+            .depth_stencil_state(&depth_stencil_info)
+            .color_blend_state(&colourblend_info)
+            .layout(frame_data_layout)
+            .render_pass(renderpass)
+            .dynamic_state(&dynamic_state)
+            .subpass(1);
+        let graphicspipeline = unsafe {
+            device
+                .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
+                .expect("A problem with the pipeline creation")
+        }[0];
+        unsafe {
+            device.destroy_shader_module(fragmentshader_module, None);
+            device.destroy_shader_module(vertexshader_module, None);
+        }
+        Ok(graphicspipeline)
     }
 
     pub fn get_current_frame_index(&self) -> u8 {
@@ -294,10 +449,30 @@ impl VulkanManager {
                 offset: 0,
                 size: self.light_buffer.get_size(),
             },
+            DescriptorData::InputAttachment {
+                image: self.swapchain.g0_imageview,
+                layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+            },
+            DescriptorData::InputAttachment {
+                image: self.swapchain.g1_imageview,
+                layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+            },
+            DescriptorData::InputAttachment {
+                image: self.swapchain.depth_imageview_depth_only,
+                layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+            },
         ];
         let desc_set_camera = self
             .descriptor_manager
             .get_descriptor_set(self.desc_layout_frame_data, &desc_values_frame_data)?;
+
+        unsafe {
+            self.device.cmd_begin_render_pass(
+                commandbuffer,
+                &renderpass_begininfo,
+                vk::SubpassContents::INLINE,
+            );
+        }
 
         unsafe {
             self.device.cmd_bind_descriptor_sets(
@@ -307,14 +482,6 @@ impl VulkanManager {
                 0,
                 &[desc_set_camera],
                 &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
-            );
-        }
-
-        unsafe {
-            self.device.cmd_begin_render_pass(
-                commandbuffer,
-                &renderpass_begininfo,
-                vk::SubpassContents::INLINE,
             );
         }
 
@@ -379,6 +546,22 @@ impl VulkanManager {
         }
 
         unsafe {
+            self.device.cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
+
+            self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.resolve_pipeline);
+            
+            let vp = vk::Viewport {
+                x: 0.0,
+                y: self.swapchain.extent.height as f32,
+                width: self.swapchain.extent.width as f32,
+                height: -(self.swapchain.extent.height as f32),
+                min_depth: 0.0,
+                max_depth: 1.0,
+            };
+            self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+
+            self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+
             self.device.cmd_end_render_pass(commandbuffer);
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -427,7 +610,7 @@ impl VulkanManager {
     pub fn submit(&self) {
         let semaphores_available =
             [self.image_acquire_semaphores[self.current_frame_index as usize]];
-        let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let waiting_stages = [vk::PipelineStageFlags::TOP_OF_PIPE];
         let semaphores_finished =
             [self.render_finished_semaphores[self.current_frame_index as usize]];
         let commandbuffers = [self.commandbuffers[self.current_frame_index as usize]];

@@ -311,7 +311,8 @@ impl VulkanManager {
             .pass_op(vk::StencilOp::KEEP)
             .depth_fail_op(vk::StencilOp::KEEP)
             .compare_op(vk::CompareOp::EQUAL)
-            .write_mask(0xFFFFFFFF)
+            .write_mask(0xFF)
+            .compare_mask(0xFF)
             .reference(1)
             .build();
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()

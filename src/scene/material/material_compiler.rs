@@ -195,7 +195,8 @@ pub fn compile_pipeline(
         .depth_fail_op(vk::StencilOp::KEEP)
         .pass_op(vk::StencilOp::REPLACE)
         .compare_op(vk::CompareOp::ALWAYS)
-        .write_mask(u32::MAX)
+        .write_mask(0xFF)
+        .compare_mask(0xFF)
         .reference(1)
         .build();
     let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()

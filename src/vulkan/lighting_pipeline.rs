@@ -5,20 +5,37 @@ use ash::{version::DeviceV1_0, vk};
 use crate::assets::shader;
 
 pub struct LightingPipeline {
-    pub point_pipeline: vk::Pipeline,
-    pub directional_pipeline: vk::Pipeline,
+    pub point_pipeline: Option<vk::Pipeline>,
+    pub directional_pipeline: Option<vk::Pipeline>,
+    pub ambient_pipeline: Option<vk::Pipeline>, 
     pub stencil_id: u8,
     device: Rc<ash::Device>,
 }
 
 impl LightingPipeline {
-    pub fn new(point_shader: &str, directional_shader: &str, pipe_layout_resolve: vk::PipelineLayout, renderpass: vk::RenderPass, device: Rc<ash::Device>, stencil_id: u8) -> Result<Rc<LightingPipeline>, vk::Result> {
-        let point_pipeline = Self::compile_pipeline(point_shader, pipe_layout_resolve, renderpass, device.as_ref(), stencil_id)?;
-        let directional_pipeline = Self::compile_pipeline(directional_shader, pipe_layout_resolve, renderpass, device.as_ref(), stencil_id)?;
+    pub fn new(point_shader: Option<&str>, directional_shader: Option<&str>, ambient_shader: Option<&str>, pipe_layout_resolve: vk::PipelineLayout, renderpass: vk::RenderPass, device: Rc<ash::Device>, stencil_id: u8) -> Result<Rc<LightingPipeline>, vk::Result> {
+        let point_pipeline = if let Some(point_shader) = point_shader {
+            Some(Self::compile_pipeline(point_shader, pipe_layout_resolve, renderpass, device.as_ref(), stencil_id)?)
+        } else {
+            None
+        };
+
+        let directional_pipeline = if let Some(directional_shader) = directional_shader {
+            Some(Self::compile_pipeline(directional_shader, pipe_layout_resolve, renderpass, device.as_ref(), stencil_id)?)
+        } else {
+            None
+        };
+
+        let ambient_pipeline = if let Some(ambient_shader) = ambient_shader {
+            Some(Self::compile_pipeline(ambient_shader, pipe_layout_resolve, renderpass, device.as_ref(), stencil_id)?)
+        } else {
+            None
+        };
 
         Ok(Rc::new(LightingPipeline {
             point_pipeline,
             directional_pipeline,
+            ambient_pipeline,
             stencil_id,
             device
         }))
@@ -156,8 +173,15 @@ impl LightingPipeline {
 impl Drop for LightingPipeline {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_pipeline(self.point_pipeline, None);
-            self.device.destroy_pipeline(self.directional_pipeline, None);
+            if let Some(pp) = self.point_pipeline {
+                self.device.destroy_pipeline(pp, None);
+            }
+            if let Some(dp) = self.directional_pipeline {
+                self.device.destroy_pipeline(dp, None);
+            }
+            if let Some(ap) = self.ambient_pipeline {
+                self.device.destroy_pipeline(ap, None);
+            }
         }
     }
 }

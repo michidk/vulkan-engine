@@ -424,50 +424,70 @@ impl VulkanManager {
         for lp in &self.lighting_pipelines {
             unsafe {
                 // point lights
-                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, lp.point_pipeline);
+                if let Some(point_pipe) = lp.point_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, point_pipe);
             
-                let vp = vk::Viewport {
-                    x: 0.0,
-                    y: self.swapchain.extent.height as f32,
-                    width: self.swapchain.extent.width as f32,
-                    height: -(self.swapchain.extent.height as f32),
-                    min_depth: 0.0,
-                    max_depth: 1.0,
-                };
-                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
-
-                for pl in &scene.light_manager.point_lights {
-                    self.device.cmd_push_constants(
-                        commandbuffer, 
-                        self.pipeline_layout_resolve_pass, 
-                        vk::ShaderStageFlags::FRAGMENT,
-                        0,
-                        slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
-                    );
-                    self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+    
+                    for pl in &scene.light_manager.point_lights {
+                        self.device.cmd_push_constants(
+                            commandbuffer, 
+                            self.pipeline_layout_resolve_pass, 
+                            vk::ShaderStageFlags::FRAGMENT,
+                            0,
+                            slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
+                        );
+                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                    }
                 }
 
                 // directional lights
-                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, lp.directional_pipeline);
+                if let Some(directional_pipe) = lp.directional_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, directional_pipe);
             
-                let vp = vk::Viewport {
-                    x: 0.0,
-                    y: self.swapchain.extent.height as f32,
-                    width: self.swapchain.extent.width as f32,
-                    height: -(self.swapchain.extent.height as f32),
-                    min_depth: 0.0,
-                    max_depth: 1.0,
-                };
-                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
 
-                for dl in &scene.light_manager.directional_lights {
-                    self.device.cmd_push_constants(
-                        commandbuffer, 
-                        self.pipeline_layout_resolve_pass, 
-                        vk::ShaderStageFlags::FRAGMENT,
-                        0,
-                        slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
-                    );
+                    for dl in &scene.light_manager.directional_lights {
+                        self.device.cmd_push_constants(
+                            commandbuffer, 
+                            self.pipeline_layout_resolve_pass, 
+                            vk::ShaderStageFlags::FRAGMENT,
+                            0,
+                            slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
+                        );
+                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                    }
+                }
+
+                // ambient
+                if let Some(ambient_pipe) = lp.ambient_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, ambient_pipe);
+            
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
                     self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
                 }
             }

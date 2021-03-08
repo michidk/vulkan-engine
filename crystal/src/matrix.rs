@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, AddAssign, Mul, Sub},
+    ops::{Add, AddAssign, Mul, Neg, Sub},
 };
 
 use crate::{
@@ -246,5 +246,47 @@ where
         }
 
         matrix
+    }
+}
+
+impl<'a, T, const R: usize, const C: usize> Neg for &'a Matrix<T, R, C>
+where
+    T: Clone + Neg<Output = T>,
+{
+    type Output = Matrix<T, R, C>;
+
+    fn neg(self) -> Self::Output {
+        let mut matrix = unsafe { Matrix::uninitialized() };
+
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *matrix.get_unchecked_mut((row_idx, col_idx)) =
+                        -self.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        matrix
+    }
+}
+
+impl<T, const R: usize, const C: usize> Neg for Matrix<T, R, C>
+where
+    T: Clone + Neg<Output = T>,
+{
+    type Output = Self;
+
+    fn neg(mut self) -> Self::Output {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) =
+                        -self.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        self
     }
 }

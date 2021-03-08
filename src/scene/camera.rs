@@ -74,7 +74,7 @@ impl Camera {
     fn update_view_matrix(&mut self) {
         let rotation = self.get_rotation().conjugated();
 
-        let m = &Mat4::from(rotation) * &Mat4::translate(-self.position);
+        let m = &Mat4::from(rotation) * &Mat4::translate(&-self.position);
 
         self.view_matrix = m;
     }

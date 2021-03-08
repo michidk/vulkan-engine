@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, Sub}};
+use std::{
+    marker::PhantomData,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, Sub},
+};
 
 use crate::{
     angle::{Angle, AngleConst},
@@ -244,15 +247,6 @@ impl<T> Vec3<T> {
         let s3 = a1.clone() * b2.clone() - a2.clone() * b1.clone();
 
         Vec3::new(s1, s2, s3)
-    }
-}
-
-impl<T> Neg for Vec3<T>
-    where T: Clone + Copy + Neg<Output = T>
-{
-    type Output = Self;
-    fn neg(self) -> Self {
-        Self::new(-*self.x(), -*self.y(), -*self.z())
     }
 }
 

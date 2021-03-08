@@ -95,13 +95,9 @@ fn setup(engine: &mut Engine) {
         }],
     };
 
-    let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
-    let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
     let mesh = mesh_data
         .bake(
-            (*engine.vulkan_manager.allocator).clone(),
-            transform,
-            inv_transform,
+            (*engine.vulkan_manager.allocator).clone()
         )
         .unwrap();
 
@@ -109,7 +105,7 @@ fn setup(engine: &mut Engine) {
         material: material0,
         mesh: mesh,
         transform: Transform {
-            position: Vec3::new(0.0, 0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },

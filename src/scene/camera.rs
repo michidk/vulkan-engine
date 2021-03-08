@@ -72,33 +72,10 @@ impl Camera {
     }
 
     fn update_view_matrix(&mut self) {
-        let rotation = self.get_rotation();
+        let rotation = self.get_rotation().conjugated();
 
-        let forward_dir = rotation.forward();
-        let right_dir = rotation.right();
-        let up_dir = rotation.up();
+        let m = &Mat4::from(rotation) * &Mat4::translate(-self.position);
 
-        let m: Mat4<f32> = Mat4::new(
-            *right_dir.x(),
-            *right_dir.y(),
-            *right_dir.z(),
-            -right_dir.dot_product(&self.position),
-            //
-            *up_dir.x(),
-            *up_dir.y(),
-            *up_dir.z(),
-            -up_dir.dot_product(&self.position),
-            //
-            *forward_dir.x(),
-            *forward_dir.y(),
-            *forward_dir.z(),
-            -forward_dir.dot_product(&self.position),
-            //
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-        );
         self.view_matrix = m;
     }
 

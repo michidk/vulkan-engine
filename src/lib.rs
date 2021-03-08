@@ -1,4 +1,3 @@
-#![feature(str_split_once)]
 #![feature(map_first_last)]
 #![feature(once_cell)]
 

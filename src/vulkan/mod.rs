@@ -267,7 +267,7 @@ impl VulkanManager {
         let clearvalues = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.003_861_873, 1.0],
+                    float32: [0.2, 0.2, 0.2, 1.0],
                 },
             },
             vk::ClearValue {

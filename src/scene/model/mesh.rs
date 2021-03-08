@@ -2,6 +2,7 @@ use std::{mem::size_of, rc::Rc};
 
 use ash::vk;
 use crystal::prelude::*;
+use ve_format::mesh::{Face, MeshData, Vertex};
 
 pub struct Mesh {
     allocator: Rc<vk_mem::Allocator>,
@@ -14,49 +15,14 @@ pub struct Mesh {
     pub submeshes: Vec<(u32, u32)>,
 }
 
-impl Drop for Mesh {
-    fn drop(&mut self) {
-        self.allocator
-            .destroy_buffer(self.vertex_buffer, &self.vertex_buffer_alloc);
-        self.allocator
-            .destroy_buffer(self.instance_buffer, &self.instance_buffer_alloc);
-        self.allocator
-            .destroy_buffer(self.index_buffer, &self.index_buffer_alloc);
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Vertex {
-    pub position: Vec3<f32>,
-    pub color: Vec3<f32>,
-    pub normal: Vec3<f32>,
-    pub uv: Vec2<f32>,
-}
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Submesh {
-    pub faces: Vec<Face>,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Face {
-    pub indices: [u32; 3],
-}
-
-pub struct MeshData {
-    pub vertices: Vec<Vertex>,
-    pub submeshes: Vec<Submesh>,
-}
-
-impl MeshData {
+impl Mesh {
     pub fn bake(
-        &self,
+        mesh_data: MeshData,
         allocator: Rc<vk_mem::Allocator>,
         transform: Mat4<f32>,
         inv_transform: Mat4<f32>,
     ) -> Result<Rc<Mesh>, vk_mem::Error> {
-        let vertex_buffer_size = self.vertices.len() * size_of::<Vertex>();
+        let vertex_buffer_size = mesh_data.vertices.len() * size_of::<Vertex>();
         let vertex_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .size(vertex_buffer_size as u64)
@@ -83,7 +49,7 @@ impl MeshData {
             allocator.create_buffer(&instance_buffer_info, &instance_buffer_alloc_info)?;
 
         let mut index_buffer_size = 0u64;
-        for sm in &self.submeshes {
+        for sm in &mesh_data.submeshes {
             index_buffer_size += (sm.faces.len() * size_of::<Face>()) as u64;
         }
         let index_buffer_info = vk::BufferCreateInfo::builder()
@@ -100,7 +66,7 @@ impl MeshData {
 
         let map = allocator.map_memory(&vertex_buffer_alloc)? as *mut Vertex;
         unsafe {
-            map.copy_from_nonoverlapping(self.vertices.as_ptr(), self.vertices.len());
+            map.copy_from_nonoverlapping(mesh_data.vertices.as_ptr(), mesh_data.vertices.len());
         }
         allocator.unmap_memory(&vertex_buffer_alloc);
 
@@ -113,7 +79,7 @@ impl MeshData {
 
         let map = allocator.map_memory(&index_buffer_alloc)? as *mut Face;
         let mut offset = 0usize;
-        for sm in &self.submeshes {
+        for sm in &mesh_data.submeshes {
             unsafe {
                 map.add(offset)
                     .copy_from_nonoverlapping(sm.faces.as_ptr(), sm.faces.len())
@@ -122,9 +88,9 @@ impl MeshData {
         }
         allocator.unmap_memory(&index_buffer_alloc);
 
-        let mut submeshes = Vec::with_capacity(self.submeshes.len());
+        let mut submeshes = Vec::with_capacity(mesh_data.submeshes.len());
         let mut start_index = 0u32;
-        for sm in &self.submeshes {
+        for sm in &mesh_data.submeshes {
             submeshes.push((start_index, sm.faces.len() as u32 * 3));
             start_index += sm.faces.len() as u32 * 3;
         }
@@ -139,5 +105,16 @@ impl MeshData {
             index_buffer_alloc,
             submeshes,
         }))
+    }
+}
+
+impl Drop for Mesh {
+    fn drop(&mut self) {
+        self.allocator
+            .destroy_buffer(self.vertex_buffer, &self.vertex_buffer_alloc);
+        self.allocator
+            .destroy_buffer(self.instance_buffer, &self.instance_buffer_alloc);
+        self.allocator
+            .destroy_buffer(self.index_buffer, &self.index_buffer_alloc);
     }
 }

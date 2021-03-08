@@ -1,169 +1,10 @@
-/// Parses `.obj` files
 use std::fs;
 use std::io::{self, BufRead};
 use std::{num, path::Path};
 
-use crystal::prelude::*;
+use log::debug;
 
-use crate::scene::model::mesh;
-
-#[derive(Debug, Default, PartialEq)]
-struct ObjVertex {
-    position: [f32; 3],
-    color: Option<[f32; 3]>,
-}
-
-#[derive(Debug, Default, PartialEq)]
-struct ObjFaceIndex {
-    vert_i: usize,
-    uv_i: Option<usize>,
-    normal_i: Option<usize>,
-}
-
-#[derive(Debug, Default, PartialEq)]
-struct ObjFace {
-    face_i: Vec<ObjFaceIndex>,
-}
-
-#[derive(Debug, Default)]
-struct ObjSubmesh {
-    name: Option<String>,
-    faces: Vec<ObjFace>,
-}
-
-#[derive(Debug, Default)]
-pub struct ObjMeshData {
-    name: Option<String>,
-    submeshes: Vec<ObjSubmesh>,
-    vertices: Vec<ObjVertex>,
-    uvs: Vec<[f32; 2]>,
-    normals: Vec<[f32; 3]>,
-}
-
-#[derive(Debug, Default)]
-pub struct ObjMeshBuilder {
-    mesh: ObjMeshData,
-    curr_submesh: ObjSubmesh,
-}
-
-impl ObjMeshBuilder {
-    fn set_group(&mut self, name: &str) {
-        if self.curr_submesh.faces.is_empty() {
-            self.curr_submesh.name = if name.is_empty() {
-                None
-            } else {
-                Some(name.into())
-            };
-        } else {
-            let mut fg = ObjSubmesh {
-                name: if name.is_empty() {
-                    None
-                } else {
-                    Some(name.into())
-                },
-                ..ObjSubmesh::default()
-            };
-            std::mem::swap(&mut fg, &mut self.curr_submesh);
-            self.mesh.submeshes.push(fg);
-        }
-    }
-
-    fn push_vertex(&mut self, vertex: ObjVertex) {
-        self.mesh.vertices.push(vertex);
-    }
-
-    fn push_uv(&mut self, uv: [f32; 2]) {
-        self.mesh.uvs.push(uv);
-    }
-
-    fn push_normal(&mut self, normal: [f32; 3]) {
-        self.mesh.normals.push(normal);
-    }
-
-    fn push_face(&mut self, face: ObjFace) {
-        self.curr_submesh.faces.push(face);
-    }
-
-    pub fn build_mesh(self) -> Result<mesh::MeshData, ParserError> {
-        let mut mesh = self.mesh;
-        let (uvs, normals) = (mesh.uvs, mesh.normals);
-        mesh.submeshes.push(self.curr_submesh); // push the last group/submesh
-
-        // dont do, only create for refereced verticies
-        let mut vertices: Vec<mesh::Vertex> = Vec::new();
-        for vertex in mesh.vertices {
-            vertices.push(mesh::Vertex {
-                position: vertex.position.into(),
-                color: vertex.color.unwrap_or_else(|| [0.0, 0.0, 0.0]).into(),
-                normal: Vec3::new(0.0, 0.0, 0.0),
-                uv: Vec2::new(0.0, 0.0),
-            })
-        }
-
-        // hashmap: vertex als key, index of verticies vector as value
-
-        let mut submeshes: Vec<mesh::Submesh> = Vec::new();
-        for submesh in mesh.submeshes {
-            let mut faces: Vec<mesh::Face> = Vec::new();
-            for mut face in submesh.faces {
-                // set uv and normal if they appear on a face
-                // also duplicate the vertex if it was already defined with another uv or normal
-                for i in 0..=2 {
-                    let vertex = &mut vertices[face.face_i[i].vert_i - 1];
-
-                    // get uv values from current face index or default as vec
-                    let uv = face.face_i[i].uv_i.map(|x| uvs[x - 1]);
-
-                    // get normal values from current face index or default as vec
-                    let normal = face.face_i[i].normal_i.map(|x| normals[x - 1]);
-
-                    // create new vertex if not same (and assign face index to it)
-                    // TODO: problem with comparing
-
-                    // if vertex.normal != normal {
-                    //     println!("")
-                    // }
-
-                    // flaw: only works once
-                    if vertex.uv != uv || vertex.normal != normal {
-                        println!("{:?} - {:?}", vertex.normal, normal);
-                        let mut new_vertex = vertex.clone();
-                        new_vertex.uv = uv;
-                        new_vertex.normal = normal;
-                        vertices.push(new_vertex);
-                        face.face_i[i].vert_i = vertices.len();
-                    } else {
-                        vertex.uv = uv.unwrap_or_else(|| [0.0, 0.0]).into();
-                        vertex.normal = normal.unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
-                    }
-                }
-
-                // triangulate polygons for convex shapes (we might find faces which have more than three indexes)
-                for i in 2..face.face_i.len() {
-                    faces.push(mesh::Face {
-                        indices: [
-                            face.face_i[0].vert_i as u32,
-                            face.face_i[i - 1].vert_i as u32,
-                            face.face_i[i].vert_i as u32,
-                        ],
-                    });
-                    println!(
-                        "Create triangle between {}, {}, {}",
-                        face.face_i[0].vert_i,
-                        face.face_i[i - 1].vert_i,
-                        face.face_i[i].vert_i
-                    );
-                }
-            }
-            submeshes.push(mesh::Submesh { faces })
-        }
-
-        Ok(mesh::MeshData {
-            vertices,
-            submeshes,
-        })
-    }
-}
+use super::builder::*;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParserError {
@@ -179,20 +20,24 @@ pub enum ParserError {
 
 // parses wavefront obj (https://en.wikipedia.org/wiki/Wavefront_.obj_file)
 // the implementation is very forgiving and should work with most .obj files
-pub fn parse(filepath: &str) -> Result<ObjMeshBuilder, ParserError> {
+pub(crate) fn parse(filepath: &Path) -> Result<ObjMeshBuilder, ParserError> {
     let mut builder: ObjMeshBuilder = ObjMeshBuilder {
         mesh: ObjMeshData::default(),
         ..Default::default()
     };
 
     let lines = read_lines(filepath)?;
-    log::info!("Loading mesh: {}", filepath);
+    log::info!("Loading mesh: {}", filepath.display());
 
     for line in lines.flatten() {
-        println!("Parsing: {}", line);
+        if line.is_empty() {
+            continue;
+        }
 
-        if let Some((token, value)) = line.split_once(' ') {
-            parse_token(token, value, &mut builder)?;
+        debug!("Parsing: \"{}\"", line);
+
+        if let Some((token, value)) = line.replace("  ", " ").split_once(' ') {
+            parse_token(token, value.trim(), &mut builder)?;
         }
     }
 
@@ -215,23 +60,21 @@ fn parse_token(token: &str, value: &str, builder: &mut ObjMeshBuilder) -> Result
         }
         // group (submesh)
         "g" => builder.set_group(value),
-
         // vertex
         "v" => builder.push_vertex(parse_vertex(value)?),
-
         // texture coordinates
         "vt" => builder.push_uv(parse_uv(value)?),
-
         // vertex normals
         "vn" => builder.push_normal(parse_normal(value)?),
         // parameter space vertices
         "vp" => log::warn!("Parameter space vertices not supported. Ignoring."),
         "f" => builder.push_face(parse_face(value)?),
         // material
-        // "usemtl" => todo!(),
+        "usemtl" => log::warn!("Materials not yet supported. Ignoring."),
         // smothing groups
         "s" => log::warn!("Smothing groups not supported. Ignoring."),
-        _ => log::error!("Found invalid token: {}", token),
+        "" => log::warn!("Found space. Ignoring."),
+        _ => log::error!("Found invalid token: \"{}\"", token),
     };
 
     Ok(())
@@ -293,7 +136,6 @@ fn parse_face_index(value: &str) -> Result<ObjFaceIndex, ParserError> {
 }
 
 // parse a triplet seperated by dashes
-// TODO @Jonas: improve with .get
 fn parse_triplet(value: &str) -> Result<Vec<Option<usize>>, num::ParseIntError> {
     let mut ret = vec![None; 3];
 
@@ -316,12 +158,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::num::ParseIntError;
-
-    use super::{
-        parse_face, parse_token, parse_triplet, parse_vertex, ObjFace, ObjFaceIndex,
-        ObjMeshBuilder, ObjVertex, ParserError,
-    };
 
     #[test]
     fn test_parse_token() -> Result<(), ParserError> {

@@ -1,9 +1,9 @@
-use std::process::exit;
+use std::{path::Path, process::exit};
 
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::scene::material::*;
+use vulkan_engine::scene::{material::*, model::mesh::Mesh};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -11,10 +11,7 @@ use vulkan_engine::{
         camera::Camera,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
-        model::{
-            mesh::{Face, MeshData, Submesh, Vertex},
-            Model,
-        },
+        model::Model,
         transform::Transform,
     },
 };
@@ -87,25 +84,18 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = vulkan_engine::assets::obj::parse("./assets/models/polygon.obj")
-        .unwrap()
-        .build_mesh()
-        .unwrap();
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/cube.vem"))
+        .expect("Model cube.vem not found!");
 
-    // let transform = &Mat4::translate(Vec3::new(0.0, 0.0, 5.0))
-    //     * &Mat4::from_axis_angle(
-    //         &Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-    //         Angle::from_deg(180.0),
-    //     );
     let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
     let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = mesh_data
-        .bake(
-            (*engine.vulkan_manager.allocator).clone(),
-            transform,
-            inv_transform,
-        )
-        .unwrap();
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        transform,
+        inv_transform,
+    )
+    .expect("Error baking mesh!");
 
     let model = Model {
         material: brdf_material0,

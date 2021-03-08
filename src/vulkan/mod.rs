@@ -8,6 +8,7 @@ mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
+pub mod lighting_pipeline;
 
 use std::{ffi::CString, mem::size_of, rc::Rc, slice};
 
@@ -17,16 +18,9 @@ use ash::{
     vk,
 };
 
-use crate::{assets::shader, engine::Info, scene::{Scene, camera, transform::TransformData}};
+use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, transform::TransformData}};
 
-use self::{
-    buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
-    descriptor_manager::{DescriptorData, DescriptorManager},
-    queue::{PoolsWrapper, QueueFamilies, Queues},
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-};
+use self::{buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, lighting_pipeline::LightingPipeline, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper};
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
@@ -48,16 +42,16 @@ pub struct VulkanManager {
     pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
-    pub light_buffer: BufferWrapper,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
-    pipeline_layout_frame_data: vk::PipelineLayout,
+    pipeline_layout_gpass: vk::PipelineLayout,
+    pub pipeline_layout_resolve_pass: vk::PipelineLayout,
     pub descriptor_manager: DescriptorManager<8>,
     max_frames_in_flight: u8,
     pub current_frame_index: u8,
     image_acquire_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     frame_resource_fences: Vec<vk::Fence>,
-    resolve_pipeline: vk::Pipeline,
+    lighting_pipelines: Vec<Rc<LightingPipeline>>,
 }
 
 impl VulkanManager {
@@ -120,30 +114,23 @@ impl VulkanManager {
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .build(),
-            // LightData
-            vk::DescriptorSetLayoutBinding::builder()
-                .binding(1)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-                .build(),
             // AlbedoRoughnessTex
             vk::DescriptorSetLayoutBinding::builder()
-                .binding(2)
+                .binding(1)
                 .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
             // NormalMetallicTex
             vk::DescriptorSetLayoutBinding::builder()
-                .binding(3)
+                .binding(2)
                 .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
             // DepthTex
             vk::DescriptorSetLayoutBinding::builder()
-                .binding(4)
+                .binding(3)
                 .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT)
@@ -156,29 +143,37 @@ impl VulkanManager {
             logical_device.create_descriptor_set_layout(&desc_layout_frame_data_info, None)?
         };
 
-        let pipeline_layout_frame_data_push_constants = [
+        let pipeline_layout_gpass_push_constants = [
             vk::PushConstantRange::builder()
                 .stage_flags(vk::ShaderStageFlags::VERTEX)
                 .offset(0)
                 .size(128)
                 .build()
         ];
-        let pipeline_layout_frame_data_bindings = [desc_layout_frame_data];
-        let pipeline_layout_frame_data_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&pipeline_layout_frame_data_bindings)
-            .push_constant_ranges(&pipeline_layout_frame_data_push_constants)
+        let pipeline_layout_gpass_bindings = [desc_layout_frame_data];
+        let pipeline_layout_gpass_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&pipeline_layout_gpass_bindings)
+            .push_constant_ranges(&pipeline_layout_gpass_push_constants)
             .build();
-        let pipeline_layout_frame_data = unsafe {
-            logical_device.create_pipeline_layout(&pipeline_layout_frame_data_info, None)?
+        let pipeline_layout_gpass = unsafe {
+            logical_device.create_pipeline_layout(&pipeline_layout_gpass_info, None)?
         };
 
-        let mut light_buffer = BufferWrapper::new(
-            &allocator,
-            8,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-        )?;
-        light_buffer.fill(&allocator, &[0.0, 0.0])?;
+        let pipeline_layout_resolve_pass_push_constants = [
+            vk::PushConstantRange::builder()
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .offset(0)
+                .size(32)
+                .build()
+        ];
+        let pipeline_layout_resolve_pass_bindings = [desc_layout_frame_data];
+        let pipeline_layout_resolve_pass_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&pipeline_layout_resolve_pass_bindings)
+            .push_constant_ranges(&pipeline_layout_resolve_pass_push_constants)
+            .build();
+        let pipeline_layout_resolve_pass = unsafe {
+            logical_device.create_pipeline_layout(&pipeline_layout_resolve_pass_info, None)?
+        };
 
         let descriptor_manager = DescriptorManager::new(logical_device.clone())?;
 
@@ -199,8 +194,6 @@ impl VulkanManager {
             frame_resource_fences.push(unsafe { logical_device.create_fence(&fence_info, None)? });
         }
 
-        let resolve_pipeline = Self::compile_resolve_pipeline("deferred_brdf", &logical_device, pipeline_layout_frame_data, renderpass)?;
-
         Ok(Self {
             window,
             entry,
@@ -218,138 +211,21 @@ impl VulkanManager {
             commandbuffers,
             allocator: std::mem::ManuallyDrop::new(Rc::new(allocator)),
             uniform_buffer,
-            light_buffer,
             desc_layout_frame_data,
-            pipeline_layout_frame_data,
+            pipeline_layout_gpass,
+            pipeline_layout_resolve_pass,
             descriptor_manager,
             max_frames_in_flight,
             current_frame_index: 0,
             image_acquire_semaphores,
             render_finished_semaphores,
             frame_resource_fences,
-            resolve_pipeline
+            lighting_pipelines: Vec::new()
         })
     }
 
-    fn compile_resolve_pipeline(shader: &str, device: &ash::Device, frame_data_layout: vk::PipelineLayout, renderpass: vk::RenderPass) -> Result<vk::Pipeline, vk::Result> {
-        let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
-        let vertexshader_createinfo =
-            shader::load(shader, shader::ShaderKind::Vertex, &mut vertexshader_code);
-        let vertexshader_module =
-            unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
-        let fragmentshader_createinfo = shader::load(
-            shader,
-            shader::ShaderKind::Fragment,
-            &mut fragmentshader_code,
-        );
-        let fragmentshader_module =
-            unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
-        drop(vertexshader_code);
-        drop(fragmentshader_code);
-        let mainfunctionname = std::ffi::CString::new("main").unwrap();
-
-        let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(vk::ShaderStageFlags::VERTEX)
-            .module(vertexshader_module)
-            .name(&mainfunctionname);
-        let fragmentshader_stage = vk::PipelineShaderStageCreateInfo::builder()
-            .stage(vk::ShaderStageFlags::FRAGMENT)
-            .module(fragmentshader_module)
-            .name(&mainfunctionname);
-        let shader_stages = [vertexshader_stage.build(), fragmentshader_stage.build()];
-
-        let vertex_attrib_descs = [];
-        let vertex_binding_descs = [];
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_attribute_descriptions(&vertex_attrib_descs)
-            .vertex_binding_descriptions(&vertex_binding_descs);
-
-        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
-            .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
-        let scissors = [vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: vk::Extent2D {
-                width: i32::MAX as u32,
-                height: i32::MAX as u32,
-            },
-        }];
-        let viewports = [
-            vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: 1.0,
-                height: 1.0,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }
-        ];
-
-        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
-            .scissors(&scissors)
-            .viewports(&viewports);
-        let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
-            .line_width(1.0)
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::BACK)
-            .polygon_mode(vk::PolygonMode::FILL);
-        let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
-        let colourblend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
-            .blend_enable(false)
-            .color_write_mask(
-                vk::ColorComponentFlags::R
-                    | vk::ColorComponentFlags::G
-                    | vk::ColorComponentFlags::B
-                    | vk::ColorComponentFlags::A,
-            )
-            .build()];
-        let colourblend_info =
-            vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colourblend_attachments);
-        
-        let stencil_front = vk::StencilOpState::builder()
-            .fail_op(vk::StencilOp::KEEP)
-            .pass_op(vk::StencilOp::KEEP)
-            .depth_fail_op(vk::StencilOp::KEEP)
-            .compare_op(vk::CompareOp::EQUAL)
-            .write_mask(0xFF)
-            .compare_mask(0xFF)
-            .reference(1)
-            .build();
-        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
-            .depth_test_enable(false)
-            .depth_write_enable(false)
-            .stencil_test_enable(true)
-            .front(stencil_front)
-            .build();
-
-        let dynamic_states = [vk::DynamicState::VIEWPORT];
-        let dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
-            .dynamic_states(&dynamic_states)
-            .build();
-
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(&shader_stages)
-            .vertex_input_state(&vertex_input_info)
-            .input_assembly_state(&input_assembly_info)
-            .viewport_state(&viewport_info)
-            .rasterization_state(&rasterizer_info)
-            .multisample_state(&multisampler_info)
-            .depth_stencil_state(&depth_stencil_info)
-            .color_blend_state(&colourblend_info)
-            .layout(frame_data_layout)
-            .render_pass(renderpass)
-            .dynamic_state(&dynamic_state)
-            .subpass(1);
-        let graphicspipeline = unsafe {
-            device
-                .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
-                .expect("A problem with the pipeline creation")
-        }[0];
-        unsafe {
-            device.destroy_shader_module(fragmentshader_module, None);
-            device.destroy_shader_module(vertexshader_module, None);
-        }
-        Ok(graphicspipeline)
+    pub fn register_lighting_pipeline(&mut self, pipeline: Rc<LightingPipeline>) {
+        self.lighting_pipelines.push(pipeline);
     }
 
     pub fn get_current_frame_index(&self) -> u8 {
@@ -408,7 +284,7 @@ impl VulkanManager {
     pub fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
-        scene: &Scene,
+        scene: &Scene
     ) -> Result<(), vk::Result> {
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -445,11 +321,6 @@ impl VulkanManager {
                 offset: 0,
                 size: self.uniform_buffer.get_size(),
             },
-            DescriptorData::StorageBuffer {
-                buffer: self.light_buffer.buffer,
-                offset: 0,
-                size: self.light_buffer.get_size(),
-            },
             DescriptorData::InputAttachment {
                 image: self.swapchain.g0_imageview,
                 layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
@@ -479,7 +350,7 @@ impl VulkanManager {
             self.device.cmd_bind_descriptor_sets(
                 commandbuffer,
                 vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout_frame_data,
+                self.pipeline_layout_gpass,
                 0,
                 &[desc_set_camera],
                 &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
@@ -548,21 +419,61 @@ impl VulkanManager {
 
         unsafe {
             self.device.cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
+        }
 
-            self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.resolve_pipeline);
+        for lp in &self.lighting_pipelines {
+            unsafe {
+                // point lights
+                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, lp.point_pipeline);
             
-            let vp = vk::Viewport {
-                x: 0.0,
-                y: self.swapchain.extent.height as f32,
-                width: self.swapchain.extent.width as f32,
-                height: -(self.swapchain.extent.height as f32),
-                min_depth: 0.0,
-                max_depth: 1.0,
-            };
-            self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                let vp = vk::Viewport {
+                    x: 0.0,
+                    y: self.swapchain.extent.height as f32,
+                    width: self.swapchain.extent.width as f32,
+                    height: -(self.swapchain.extent.height as f32),
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                };
+                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
 
-            self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                for pl in &scene.light_manager.point_lights {
+                    self.device.cmd_push_constants(
+                        commandbuffer, 
+                        self.pipeline_layout_resolve_pass, 
+                        vk::ShaderStageFlags::FRAGMENT,
+                        0,
+                        slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
+                    );
+                    self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                }
 
+                // directional lights
+                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, lp.directional_pipeline);
+            
+                let vp = vk::Viewport {
+                    x: 0.0,
+                    y: self.swapchain.extent.height as f32,
+                    width: self.swapchain.extent.width as f32,
+                    height: -(self.swapchain.extent.height as f32),
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                };
+                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+
+                for dl in &scene.light_manager.directional_lights {
+                    self.device.cmd_push_constants(
+                        commandbuffer, 
+                        self.pipeline_layout_resolve_pass, 
+                        vk::ShaderStageFlags::FRAGMENT,
+                        0,
+                        slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
+                    );
+                    self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                }
+            }
+        }
+        
+        unsafe {
             self.device.cmd_end_render_pass(commandbuffer);
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -678,6 +589,8 @@ impl Drop for VulkanManager {
                 .device_wait_idle()
                 .expect("something wrong while waiting");
 
+            self.lighting_pipelines.clear();
+
             for s in &self.image_acquire_semaphores {
                 self.device.destroy_semaphore(*s, None);
             }
@@ -691,11 +604,9 @@ impl Drop for VulkanManager {
             self.descriptor_manager.destroy();
 
             self.uniform_buffer.destroy(&self.allocator);
-            self.light_buffer.cleanup(&self.allocator);
 
             self.pools.cleanup(&self.device);
             
-            self.device.destroy_pipeline(self.resolve_pipeline, None);
             self.device.destroy_render_pass(self.renderpass, None);
             // --segfault
             self.swapchain.cleanup(&self.device, &self.allocator);
@@ -703,7 +614,9 @@ impl Drop for VulkanManager {
             self.device
                 .destroy_descriptor_set_layout(self.desc_layout_frame_data, None);
             self.device
-                .destroy_pipeline_layout(self.pipeline_layout_frame_data, None);
+                .destroy_pipeline_layout(self.pipeline_layout_gpass, None);
+            self.device
+                .destroy_pipeline_layout(self.pipeline_layout_resolve_pass, None);
 
             std::mem::ManuallyDrop::drop(&mut self.allocator);
 

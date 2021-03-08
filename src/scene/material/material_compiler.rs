@@ -67,7 +67,8 @@ pub fn compile_pipeline(
     device: &ash::Device,
     layout: vk::PipelineLayout,
     shader: &str,
-    renderpass: vk::RenderPass
+    renderpass: vk::RenderPass,
+    stencil_id: u8
 ) -> Result<vk::Pipeline, vk::Result> {
     let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
     let vertexshader_createinfo =
@@ -197,7 +198,7 @@ pub fn compile_pipeline(
         .compare_op(vk::CompareOp::ALWAYS)
         .write_mask(0xFF)
         .compare_mask(0xFF)
-        .reference(1)
+        .reference(stencil_id as u32)
         .build();
     let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
         .depth_test_enable(true)

@@ -5,7 +5,7 @@ pub use vulkan_engine_derive::MaterialBindingFragment;
 pub use vulkan_engine_derive::MaterialBindingVertex;
 pub use vulkan_engine_derive::MaterialData;
 
-use crate::vulkan::descriptor_manager::DescriptorData;
+use crate::vulkan::{descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline};
 
 mod material_compiler;
 
@@ -67,6 +67,7 @@ impl<T: MaterialData> MaterialPipeline<T> {
         shader: &str,
         frame_data_layout: vk::DescriptorSetLayout,
         renderpass: vk::RenderPass,
+        lighting_pipeline: &LightingPipeline
     ) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
         let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(
             device.as_ref(),
@@ -81,6 +82,7 @@ impl<T: MaterialData> MaterialPipeline<T> {
             pipeline_layout,
             shader,
             renderpass,
+            lighting_pipeline.stencil_id
         )?;
 
         Ok(Rc::new(MaterialPipeline {
@@ -89,7 +91,7 @@ impl<T: MaterialData> MaterialPipeline<T> {
             pipeline,
             pipeline_layout,
             descriptor_set_layout,
-            phantom: PhantomData,
+            phantom: PhantomData
         }))
     }
 

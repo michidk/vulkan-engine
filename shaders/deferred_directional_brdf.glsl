@@ -31,9 +31,9 @@ void main() {
 }
 
 //# TYPE FRAGMENT
-layout (input_attachment_index = 0, set = 0, binding = 2) uniform subpassInput in_AlbedoRoughness;
-layout (input_attachment_index = 1, set = 0, binding = 3) uniform subpassInput in_NormalMetallic;
-layout (input_attachment_index = 2, set = 0, binding = 4) uniform subpassInput in_Depth;
+layout (input_attachment_index = 0, set = 0, binding = 1) uniform subpassInput in_AlbedoRoughness;
+layout (input_attachment_index = 1, set = 0, binding = 2) uniform subpassInput in_NormalMetallic;
+layout (input_attachment_index = 2, set = 0, binding = 3) uniform subpassInput in_Depth;
 
 layout (set = 0, binding = 0) uniform CamData {
     mat4 viewMatrix;
@@ -43,11 +43,10 @@ layout (set = 0, binding = 0) uniform CamData {
     vec3 camPos;
 } u_CamData;
 
-readonly layout (set = 0, binding = 1) buffer LightBuffer {
-    float numDirectional;
-    float numPoint;
-    vec3 data[];
-} u_LightBuffer;
+layout (push_constant) uniform LightData {
+    vec4 directionToLight;
+    vec4 irradiance;
+} u_LightData;
 
 layout (location = 0) in vec2 v2f_UV;
 
@@ -55,11 +54,13 @@ layout (location = 0) out vec4 out_Color;
 
 const float PI = 3.1415926535897932384626433832795;
 
+// Schlicks approximation (approximates r_0 = ((n_1 - n_2)/(n_1 + n_2))^2)
 vec3 schlick(vec3 r0, float cosTheta) {
     // we could use pow, but then it do all the float checks - which we don't need
     return r0 + (1.0 - r0) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta) * (1.0 - cosTheta);
 }
 
+// normal distribution function: Trowbridge-Reitz GGX
 float distributionGGX(vec3 normal, vec3 halfVector, float roughness) {
     float a = roughness * roughness; // rougness apparently looks more "correct", when beeing squared (according to Disney)
     float a2 = a * a;
@@ -130,33 +131,11 @@ void main() {
 
     vec3 directionToCamera = normalize(u_CamData.camPos - worldPos);
 
-    int number_directional = int(u_LightBuffer.numDirectional);
-    int number_point = int(u_LightBuffer.numPoint);
+    vec3 directionToLight = u_LightData.directionToLight.xyz; // direction to light
+    vec3 irradiance = u_LightData.irradiance.rgb; // light color in lx (= lm/m^2), values from https://en.wikipedia.org/wiki/Lux#Illuminance
 
-    vec3 radiance = vec3(0);
-
-    // directional lights
-    for (int i = 0; i < number_directional; i++) {
-        vec3 directionToLight = u_LightBuffer.data[2 * i]; // direction to light
-        vec3 irradiance = u_LightBuffer.data[2 * i + 1]; // light color in lx (= lm/m^2), values from https://en.wikipedia.org/wiki/Lux#Illuminance
-
-        radiance += computeRadiance(irradiance, normalize(directionToLight), worldNormal, directionToCamera, albedo, metallic, roughness);
-    }
-
-    // point lights
-    for (int i = 0; i < number_point; i++) {
-        vec3 lightPosition = u_LightBuffer.data[2 * i + 2 * number_directional]; // light position
-        vec3 luminousFlux = u_LightBuffer.data[2 * i + 1 + 2 * number_directional]; // light color in lm, values from https://en.wikipedia.org/wiki/Luminous_flux#Examples
-
-        // light fall-off
-        vec3 directionToLight = normalize(lightPosition - worldPos);
-        float d = length(worldPos - lightPosition);
-        vec3 irradiance = luminousFlux / (4 * PI * d * d);
-
-        radiance += computeRadiance(irradiance, directionToLight, worldNormal, directionToCamera, albedo, metallic, roughness);
-    };
-
-    radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping
+    vec3 radiance = computeRadiance(irradiance, normalize(directionToLight), worldNormal, directionToCamera, albedo, metallic, roughness);
+    //radiance = radiance / (vec3(1.0) + radiance); // Reinhard tone mapping
 
     out_Color = vec4(radiance, 1.0);
 }

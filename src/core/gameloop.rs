@@ -38,11 +38,6 @@ impl GameLoop {
             vk.current_frame_index,
         );
 
-        scene
-            .light_manager
-            .update_buffer(&vk.allocator, &mut vk.light_buffer)
-            .expect("Something went wrong when updating light");
-
         vk.update_commandbuffer(image_index as usize, scene)
             .expect("updating the command buffer");
 

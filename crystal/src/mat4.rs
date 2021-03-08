@@ -35,34 +35,24 @@ impl<T> Mat4<T> {
 
     pub fn scale_uniform(factor: T) -> Self
     where
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One + MulAssign<T>,
     {
-        let mut matrix = &Self::identity() * factor;
+        let mut matrix = Self::identity();
+        matrix *= factor;
         unsafe { *matrix.get_unchecked_mut((3, 3)) = T::one() };
         matrix
     }
 
+    #[rustfmt::skip]
     pub fn scale(scale: &Vec3<T>) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,
     {
         Self::new(
-            scale.x().clone(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            scale.y().clone(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            scale.z().clone(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            T::zero(),
-            T::one(),
+            scale.x().clone(), T::zero(), T::zero(), T::zero(),
+            T::zero(), scale.y().clone(), T::zero(), T::zero(),
+            T::zero(), T::zero(), scale.z().clone(), T::zero(),
+            T::zero(), T::zero(), T::zero(), T::one(),
         )
     }
 
@@ -348,23 +338,23 @@ impl<T> Mat4<T> {
     }
 }
 
-impl<T> From<Quaternion<T>> for Mat4<T>
+impl<'a, T> From<&'a Quaternion<T>> for Mat4<T>
 where
     T: Clone + Zero + One + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T>,
 {
-    fn from(q: Quaternion<T>) -> Self {
+    fn from(value: &'a Quaternion<T>) -> Self {
         let two = T::one() + T::one();
 
-        let xy = q.x().clone() * q.y().clone();
-        let xz = q.x().clone() * q.z().clone();
-        let xw = q.x().clone() * q.w().clone();
-        let yz = q.y().clone() * q.z().clone();
-        let yw = q.y().clone() * q.w().clone();
-        let zw = q.z().clone() * q.w().clone();
-        let x2 = q.x().clone() * q.x().clone();
-        let y2 = q.y().clone() * q.y().clone();
-        let z2 = q.z().clone() * q.z().clone();
-        let w2 = q.w().clone() * q.w().clone();
+        let xy = value.x().clone() * value.y().clone();
+        let xz = value.x().clone() * value.z().clone();
+        let xw = value.x().clone() * value.w().clone();
+        let yz = value.y().clone() * value.z().clone();
+        let yw = value.y().clone() * value.w().clone();
+        let zw = value.z().clone() * value.w().clone();
+        let x2 = value.x().clone() * value.x().clone();
+        let y2 = value.y().clone() * value.y().clone();
+        let z2 = value.z().clone() * value.z().clone();
+        let w2 = value.w().clone() * value.w().clone();
 
         Self::from_data([
             [
@@ -387,6 +377,15 @@ where
             ],
             [T::zero(), T::zero(), T::zero(), T::one()],
         ])
+    }
+}
+
+impl<T> From<Quaternion<T>> for Mat4<T>
+where
+    T: Clone + Zero + One + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T>,
+{
+    fn from(value: Quaternion<T>) -> Self {
+        Self::from(&value)
     }
 }
 

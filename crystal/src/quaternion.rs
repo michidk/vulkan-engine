@@ -131,6 +131,10 @@ impl<T> Quaternion<T> {
     {
         self * &Vec3::unit_y()
     }
+
+    pub fn into_inner(self) -> Vec4<T> {
+        self.inner
+    }
 }
 
 impl<T> Clone for Quaternion<T>
@@ -174,6 +178,12 @@ where
 impl<T> From<[T; 4]> for Quaternion<T> {
     fn from(data: [T; 4]) -> Self {
         Self::from_vec4(data.into())
+    }
+}
+
+impl<T> From<Quaternion<T>> for Vec4<T> {
+    fn from(value: Quaternion<T>) -> Self {
+        value.inner
     }
 }
 

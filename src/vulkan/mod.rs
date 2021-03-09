@@ -277,6 +277,186 @@ impl VulkanManager {
             .aquire_next_image(self.image_acquire_semaphores[self.current_frame_index as usize])
     }
 
+    fn build_render_order(models: &Vec<Model>) -> Vec<&Model> {
+        let mut res: Vec<&Model> = Vec::with_capacity(models.len());
+
+        for obj in models {
+            let mut index = 0;
+            for cmp in &res {
+                // order: pipeline -> material -> mesh
+                if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
+                    break;
+                }
+                if cmp.material.as_ref() as *const dyn MaterialInterface > obj.material.as_ref() as *const dyn MaterialInterface {
+                    break;
+                }
+                if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {
+                    break;
+                }
+
+                index += 1;
+            }
+            res.insert(index, obj);
+        }
+
+        res
+    }
+
+    fn render_gpass(&mut self, commandbuffer: vk::CommandBuffer, models: &Vec<&Model>) -> Result<(), vk::Result> {
+        let mut last_pipeline = vk::Pipeline::null();
+        let mut last_mat: *const u8 = null();
+        let mut last_mesh: *const Mesh = null();
+        for obj in models {
+            unsafe {
+                if last_pipeline != obj.material.get_pipeline() {
+                    self.device.cmd_bind_pipeline(
+                        commandbuffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        obj.material.get_pipeline(),
+                    );
+    
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+
+                    last_pipeline = obj.material.get_pipeline();
+                    last_mat = null();
+                }
+
+                let mat = obj.material.as_ref() as *const dyn MaterialInterface as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
+                if mat != last_mat {
+                    let mat_desc_set = self
+                        .descriptor_manager
+                        .get_descriptor_set(obj.material.get_descriptor_set_layout(), obj.material.get_descriptor_data())?;
+                    self.device.cmd_bind_descriptor_sets(
+                        commandbuffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        obj.material.get_pipeline_layout(),
+                        1,
+                        &[mat_desc_set],
+                        &[],
+                    );
+
+                    last_mat = mat;
+                }
+
+                let mesh = obj.mesh.as_ref() as *const Mesh;
+                if mesh != last_mesh {
+                    self.device.cmd_bind_vertex_buffers(
+                        commandbuffer,
+                        0,
+                        &[obj.mesh.vertex_buffer],
+                        &[0],
+                    );
+                    self.device.cmd_bind_index_buffer(
+                        commandbuffer,
+                        obj.mesh.index_buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+
+                    last_mesh = mesh;
+                }
+
+                let transform_data = obj.transform.get_transform_data();
+                self.device.cmd_push_constants(
+                    commandbuffer, 
+                    obj.material.get_pipeline_layout(),
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    slice::from_raw_parts(&transform_data as *const TransformData as *const u8, size_of::<TransformData>())
+                );
+
+                for sm in &obj.mesh.submeshes {
+                    self.device
+                        .cmd_draw_indexed(commandbuffer, sm.1, 1, sm.0, 0, 0);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, light_manager: &LightManager) {
+        for lp in &self.lighting_pipelines {
+            unsafe {
+                // point lights
+                if let Some(point_pipe) = lp.point_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, point_pipe);
+            
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+    
+                    for pl in &light_manager.point_lights {
+                        self.device.cmd_push_constants(
+                            commandbuffer, 
+                            self.pipeline_layout_resolve_pass, 
+                            vk::ShaderStageFlags::FRAGMENT,
+                            0,
+                            slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
+                        );
+                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                    }
+                }
+
+                // directional lights
+                if let Some(directional_pipe) = lp.directional_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, directional_pipe);
+            
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+
+                    for dl in &light_manager.directional_lights {
+                        self.device.cmd_push_constants(
+                            commandbuffer, 
+                            self.pipeline_layout_resolve_pass, 
+                            vk::ShaderStageFlags::FRAGMENT,
+                            0,
+                            slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
+                        );
+                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                    }
+                }
+
+                // ambient
+                if let Some(ambient_pipe) = lp.ambient_pipeline {
+                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, ambient_pipe);
+            
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                }
+            }
+        }
+    }
+
     pub fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
@@ -342,26 +522,6 @@ impl VulkanManager {
             );
         }
 
-        let mut render_map: Vec<&Model> = Vec::with_capacity(scene.models.len());
-        for obj in &scene.models {
-            let mut index = 0;
-            for cmp in &render_map {
-                // order: pipeline -> material -> mesh
-                if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
-                    break;
-                }
-                if cmp.material.as_ref() as *const dyn MaterialInterface > obj.material.as_ref() as *const dyn MaterialInterface {
-                    break;
-                }
-                if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {
-                    break;
-                }
-
-                index += 1;
-            }
-            render_map.insert(index, obj);
-        }
-
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 commandbuffer,
@@ -373,82 +533,8 @@ impl VulkanManager {
             );
         }
 
-        let mut last_pipeline = vk::Pipeline::null();
-        let mut last_mat: *const u8 = null();
-        let mut last_mesh: *const Mesh = null();
-        for obj in &render_map {
-            unsafe {
-                if last_pipeline != obj.material.get_pipeline() {
-                    self.device.cmd_bind_pipeline(
-                        commandbuffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        obj.material.get_pipeline(),
-                    );
-    
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
-
-                    last_pipeline = obj.material.get_pipeline();
-                    last_mat = null();
-                }
-
-                let mat = obj.material.as_ref() as *const dyn MaterialInterface as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
-                if mat != last_mat {
-                    let mat_desc_set = self
-                        .descriptor_manager
-                        .get_descriptor_set(obj.material.get_descriptor_set_layout(), obj.material.get_descriptor_data())?;
-                    self.device.cmd_bind_descriptor_sets(
-                        commandbuffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        obj.material.get_pipeline_layout(),
-                        1,
-                        &[mat_desc_set],
-                        &[],
-                    );
-
-                    last_mat = mat;
-                }
-
-                let mesh = obj.mesh.as_ref() as *const Mesh;
-                if mesh != last_mesh {
-                    self.device.cmd_bind_vertex_buffers(
-                        commandbuffer,
-                        0,
-                        &[obj.mesh.vertex_buffer],
-                        &[0],
-                    );
-                    self.device.cmd_bind_index_buffer(
-                        commandbuffer,
-                        obj.mesh.index_buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                    
-                    last_mesh = mesh;
-                }
-
-                let transform_data = obj.transform.get_transform_data();
-                self.device.cmd_push_constants(
-                    commandbuffer, 
-                    obj.material.get_pipeline_layout(),
-                    vk::ShaderStageFlags::VERTEX,
-                    0,
-                    slice::from_raw_parts(&transform_data as *const TransformData as *const u8, size_of::<TransformData>())
-                );
-
-                for sm in &obj.mesh.submeshes {
-                    self.device
-                        .cmd_draw_indexed(commandbuffer, sm.1, 1, sm.0, 0, 0);
-                }
-            }
-        }
+        let render_map = Self::build_render_order(&scene.models);
+        self.render_gpass(commandbuffer, &render_map)?;
 
         unsafe {
             self.device.cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
@@ -463,77 +549,7 @@ impl VulkanManager {
             );
         }
 
-        for lp in &self.lighting_pipelines {
-            unsafe {
-                // point lights
-                if let Some(point_pipe) = lp.point_pipeline {
-                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, point_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
-    
-                    for pl in &scene.light_manager.point_lights {
-                        self.device.cmd_push_constants(
-                            commandbuffer, 
-                            self.pipeline_layout_resolve_pass, 
-                            vk::ShaderStageFlags::FRAGMENT,
-                            0,
-                            slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
-                        );
-                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
-                    }
-                }
-
-                // directional lights
-                if let Some(directional_pipe) = lp.directional_pipeline {
-                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, directional_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
-
-                    for dl in &scene.light_manager.directional_lights {
-                        self.device.cmd_push_constants(
-                            commandbuffer, 
-                            self.pipeline_layout_resolve_pass, 
-                            vk::ShaderStageFlags::FRAGMENT,
-                            0,
-                            slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
-                        );
-                        self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
-                    }
-                }
-
-                // ambient
-                if let Some(ambient_pipe) = lp.ambient_pipeline {
-                    self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, ambient_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
-                    self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
-                }
-            }
-        }
+        self.render_resolve_pass(commandbuffer, &scene.light_manager);
         
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);

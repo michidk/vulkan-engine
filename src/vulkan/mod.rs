@@ -10,15 +10,11 @@ mod surface;
 mod swapchain;
 pub mod lighting_pipeline;
 
-use std::{ffi::CString, mem::size_of, rc::Rc, slice};
+use std::{collections::BTreeMap, ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{
-    extensions::ext,
-    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
-    vk,
-};
+use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, Handle}};
 
-use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, transform::TransformData}};
+use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, material::{MaterialInterface, MaterialPipeline}, model::Model, transform::TransformData}};
 
 use self::{buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, lighting_pipeline::LightingPipeline, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper};
 
@@ -346,6 +342,23 @@ impl VulkanManager {
             );
         }
 
+        let mut render_map: Vec<&Model> = Vec::with_capacity(scene.models.len());
+        for obj in &scene.models {
+            let mut index = 0;
+            for cmp in &render_map {
+                // order: pipeline -> material -> mesh
+                if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
+                    break;
+                }
+                if cmp.material.as_ref() as *const dyn MaterialInterface > obj.material.as_ref() as *const dyn MaterialInterface {
+                    break;
+                }
+
+                index += 1;
+            }
+            render_map.insert(index, obj);
+        }
+
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 commandbuffer,
@@ -357,36 +370,47 @@ impl VulkanManager {
             );
         }
 
-        for obj in &scene.models {
+        let mut last_pipeline = vk::Pipeline::null();
+        let mut last_mat: *const u8 = null();
+        for obj in &render_map {
             unsafe {
-                self.device.cmd_bind_pipeline(
-                    commandbuffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    obj.material.get_pipeline(),
-                );
+                if last_pipeline != obj.material.get_pipeline() {
+                    self.device.cmd_bind_pipeline(
+                        commandbuffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        obj.material.get_pipeline(),
+                    );
+    
+                    let vp = vk::Viewport {
+                        x: 0.0,
+                        y: self.swapchain.extent.height as f32,
+                        width: self.swapchain.extent.width as f32,
+                        height: -(self.swapchain.extent.height as f32),
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
 
-                let vp = vk::Viewport {
-                    x: 0.0,
-                    y: self.swapchain.extent.height as f32,
-                    width: self.swapchain.extent.width as f32,
-                    height: -(self.swapchain.extent.height as f32),
-                    min_depth: 0.0,
-                    max_depth: 1.0,
-                };
-                self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    last_pipeline = obj.material.get_pipeline();
+                    last_mat = null();
+                }
 
-                let mat_desc_data = obj.material.get_descriptor_data();
-                let mat_desc_set = self
-                    .descriptor_manager
-                    .get_descriptor_set(obj.material.get_descriptor_set_layout(), mat_desc_data)?;
-                self.device.cmd_bind_descriptor_sets(
-                    commandbuffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    obj.material.get_pipeline_layout(),
-                    1,
-                    &[mat_desc_set],
-                    &[],
-                );
+                let mat = obj.material.as_ref() as *const dyn MaterialInterface as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
+                if mat != last_mat {
+                    let mat_desc_set = self
+                        .descriptor_manager
+                        .get_descriptor_set(obj.material.get_descriptor_set_layout(), obj.material.get_descriptor_data())?;
+                    self.device.cmd_bind_descriptor_sets(
+                        commandbuffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        obj.material.get_pipeline_layout(),
+                        1,
+                        &[mat_desc_set],
+                        &[],
+                    );
+
+                    last_mat = mat;
+                }
 
                 self.device.cmd_bind_vertex_buffers(
                     commandbuffer,
@@ -419,6 +443,15 @@ impl VulkanManager {
 
         unsafe {
             self.device.cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
+
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout_resolve_pass,
+                0,
+                &[desc_set_camera],
+                &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
+            );
         }
 
         for lp in &self.lighting_pipelines {

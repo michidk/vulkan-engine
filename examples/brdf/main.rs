@@ -107,6 +107,15 @@ fn setup(engine: &mut Engine) {
             },
         })
         .unwrap();
+    let brdf_material1 = brdf_pipeline
+        .create_material(BrdfMaterialData {
+            color_data: BrdfColorData {
+                color: Vec4::new(1.0, 0.5, 0.5, 1.0),
+                metallic: 1.0,
+                roughness: 0.2,
+            },
+        })
+        .unwrap();
 
     let unlit_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
@@ -159,7 +168,7 @@ fn setup(engine: &mut Engine) {
         .unwrap();
 
     let model = Model {
-        material: brdf_material0,
+        material: brdf_material0.clone(),
         mesh: mesh.clone(),
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
@@ -168,7 +177,7 @@ fn setup(engine: &mut Engine) {
         },
     };
     let model2 = Model {
-        material: unlit_material0,
+        material: unlit_material0.clone(),
         mesh: mesh.clone(),
         transform: Transform {
             position: Vec3::new(-3.0, 0.0, 4.0),
@@ -176,9 +185,29 @@ fn setup(engine: &mut Engine) {
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     };
+    let model3 = Model {
+        material: brdf_material0.clone(),
+        mesh: mesh.clone(),
+        transform: Transform {
+            position: Vec3::new(3.0, 0.0, 5.0),
+            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(-15.0)),
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        },
+    };
+    let model4 = Model {
+        material: brdf_material1.clone(),
+        mesh: mesh.clone(),
+        transform: Transform {
+            position: Vec3::new(2.0, 1.0, 4.0),
+            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(180.0)),
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        },
+    };
 
     scene.add(model);
     scene.add(model2);
+    scene.add(model3);
+    scene.add(model4);
 
     // setup scene
     let lights = &mut scene.light_manager;

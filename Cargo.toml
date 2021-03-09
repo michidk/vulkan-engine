@@ -29,4 +29,4 @@ vulkan-engine_derive = { path="vulkan-engine_derive" }
 lto = "thin"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0

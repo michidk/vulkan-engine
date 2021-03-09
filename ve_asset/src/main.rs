@@ -5,9 +5,9 @@ pub(crate) mod mesh;
 pub(crate) mod utils;
 
 use anyhow::Result;
-use log::{error, warn};
+use log::{debug, error, warn};
 use mesh::obj;
-use std::{path::Path, process::exit};
+use std::path::Path;
 use structopt::StructOpt;
 
 // Cli arguments
@@ -48,7 +48,7 @@ const GLOB_OPTIONS: glob::MatchOptions = glob::MatchOptions {
     require_literal_leading_dot: false,
 };
 
-fn main() {
+fn main() -> Result<()> {
     let args = CliArgs::from_args();
 
     if !args.verbose {
@@ -59,10 +59,7 @@ fn main() {
             .init();
     }
 
-    if let Err(err) = prepare(args) {
-        error!("{}", err);
-        exit(1);
-    }
+    Ok(prepare(args)?)
 }
 
 fn prepare(args: CliArgs) -> Result<()> {
@@ -86,12 +83,11 @@ fn prepare(args: CliArgs) -> Result<()> {
             continue;
         }
 
-        println!("Processing `{}`", path.display());
-
         // check extension
         if let Some(Some(extension)) = path.extension().map(|x| x.to_str()) {
             match extension.to_ascii_lowercase().as_ref() {
                 "obj" => obj::process(&path, &output_path)?,
+                "toml" => debug!("Ignored toml file: {}", &path.display()),
                 _ => warn!("Could not handle path: {}", &path.display()),
             }
         } else {

@@ -1,9 +1,11 @@
+use std::iter;
+
 use crystal::prelude::*;
 
 use log::debug;
 use ve_format::mesh;
 
-use super::parser::ParserError;
+use super::{meta::ObjMeta, parser::ParserError};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct ObjVertex {
@@ -42,6 +44,7 @@ pub(crate) struct ObjMeshData {
 pub(crate) struct ObjMeshBuilder {
     pub(crate) mesh: ObjMeshData,
     pub(crate) curr_submesh: ObjSubmesh,
+    pub(crate) meta: ObjMeta,
 }
 
 impl ObjMeshBuilder {
@@ -74,7 +77,14 @@ impl ObjMeshBuilder {
         self.mesh.uvs.push(uv);
     }
 
-    pub(crate) fn push_normal(&mut self, normal: [f32; 3]) {
+    pub(crate) fn push_normal(&mut self, mut normal: [f32; 3]) {
+        // invert normals if necessary
+        for n in 0..3 {
+            if self.meta.flip_normals[n] {
+                normal[n] = -normal[n];
+            }
+        }
+
         self.mesh.normals.push(normal);
     }
 
@@ -139,10 +149,16 @@ impl ObjMeshBuilder {
             submeshes.push(mesh::Submesh { faces })
         }
 
-        Ok(mesh::MeshData {
+        let mut mesh_data = mesh::MeshData {
             vertices,
             submeshes,
-        })
+        };
+
+        if self.meta.calculate_normals {
+            ObjMeshBuilder::calculate_normals(&mut mesh_data);
+        }
+
+        Ok(mesh_data)
     }
 
     fn find_vertex(
@@ -167,14 +183,11 @@ impl ObjMeshBuilder {
             .into();
 
         // get normal values from current face index or default as vec
-        let mut normal: Vec3<f32> = face.face_i[i]
+        let normal: Vec3<f32> = face.face_i[i]
             .normal_i
             .map(|x| normals[x - 1])
             .unwrap_or_else(|| [0.0, 0.0, 0.0])
             .into();
-
-        *normal.x_mut() = -*normal.x_mut();
-        *normal.z_mut() = -*normal.z_mut();
 
         // search if vertex already exists, will result in O(n*log(n))
         let mut potential_vert_idx: Option<usize> = None;
@@ -205,5 +218,60 @@ impl ObjMeshBuilder {
         }
 
         vert_idx
+    }
+
+    /// calculates normals of the mesh
+    // for each submesh:
+    // - go through each face
+    // - - calculate face normal depending on winding order of vertices
+    // - - - u = v1 - v0
+    // - - - v = v2 - v0
+    // - - - face_normal = cross(u, v)
+    // go through each vertex
+    // - figure out the faces it is used in (using `face_to_vert`)
+    // - average the normals of those faces and assign to vertex: (normal1 + normal2 + ... ) / normals.length
+    fn calculate_normals(data: &mut mesh::MeshData) {
+        let mut f_normals: Vec<Vec3<f32>> = Vec::new();
+
+        let mut face_to_vert: Vec<Vec<usize>> = iter::repeat(Default::default())
+            .take(data.vertices.len())
+            .collect();
+
+        for submesh in &data.submeshes {
+            for face in &submesh.faces {
+                let (v0_i, v1_i, v2_i) = (
+                    face.indices[0] as usize,
+                    face.indices[1] as usize,
+                    face.indices[2] as usize,
+                );
+                let (v0, v1, v2) = (
+                    data.vertices[v0_i],
+                    data.vertices[v1_i],
+                    data.vertices[v2_i],
+                );
+                let u: Vec3<f32> = &v1.position - &v0.position;
+                let v: Vec3<f32> = &v2.position - &v0.position;
+                let normal = &u.cross_product(&v);
+
+                f_normals.push(*normal);
+
+                face_to_vert[v0_i].push(f_normals.len() - 1);
+                face_to_vert[v1_i].push(f_normals.len() - 1);
+                face_to_vert[v2_i].push(f_normals.len() - 1);
+            }
+        }
+
+        for (idx, vertex) in data.vertices.iter_mut().enumerate() {
+            let faces = &face_to_vert[idx];
+            let mut normal: Vec3<f32> = Vec3::zero();
+
+            for face_idx in faces {
+                normal += f_normals[*face_idx];
+            }
+
+            let len = f_normals.len() as f32;
+            let normal = Vec3::new(normal.x() / len, normal.y() / len, normal.z() / len);
+            vertex.normal = normal;
+        }
     }
 }

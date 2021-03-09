@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use std::{
     fs::File,
     io::Write,
@@ -18,7 +18,10 @@ pub fn combine_path(directory: &Path, file_name: &str, extension: &str) -> Resul
 }
 
 pub fn write_file(target: PathBuf, data: Vec<u8>) -> Result<File> {
-    let mut buffer = File::create(target)?;
-    buffer.write(data.as_slice())?;
+    let mut buffer = File::create(&target)
+        .with_context(|| format!("Could not create file: {}", &target.display()))?;
+    buffer
+        .write(data.as_slice())
+        .with_context(|| format!("Could not write data to file: {}", &target.display()))?;
     Ok(buffer)
 }

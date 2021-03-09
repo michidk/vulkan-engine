@@ -4,7 +4,7 @@ use std::{num, path::Path};
 
 use log::debug;
 
-use super::builder::*;
+use super::{builder::*, meta::ObjMeta};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParserError {
@@ -20,9 +20,10 @@ pub enum ParserError {
 
 // parses wavefront obj (https://en.wikipedia.org/wiki/Wavefront_.obj_file)
 // the implementation is very forgiving and should work with most .obj files
-pub(crate) fn parse(filepath: &Path) -> Result<ObjMeshBuilder, ParserError> {
+pub(crate) fn parse(filepath: &Path, meta: ObjMeta) -> Result<ObjMeshBuilder, ParserError> {
     let mut builder: ObjMeshBuilder = ObjMeshBuilder {
         mesh: ObjMeshData::default(),
+        meta,
         ..Default::default()
     };
 

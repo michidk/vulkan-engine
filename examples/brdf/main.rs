@@ -111,7 +111,7 @@ fn setup(engine: &mut Engine) {
         .create_material(BrdfMaterialData {
             color_data: BrdfColorData {
                 color: Vec4::new(1.0, 0.5, 0.5, 1.0),
-                metallic: 1.0,
+                metallic: 0.0,
                 roughness: 0.2,
             },
         })
@@ -135,7 +135,7 @@ fn setup(engine: &mut Engine) {
         }
     ).unwrap();
 
-    let mesh_data = MeshData {
+    let mesh_data0 = MeshData {
         vertices: vec![
             Vertex {
                 position: Vec3::new(-1.0, -1.0, 0.0),
@@ -160,8 +160,38 @@ fn setup(engine: &mut Engine) {
             faces: vec![Face { indices: [0, 1, 2] }],
         }],
     };
+    let mesh0 = mesh_data0
+        .bake(
+            (*engine.vulkan_manager.allocator).clone()
+        )
+        .unwrap();
 
-    let mesh = mesh_data
+    let mesh_data1 = MeshData {
+        vertices: vec![
+            Vertex {
+                position: Vec3::new(-0.5, -1.0, 0.0),
+                color: Vec3::new(1.0, 0.0, 1.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(0.0, 0.0),
+            },
+            Vertex {
+                position: Vec3::new(1.0, -1.0, 0.0),
+                color: Vec3::new(1.0, 0.0, 1.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(0.0, 0.0),
+            },
+            Vertex {
+                position: Vec3::new(0.0, 1.0, 0.0),
+                color: Vec3::new(1.0, 0.0, 1.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(0.0, 0.0),
+            },
+        ],
+        submeshes: vec![Submesh {
+            faces: vec![Face { indices: [0, 1, 2] }],
+        }],
+    };
+    let mesh1 = mesh_data1
         .bake(
             (*engine.vulkan_manager.allocator).clone()
         )
@@ -169,7 +199,7 @@ fn setup(engine: &mut Engine) {
 
     let model = Model {
         material: brdf_material0.clone(),
-        mesh: mesh.clone(),
+        mesh: mesh0.clone(),
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(0.0)),
@@ -177,8 +207,8 @@ fn setup(engine: &mut Engine) {
         },
     };
     let model2 = Model {
-        material: unlit_material0.clone(),
-        mesh: mesh.clone(),
+        material: brdf_material1.clone(),
+        mesh: mesh0.clone(),
         transform: Transform {
             position: Vec3::new(-3.0, 0.0, 4.0),
             rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(15.0)),
@@ -187,7 +217,7 @@ fn setup(engine: &mut Engine) {
     };
     let model3 = Model {
         material: brdf_material0.clone(),
-        mesh: mesh.clone(),
+        mesh: mesh1.clone(),
         transform: Transform {
             position: Vec3::new(3.0, 0.0, 5.0),
             rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(-15.0)),
@@ -195,11 +225,20 @@ fn setup(engine: &mut Engine) {
         },
     };
     let model4 = Model {
-        material: brdf_material1.clone(),
-        mesh: mesh.clone(),
+        material: unlit_material0.clone(),
+        mesh: mesh0.clone(),
         transform: Transform {
             position: Vec3::new(2.0, 1.0, 4.0),
             rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(180.0)),
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        },
+    };
+    let model5 = Model {
+        material: brdf_material0.clone(),
+        mesh: mesh0.clone(),
+        transform: Transform {
+            position: Vec3::new(-2.5, 1.0, 4.0),
+            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(15.0)),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     };
@@ -208,6 +247,7 @@ fn setup(engine: &mut Engine) {
     scene.add(model2);
     scene.add(model3);
     scene.add(model4);
+    scene.add(model5);
 
     // setup scene
     let lights = &mut scene.light_manager;

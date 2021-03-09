@@ -14,7 +14,7 @@ use std::{collections::BTreeMap, ffi::CString, mem::size_of, ptr::null, rc::Rc, 
 
 use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, Handle}};
 
-use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, material::{MaterialInterface, MaterialPipeline}, model::Model, transform::TransformData}};
+use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, material::{MaterialInterface, MaterialPipeline}, model::{Model, mesh::Mesh}, transform::TransformData}};
 
 use self::{buffer::{BufferWrapper, PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, lighting_pipeline::LightingPipeline, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper};
 
@@ -353,6 +353,9 @@ impl VulkanManager {
                 if cmp.material.as_ref() as *const dyn MaterialInterface > obj.material.as_ref() as *const dyn MaterialInterface {
                     break;
                 }
+                if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {
+                    break;
+                }
 
                 index += 1;
             }
@@ -372,6 +375,7 @@ impl VulkanManager {
 
         let mut last_pipeline = vk::Pipeline::null();
         let mut last_mat: *const u8 = null();
+        let mut last_mesh: *const Mesh = null();
         for obj in &render_map {
             unsafe {
                 if last_pipeline != obj.material.get_pipeline() {
@@ -412,18 +416,23 @@ impl VulkanManager {
                     last_mat = mat;
                 }
 
-                self.device.cmd_bind_vertex_buffers(
-                    commandbuffer,
-                    0,
-                    &[obj.mesh.vertex_buffer],
-                    &[0],
-                );
-                self.device.cmd_bind_index_buffer(
-                    commandbuffer,
-                    obj.mesh.index_buffer,
-                    0,
-                    vk::IndexType::UINT32,
-                );
+                let mesh = obj.mesh.as_ref() as *const Mesh;
+                if mesh != last_mesh {
+                    self.device.cmd_bind_vertex_buffers(
+                        commandbuffer,
+                        0,
+                        &[obj.mesh.vertex_buffer],
+                        &[0],
+                    );
+                    self.device.cmd_bind_index_buffer(
+                        commandbuffer,
+                        obj.mesh.index_buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    
+                    last_mesh = mesh;
+                }
 
                 let transform_data = obj.transform.get_transform_data();
                 self.device.cmd_push_constants(

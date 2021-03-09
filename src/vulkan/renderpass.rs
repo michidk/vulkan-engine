@@ -7,13 +7,13 @@ pub fn init_renderpass(
     let attachments = [
         // OutColor
         vk::AttachmentDescription::builder()
-            .format(format)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::STORE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
             .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
             .initial_layout(vk::ImageLayout::UNDEFINED)
-            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+            .final_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
             .samples(vk::SampleCountFlags::TYPE_1)
             .build(),
         // Depth
@@ -113,6 +113,15 @@ pub fn init_renderpass(
             .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::FRAGMENT_SHADER)
             .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::INPUT_ATTACHMENT_READ)
+            .build(),
+        // 1 to pp: make sure layout transition happens before transfer
+        vk::SubpassDependency::builder()
+            .src_subpass(1)
+            .dst_subpass(vk::SUBPASS_EXTERNAL)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .dst_stage_mask(vk::PipelineStageFlags::TRANSFER)
+            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+            .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
             .build()
     ];
     let renderpass_info = vk::RenderPassCreateInfo::builder()

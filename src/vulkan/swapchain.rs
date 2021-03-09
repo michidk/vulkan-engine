@@ -1,3 +1,5 @@
+use std::ptr::null;
+
 use ash::{version::DeviceV1_0, vk};
 
 use super::{error::VulkanError, queue, surface};
@@ -10,21 +12,25 @@ pub struct SwapchainWrapper {
     pub swapchain: vk::SwapchainKHR,
     pub images: Vec<vk::Image>,
     pub imageviews: Vec<vk::ImageView>,
-    pub depth_image: vk::Image,
-    pub depth_image_allocation: vk_mem::Allocation,
-    pub depth_image_allocation_info: vk_mem::AllocationInfo,
+    pub depth_image: vk::Image, // used in gpass and resolve pass
+    pub depth_image_alloc: vk_mem::Allocation,
     pub depth_imageview: vk::ImageView,
     pub depth_imageview_depth_only: vk::ImageView,
-    pub framebuffers: Vec<vk::Framebuffer>,
     pub surface_format: vk::SurfaceFormatKHR,
     pub extent: vk::Extent2D,
     pub amount_of_images: u32,
+    pub resolve_image: vk::Image, // will contain the finished deferred scene rendering
+    pub resolve_imageview: vk::ImageView,
+    pub resolve_image_alloc: vk_mem::Allocation,
     pub g0_image: vk::Image,
     pub g0_imageview: vk::ImageView,
     pub g0_image_alloc: vk_mem::Allocation,
     pub g1_image: vk::Image,
     pub g1_imageview: vk::ImageView,
     pub g1_image_alloc: vk_mem::Allocation,
+    pub framebuffer_deferred: vk::Framebuffer, // used for gpass and resolve pass, renders to resolve_image
+    pub framebuffer_pp_a: vk::Framebuffer, // used for pp, renders to g0_image
+    pub framebuffer_pp_b: vk::Framebuffer, // used for pp, renders to g1_image
 }
 
 impl SwapchainWrapper {
@@ -49,21 +55,18 @@ impl SwapchainWrapper {
             PREFERRED_IMAGE_COUNT.max(surface_capabilities.min_image_count)
         };
 
-        let mut swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
+        let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surface.surface)
             .min_image_count(image_count)
             .image_format(surface_format.format)
             .image_color_space(surface_format.color_space)
             .image_extent(extent)
             .image_array_layers(1)
-            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
+            .image_usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::COLOR_ATTACHMENT)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode);
-
-        swapchain_create_info =
-            swapchain_create_info.image_sharing_mode(vk::SharingMode::EXCLUSIVE);
 
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };
@@ -94,7 +97,6 @@ impl SwapchainWrapper {
 
         let depth_image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
-            // TODO: maybe optimize wit D24 bit instead
             .format(vk::Format::D24_UNORM_S8_UINT)
             .extent(extend_3d)
             .mip_levels(1)
@@ -107,7 +109,7 @@ impl SwapchainWrapper {
             usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()
         };
-        let (depth_image, depth_image_allocation, depth_image_allocation_info) =
+        let (depth_image, depth_image_alloc, _) =
             allocator.create_image(&depth_image_info, &allocation_info)?;
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL)
@@ -135,6 +137,36 @@ impl SwapchainWrapper {
             .format(vk::Format::D24_UNORM_S8_UINT)
             .subresource_range(*subresource_range);
         let depth_imageview_depth_only =
+            unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
+
+        let resolve_image_info = vk::ImageCreateInfo::builder()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .extent(extend_3d)
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let allocation_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::GpuOnly,
+            ..Default::default()
+        };
+        let (resolve_image, resolve_image_alloc, _) =
+            allocator.create_image(&resolve_image_info, &allocation_info)?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(resolve_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .subresource_range(*subresource_range);
+        let resolve_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
         let g0_image_info = vk::ImageCreateInfo::builder()
@@ -203,11 +235,9 @@ impl SwapchainWrapper {
             images: swapchain_images,
             imageviews: swapchain_imageviews,
             depth_image,
-            depth_image_allocation,
-            depth_image_allocation_info,
+            depth_image_alloc,
             depth_imageview,
             depth_imageview_depth_only,
-            framebuffers: vec![],
             surface_format,
             extent,
             amount_of_images,
@@ -216,7 +246,13 @@ impl SwapchainWrapper {
             g0_imageview,
             g1_image,
             g1_image_alloc,
-            g1_imageview
+            g1_imageview,
+            resolve_image,
+            resolve_imageview,
+            resolve_image_alloc,
+            framebuffer_deferred: vk::Framebuffer::null(),
+            framebuffer_pp_a: vk::Framebuffer::null(),
+            framebuffer_pp_b: vk::Framebuffer::null(),
         })
     }
 
@@ -239,25 +275,48 @@ impl SwapchainWrapper {
         &mut self,
         logical_device: &ash::Device,
         renderpass: vk::RenderPass,
+        pp_renderpass: vk::RenderPass,
     ) -> Result<(), vk::Result> {
-        for iv in &self.imageviews {
-            let iview = [*iv, self.depth_imageview, self.g0_imageview, self.g1_imageview];
-            let framebuffer_info = vk::FramebufferCreateInfo::builder()
-                .render_pass(renderpass)
-                .attachments(&iview)
-                .width(self.extent.width)
-                .height(self.extent.height)
-                .layers(1);
-            let fb = unsafe { logical_device.create_framebuffer(&framebuffer_info, None) }?;
-            self.framebuffers.push(fb);
-        }
+        // deferred framebuffer
+        let views = [self.resolve_imageview, self.depth_imageview, self.g0_imageview, self.g1_imageview];
+        let fb_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(renderpass)
+            .attachments(&views)
+            .width(self.extent.width)
+            .height(self.extent.height)
+            .layers(1)
+            .build();
+        self.framebuffer_deferred = unsafe { logical_device.create_framebuffer(&fb_info, None)? };
+
+        // PP a framebuffer
+        let views = [self.g0_imageview];
+        let fb_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(pp_renderpass)
+            .attachments(&views)
+            .width(self.extent.width)
+            .height(self.extent.height)
+            .layers(1)
+            .build();
+        self.framebuffer_pp_a = unsafe { logical_device.create_framebuffer(&fb_info, None)? };
+
+        // PP b framebuffer
+        let views = [self.g1_imageview];
+        let fb_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(pp_renderpass)
+            .attachments(&views)
+            .width(self.extent.width)
+            .height(self.extent.height)
+            .layers(1)
+            .build();
+        self.framebuffer_pp_b = unsafe { logical_device.create_framebuffer(&fb_info, None)? };
+
         Ok(())
     }
 
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
         logical_device.destroy_image_view(self.depth_imageview, None);
         logical_device.destroy_image_view(self.depth_imageview_depth_only, None);
-        allocator.destroy_image(self.depth_image, &self.depth_image_allocation);
+        allocator.destroy_image(self.depth_image, &self.depth_image_alloc);
 
         logical_device.destroy_image_view(self.g0_imageview, None);
         allocator.destroy_image(self.g0_image, &self.g0_image_alloc);
@@ -265,9 +324,6 @@ impl SwapchainWrapper {
         logical_device.destroy_image_view(self.g1_imageview, None);
         allocator.destroy_image(self.g1_image, &self.g1_image_alloc);
 
-        for fb in &self.framebuffers {
-            logical_device.destroy_framebuffer(*fb, None);
-        }
         for iv in &self.imageviews {
             logical_device.destroy_image_view(*iv, None);
         }

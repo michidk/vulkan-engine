@@ -69,7 +69,14 @@ impl ObjMeshBuilder {
         }
     }
 
-    pub(crate) fn push_vertex(&mut self, vertex: ObjVertex) {
+    pub(crate) fn push_vertex(&mut self, mut vertex: ObjVertex) {
+        // invert vertex if necessary
+        for n in 0..3 {
+            if self.meta.flip_axis[n] {
+                vertex.position[n] = -vertex.position[n];
+            }
+        }
+
         self.mesh.vertices.push(vertex);
     }
 
@@ -80,7 +87,7 @@ impl ObjMeshBuilder {
     pub(crate) fn push_normal(&mut self, mut normal: [f32; 3]) {
         // invert normals if necessary
         for n in 0..3 {
-            if self.meta.flip_normals[n] {
+            if self.meta.flip_axis[n] {
                 normal[n] = -normal[n];
             }
         }
@@ -226,7 +233,7 @@ impl ObjMeshBuilder {
     // - - calculate face normal depending on winding order of vertices
     // - - - u = v1 - v0
     // - - - v = v2 - v0
-    // - - - face_normal = cross(u, v)
+    // - - - face_normal = cross(v, u) [or cross(u, v) in the case of a right handed coordinate system]
     // go through each vertex
     // - figure out the faces it is used in (using `face_to_vert`)
     // - average the normals of those faces and assign to vertex: (normal1 + normal2 + ... ) / normals.length
@@ -251,7 +258,7 @@ impl ObjMeshBuilder {
                 );
                 let u: Vec3<f32> = &v1.position - &v0.position;
                 let v: Vec3<f32> = &v2.position - &v0.position;
-                let normal = &u.cross_product(&v);
+                let normal = &v.cross_product(&u); // left handed
 
                 f_normals.push(*normal);
 

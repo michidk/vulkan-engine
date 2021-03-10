@@ -314,6 +314,10 @@ impl SwapchainWrapper {
     }
 
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
+        logical_device.destroy_framebuffer(self.framebuffer_deferred, None);
+        logical_device.destroy_framebuffer(self.framebuffer_pp_a, None);
+        logical_device.destroy_framebuffer(self.framebuffer_pp_b, None);
+
         logical_device.destroy_image_view(self.depth_imageview, None);
         logical_device.destroy_image_view(self.depth_imageview_depth_only, None);
         allocator.destroy_image(self.depth_image, &self.depth_image_alloc);
@@ -323,6 +327,9 @@ impl SwapchainWrapper {
 
         logical_device.destroy_image_view(self.g1_imageview, None);
         allocator.destroy_image(self.g1_image, &self.g1_image_alloc);
+
+        logical_device.destroy_image_view(self.resolve_imageview, None);
+        allocator.destroy_image(self.resolve_image, &self.resolve_image_alloc);
 
         for iv in &self.imageviews {
             logical_device.destroy_image_view(*iv, None);

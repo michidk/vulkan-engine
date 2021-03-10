@@ -854,15 +854,23 @@ impl Drop for VulkanManager {
             self.pools.cleanup(&self.device);
             
             self.device.destroy_render_pass(self.renderpass, None);
+            self.device.destroy_render_pass(self.renderpass_pp, None);
             // --segfault
             self.swapchain.cleanup(&self.device, &self.allocator);
+
+            self.device.destroy_sampler(self.sampler_linear, None);
 
             self.device
                 .destroy_descriptor_set_layout(self.desc_layout_frame_data, None);
             self.device
+                .destroy_descriptor_set_layout(self.desc_layout_pp, None);
+            
+            self.device
                 .destroy_pipeline_layout(self.pipeline_layout_gpass, None);
             self.device
                 .destroy_pipeline_layout(self.pipeline_layout_resolve_pass, None);
+            self.device
+                .destroy_pipeline_layout(self.pipe_layout_pp, None);
 
             std::mem::ManuallyDrop::drop(&mut self.allocator);
 

@@ -374,7 +374,7 @@ impl VulkanManager {
                 if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
                     break;
                 }
-                if cmp.material.as_ref() as *const dyn MaterialInterface > obj.material.as_ref() as *const dyn MaterialInterface {
+                if cmp.material.as_ref() as *const dyn MaterialInterface as *const u8 > obj.material.as_ref() as *const dyn MaterialInterface as *const u8 {
                     break;
                 }
                 if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {

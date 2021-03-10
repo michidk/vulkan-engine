@@ -14,6 +14,9 @@ mod scalar;
 mod unit;
 mod vector;
 
+#[cfg(feature = "serde-serialize")]
+mod serde;
+
 #[cfg(test)]
 mod test_util;
 

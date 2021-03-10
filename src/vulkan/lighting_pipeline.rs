@@ -107,7 +107,7 @@ impl LightingPipeline {
         let colourblend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::ONE)
-            .dst_color_blend_factor(vk::BlendFactor::ONE)
+            .dst_color_blend_factor(vk::BlendFactor::DST_ALPHA) // this ensures that the clear color is not added to the final color
             .color_blend_op(vk::BlendOp::ADD)
             .src_alpha_blend_factor(vk::BlendFactor::ONE)
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)

@@ -3,7 +3,8 @@ use std::process::exit;
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::{scene::material::*, vulkan::lighting_pipeline::LightingPipeline};
+use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
+use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::lighting_pipeline::LightingPipeline};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -12,7 +13,6 @@ use vulkan_engine::{
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::{
-            mesh::{Face, MeshData, Submesh, Vertex},
             Model,
         },
         transform::Transform,
@@ -160,8 +160,8 @@ fn setup(engine: &mut Engine) {
             faces: vec![Face { indices: [0, 1, 2] }],
         }],
     };
-    let mesh0 = mesh_data0
-        .bake(
+    let mesh0 = Mesh::bake(
+            mesh_data0,
             (*engine.vulkan_manager.allocator).clone()
         )
         .unwrap();
@@ -191,8 +191,8 @@ fn setup(engine: &mut Engine) {
             faces: vec![Face { indices: [0, 1, 2] }],
         }],
     };
-    let mesh1 = mesh_data1
-        .bake(
+    let mesh1 = Mesh::bake(
+            mesh_data1,
             (*engine.vulkan_manager.allocator).clone()
         )
         .unwrap();

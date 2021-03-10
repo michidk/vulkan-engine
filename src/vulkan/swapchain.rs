@@ -30,7 +30,7 @@ pub struct SwapchainWrapper {
     pub g1_image_alloc: vk_mem::Allocation,
     pub framebuffer_deferred: vk::Framebuffer, // used for gpass and resolve pass, renders to resolve_image
     pub framebuffer_pp_a: vk::Framebuffer, // used for pp, renders to g0_image
-    pub framebuffer_pp_b: vk::Framebuffer, // used for pp, renders to g1_image
+    pub framebuffer_pp_b: vk::Framebuffer, // used for pp, renders to resolve_image
 }
 
 impl SwapchainWrapper {
@@ -147,7 +147,7 @@ impl SwapchainWrapper {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
+            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
@@ -177,7 +177,7 @@ impl SwapchainWrapper {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT)
+            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
@@ -300,7 +300,7 @@ impl SwapchainWrapper {
         self.framebuffer_pp_a = unsafe { logical_device.create_framebuffer(&fb_info, None)? };
 
         // PP b framebuffer
-        let views = [self.g1_imageview];
+        let views = [self.resolve_imageview];
         let fb_info = vk::FramebufferCreateInfo::builder()
             .render_pass(pp_renderpass)
             .attachments(&views)

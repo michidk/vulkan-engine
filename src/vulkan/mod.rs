@@ -13,7 +13,7 @@ pub mod pp_effect;
 
 use std::{collections::BTreeMap, ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, AttachmentDescription, AttachmentReference, Handle, ImageSubresourceLayers, ImageSubresourceRange, SubpassDependency, SubpassDescription}};
+use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, AttachmentDescription, AttachmentReference, Handle, ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, SubpassDependency, SubpassDescription}};
 
 use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, material::{MaterialInterface, MaterialPipeline}, model::{Model, mesh::Mesh}, transform::TransformData}};
 
@@ -544,6 +544,195 @@ impl VulkanManager {
         }
     }
 
+    fn render_pp(&mut self, commandbuffer: vk::CommandBuffer, swapchain_image_index: usize) -> Result<(), vk::Result> {
+        // resolve image contains finished scene rendering in hdr format
+        // for each pp effect:
+        //      - transition src image (either resolve_image or g0_image) to SHADER_READONLY_OPTIMAL layout (done by previous pp renderpass and resolve pass)
+        //      - transition dst image (either resolve_image or g0_image) to COLOR_ATTACHMENT_OPTIMAL layout (done by renderpass)
+        //      - begin pp renderpass with correct framebuffer
+        //      - bind pipeline and correct descriptor set
+        //      - draw fullscreen quad
+        // transition swapchain image to TRANSFER_DST_OPTIMAL
+        // transition final dst image (either resolve_image or g0_image) to TRANSFER_SRC_OPTIMAL
+        // ImageBlit to swapchain
+        // Transition swapchain image to PRESENT_SRC_KHR
+
+        let mut direction = false;
+
+        for effect in &self.pp_effects {
+            // begin renderpass
+            let rp_info = vk::RenderPassBeginInfo::builder()
+                .render_pass(self.renderpass_pp)
+                .framebuffer(if !direction { self.swapchain.framebuffer_pp_a } else { self.swapchain.framebuffer_pp_b })
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D{x: 0, y: 0},
+                    extent: self.swapchain.extent,
+                })
+                .build();
+            unsafe {
+                self.device.cmd_begin_render_pass(commandbuffer, &rp_info, vk::SubpassContents::INLINE);
+            }
+
+            // bind pp pipeline and descriptor set
+            unsafe {
+                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, effect.pipeline);
+            }
+
+            let viewport = vk::Viewport {
+                x: 0.0,
+                y: self.swapchain.extent.height as f32,
+                width: self.swapchain.extent.width as f32,
+                height: -(self.swapchain.extent.height as f32),
+                min_depth: 0.0,
+                max_depth: 1.0,
+            };
+            unsafe {
+                self.device.cmd_set_viewport(commandbuffer, 0, &[viewport]);
+            }
+
+            let desc_data = [
+                DescriptorData::ImageSampler {
+                    image: if !direction { self.swapchain.resolve_imageview } else { self.swapchain.g0_imageview },
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    sampler: vk::Sampler::null(),
+                }
+            ];
+            let desc_set = self.descriptor_manager.get_descriptor_set(self.desc_layout_pp, &desc_data)?;
+            unsafe {
+                self.device.cmd_bind_descriptor_sets(
+                    commandbuffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipe_layout_pp,
+                    0,
+                    &[desc_set],
+                    &[]
+                );
+            }
+
+            unsafe {
+                self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
+                self.device.cmd_end_render_pass(commandbuffer);
+            }
+
+            direction = !direction;
+        }
+
+        // transition swapchain image to TRANSFER_DST_OPTIMAL and final pp image to TRANSFER_SRC_OPTIMAL
+        let transitions = [
+            // swapchain image
+            vk::ImageMemoryBarrier::builder()
+                .src_access_mask(vk::AccessFlags::empty())
+                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .old_layout(vk::ImageLayout::UNDEFINED)
+                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .image(self.swapchain.images[swapchain_image_index])
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .build(),
+            // pp image
+            vk::ImageMemoryBarrier::builder()
+                .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+                .old_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                .image(if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image })
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .build(),
+        ];
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                commandbuffer,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &transitions
+            );
+        }
+
+        // blit pp image to swapchain (automatically converts to sRGB)
+        let regions = [
+            vk::ImageBlit {
+                src_subresource: vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_offsets: [
+                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                    vk::Offset3D { x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }
+                ],
+                dst_subresource: vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                dst_offsets: [
+                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                    vk::Offset3D { x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }
+                ],
+            }
+        ];
+
+        unsafe {
+            self.device.cmd_blit_image(
+                commandbuffer,
+                if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image },
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                self.swapchain.images[swapchain_image_index],
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &regions,
+                vk::Filter::LINEAR
+            );
+        }
+
+        // transition swapchain image to PRESENT_SRC_KHR
+        let transitions = [
+            // swapchain image
+            vk::ImageMemoryBarrier::builder()
+                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                .image(self.swapchain.images[swapchain_image_index])
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .build()
+        ];
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                commandbuffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &transitions
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
@@ -641,85 +830,7 @@ impl VulkanManager {
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);
 
-            let transitions = [
-                vk::ImageMemoryBarrier::builder()
-                    .src_access_mask(vk::AccessFlags::empty())
-                    .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-                    .old_layout(vk::ImageLayout::UNDEFINED)
-                    .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-                    .image(self.swapchain.images[swapchain_image_index])
-                    .subresource_range(vk::ImageSubresourceRange {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        base_mip_level: 0,
-                        level_count: 1,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    })
-                    .build()
-            ];
-            self.device.cmd_pipeline_barrier(
-                commandbuffer,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &transitions
-            );
-
-            let blits = [
-                vk::ImageBlit {
-                    src_subresource: vk::ImageSubresourceLayers {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        mip_level: 0,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    },
-                    src_offsets: [ vk::Offset3D { x: 0, y: 0, z: 0 }, vk::Offset3D{x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }],
-                    dst_subresource: vk::ImageSubresourceLayers {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        mip_level: 0,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    },
-                    dst_offsets: [ vk::Offset3D { x: 0, y: 0, z: 0 }, vk::Offset3D{x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }],
-                }
-            ];
-            self.device.cmd_blit_image(
-                commandbuffer,
-                self.swapchain.resolve_image,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                self.swapchain.images[swapchain_image_index],
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &blits,
-                vk::Filter::NEAREST
-            );
-
-            let transitions = [
-                vk::ImageMemoryBarrier::builder()
-                    .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
-                    .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-                    .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                    .image(self.swapchain.images[swapchain_image_index])
-                    .subresource_range(vk::ImageSubresourceRange {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        base_mip_level: 0,
-                        level_count: 1,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    })
-                    .build()
-            ];
-            self.device.cmd_pipeline_barrier(
-                commandbuffer,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &transitions
-            );
+            self.render_pp(commandbuffer, swapchain_image_index)?;
 
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -836,6 +947,7 @@ impl Drop for VulkanManager {
                 .expect("something wrong while waiting");
 
             self.lighting_pipelines.clear();
+            self.pp_effects.clear();
 
             for s in &self.image_acquire_semaphores {
                 self.device.destroy_semaphore(*s, None);

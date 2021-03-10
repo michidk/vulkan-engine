@@ -4,7 +4,7 @@ use std::process::exit;
 use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
-use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::lighting_pipeline::LightingPipeline};
+use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect}};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -66,6 +66,14 @@ fn main() {
 
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
+
+    let pp_tonemap = PPEffect::new(
+        "tone_map",
+        engine.vulkan_manager.pipe_layout_pp,
+        engine.vulkan_manager.renderpass_pp,
+        engine.vulkan_manager.device.clone()
+    ).unwrap();
+    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
 
     let brdf_lighting = LightingPipeline::new(
      Some("deferred_point_brdf"), 

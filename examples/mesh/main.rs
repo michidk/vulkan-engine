@@ -3,7 +3,7 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::lighting_pipeline::LightingPipeline};
+use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect}};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -64,6 +64,14 @@ fn main() {
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
+    let pp_tonemap = PPEffect::new(
+        "tone_map",
+        engine.vulkan_manager.pipe_layout_pp,
+        engine.vulkan_manager.renderpass_pp,
+        engine.vulkan_manager.device.clone()
+    ).unwrap();
+    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+
     let brdf_resolve_pipeline = LightingPipeline::new(
         Some("deferred_point_brdf"),
         Some("deferred_directional_brdf"),
@@ -94,7 +102,7 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/cube.vem"))
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
         .expect("Model cube.vem not found!");
 
     let mesh = Mesh::bake(

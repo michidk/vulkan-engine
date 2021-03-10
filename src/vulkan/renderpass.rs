@@ -5,7 +5,7 @@ pub fn init_renderpass(
     format: vk::Format,
 ) -> Result<vk::RenderPass, vk::Result> {
     let attachments = [
-        // OutColor
+        // Resolve
         vk::AttachmentDescription::builder()
             .format(vk::Format::R32G32B32A32_SFLOAT)
             .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -13,7 +13,7 @@ pub fn init_renderpass(
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
             .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
             .initial_layout(vk::ImageLayout::UNDEFINED)
-            .final_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+            .final_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .samples(vk::SampleCountFlags::TYPE_1)
             .build(),
         // Depth
@@ -114,14 +114,14 @@ pub fn init_renderpass(
             .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::INPUT_ATTACHMENT_READ)
             .build(),
-        // 1 to pp: make sure layout transition happens before transfer
+        // 1 to pp: make sure layout transition happens before post processing sampling
         vk::SubpassDependency::builder()
             .src_subpass(1)
             .dst_subpass(vk::SUBPASS_EXTERNAL)
             .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-            .dst_stage_mask(vk::PipelineStageFlags::TRANSFER)
+            .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
             .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-            .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+            .dst_access_mask(vk::AccessFlags::SHADER_READ)
             .build()
     ];
     let renderpass_info = vk::RenderPassCreateInfo::builder()

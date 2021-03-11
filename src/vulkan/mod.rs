@@ -132,8 +132,7 @@ impl VulkanManager {
             .build();
         let renderpass_pp = unsafe { logical_device.create_render_pass(&renderpass_pp_info, None)? };
 
-        let format = surface.choose_format(physical_device)?.format;
-        let renderpass = renderpass::init_renderpass(&logical_device, format)?;
+        let renderpass = renderpass::create_deferred_pass(vk::Format::R16G16B16A16_SFLOAT, vk::Format::D24_UNORM_S8_UINT, &logical_device)?;
         swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
@@ -879,7 +878,7 @@ impl VulkanManager {
     pub fn submit(&self) {
         let semaphores_available =
             [self.image_acquire_semaphores[self.current_frame_index as usize]];
-        let waiting_stages = [vk::PipelineStageFlags::TOP_OF_PIPE];
+        let waiting_stages = [vk::PipelineStageFlags::TRANSFER]; // wait for image acquisition before blitting the final image to the swapchain
         let semaphores_finished =
             [self.render_finished_semaphores[self.current_frame_index as usize]];
         let commandbuffers = [self.commandbuffers[self.current_frame_index as usize]];

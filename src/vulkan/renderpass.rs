@@ -1,13 +1,16 @@
 use ash::{version::DeviceV1_0, vk::{self, SubpassDependency}};
 
-pub fn init_renderpass(
+use crate::utils::color;
+
+pub fn create_deferred_pass(
+    color_format: vk::Format,
+    depth_format: vk::Format,
     logical_device: &ash::Device,
-    format: vk::Format,
 ) -> Result<vk::RenderPass, vk::Result> {
     let attachments = [
         // Resolve
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .format(color_format)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::STORE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -18,18 +21,18 @@ pub fn init_renderpass(
             .build(),
         // Depth
         vk::AttachmentDescription::builder()
-            .format(vk::Format::D24_UNORM_S8_UINT)
+            .format(depth_format)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::CLEAR)
-            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE) // TODO: should this be STORE?
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE) // TODO: needs to be STORE when used in PP effects
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .final_layout(vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL)
             .samples(vk::SampleCountFlags::TYPE_1)
             .build(),
         // AlbedoRoughness
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .format(color_format)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -40,7 +43,7 @@ pub fn init_renderpass(
             .build(),
         // NormalMetallic
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .format(color_format)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -105,16 +108,34 @@ pub fn init_renderpass(
             .build(),
     ];
     let subpass_dependencies = [
-        // 0 to 1: wait for color attachment output of 0 in fragment shader of 1
+        // external to 0: wait for previous frame image blit reading g0 image
+        vk::SubpassDependency::builder()
+            .src_subpass(vk::SUBPASS_EXTERNAL)
+            .dst_subpass(0)
+            .src_stage_mask(vk::PipelineStageFlags::TRANSFER)
+            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_access_mask(vk::AccessFlags::TRANSFER_READ)
+            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+            .build(),
+        // 0 to 1: wait for gpass writing of 0 before input attachment reading of 1
         vk::SubpassDependency::builder()
             .src_subpass(0)
             .dst_subpass(1)
-            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
+            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+            .dst_access_mask(vk::AccessFlags::INPUT_ATTACHMENT_READ)
+            .build(),
+        // 0 to 1: wait for fragment tests of 0 before fragment tests and input attachment reading of 1
+        vk::SubpassDependency::builder()
+            .src_subpass(0)
+            .dst_subpass(1)
+            .src_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
             .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::FRAGMENT_SHADER)
-            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+            .src_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::INPUT_ATTACHMENT_READ)
             .build(),
-        // 1 to pp: make sure layout transition happens before post processing sampling
+        // 1 to pp: wait for color attachment writing of 1 before sampling of PP
         vk::SubpassDependency::builder()
             .src_subpass(1)
             .dst_subpass(vk::SUBPASS_EXTERNAL)

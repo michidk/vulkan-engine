@@ -141,7 +141,7 @@ impl SwapchainWrapper {
 
         let resolve_image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .extent(extend_3d)
             .mip_levels(1)
             .array_layers(1)
@@ -164,14 +164,14 @@ impl SwapchainWrapper {
         let imageview_create_info = vk::ImageViewCreateInfo::builder()
             .image(resolve_image)
             .view_type(vk::ImageViewType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
         let resolve_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
         let g0_image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .extent(extend_3d)
             .mip_levels(1)
             .array_layers(1)
@@ -194,14 +194,14 @@ impl SwapchainWrapper {
         let imageview_create_info = vk::ImageViewCreateInfo::builder()
             .image(g0_image)
             .view_type(vk::ImageViewType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
         let g0_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
         let g1_image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .extent(extend_3d)
             .mip_levels(1)
             .array_layers(1)
@@ -224,7 +224,7 @@ impl SwapchainWrapper {
         let imageview_create_info = vk::ImageViewCreateInfo::builder()
             .image(g1_image)
             .view_type(vk::ImageViewType::TYPE_2D)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
         let g1_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;

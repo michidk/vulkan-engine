@@ -7,7 +7,7 @@ pub fn init_renderpass(
     let attachments = [
         // Resolve
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::STORE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -29,7 +29,7 @@ pub fn init_renderpass(
             .build(),
         // AlbedoRoughness
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -40,7 +40,7 @@ pub fn init_renderpass(
             .build(),
         // NormalMetallic
         vk::AttachmentDescription::builder()
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)

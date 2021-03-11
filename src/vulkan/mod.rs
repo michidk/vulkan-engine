@@ -95,7 +95,7 @@ impl VulkanManager {
 
         let renderpass_pp_attachments = [
             vk::AttachmentDescription::builder()
-                .format(vk::Format::R32G32B32A32_SFLOAT)
+                .format(vk::Format::R16G16B16A16_SFLOAT)
                 .samples(vk::SampleCountFlags::TYPE_1)
                 .load_op(vk::AttachmentLoadOp::DONT_CARE)
                 .store_op(vk::AttachmentStoreOp::STORE)

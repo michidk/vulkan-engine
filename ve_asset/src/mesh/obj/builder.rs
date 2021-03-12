@@ -114,41 +114,30 @@ impl ObjMeshBuilder {
                 let mut local_face_idx: Vec<usize> = Vec::new();
 
                 // set uv and normal if they appear on a face
-                // also duplicate the vertex if it was already defined with another uv or normal
-                for i in 0..=1 {
+                for i in 0..face.face_i.len() {
                     let obj_vert = &mesh.vertices[face.face_i[i].vert_i - 1];
 
-                    local_face_idx.push(Self::find_vertex(
-                        i,
-                        &uvs,
-                        &normals,
-                        &mut face,
-                        &obj_vert,
-                        &mut vertices,
-                    ));
-                }
-
-                // triangulate polygons for convex shapes (we might find faces which have more than three indexes)
-                for i in 2..face.face_i.len() {
-                    let obj_vert = &mesh.vertices[face.face_i[i].vert_i - 1];
-
+                    // duplicate the vertex if it was already defined with another uv or normal
                     let idx =
                         Self::find_vertex(i, &uvs, &normals, &mut face, &obj_vert, &mut vertices);
 
-                    debug!(
-                        "Create triangle between {}, {}, {}",
-                        local_face_idx[0],
-                        local_face_idx[i - 1],
-                        idx
-                    );
+                    // triangulate polygons for convex shapes (we might find faces which have more than three indexes)
+                    if i > 1 {
+                        debug!(
+                            "Create triangle between {}, {}, {}",
+                            local_face_idx[0],
+                            local_face_idx[i - 1],
+                            idx
+                        );
 
-                    faces.push(mesh::Face {
-                        indices: [
-                            (local_face_idx[0]) as u32,
-                            (local_face_idx[i - 1]) as u32,
-                            (idx) as u32,
-                        ],
-                    });
+                        faces.push(mesh::Face {
+                            indices: [
+                                (local_face_idx[0]) as u32,
+                                (local_face_idx[i - 1]) as u32,
+                                (idx) as u32,
+                            ],
+                        });
+                    }
 
                     local_face_idx.push(idx);
                 }

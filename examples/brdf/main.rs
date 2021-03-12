@@ -1,4 +1,4 @@
-use std::process::exit;
+use std::{path::Path, process::exit};
 
 /// Renders a brdf example
 use crystal::prelude::*;
@@ -22,7 +22,7 @@ use vulkan_engine::{
 #[repr(C)]
 #[derive(MaterialBindingFragment)]
 struct BrdfColorData {
-    color: Vec4<f32>,
+    albedo: Vec4<f32>,
     metallic: f32,
     roughness: f32,
 }
@@ -86,17 +86,6 @@ fn setup(engine: &mut Engine) {
     ).unwrap();
     engine.vulkan_manager.register_lighting_pipeline(brdf_lighting.clone());
 
-    let unlit_lighting = LightingPipeline::new(
-        None,
-        None,
-        Some("deferred_unlit"),
-        engine.vulkan_manager.pipeline_layout_resolve_pass,
-        engine.vulkan_manager.renderpass,
-        engine.vulkan_manager.device.clone(),
-        2
-    ).unwrap();
-    engine.vulkan_manager.register_lighting_pipeline(unlit_lighting.clone());
-
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
@@ -106,156 +95,40 @@ fn setup(engine: &mut Engine) {
         brdf_lighting.as_ref()
     )
     .unwrap();
-    let brdf_material0 = brdf_pipeline
-        .create_material(BrdfMaterialData {
-            color_data: BrdfColorData {
-                color: Vec4::new(0.5, 0.5, 0.5, 1.0),
-                metallic: 0.0,
-                roughness: 0.1,
-            },
-        })
-        .unwrap();
-    let brdf_material1 = brdf_pipeline
-        .create_material(BrdfMaterialData {
-            color_data: BrdfColorData {
-                color: Vec4::new(1.0, 0.5, 0.5, 1.0),
-                metallic: 0.0,
-                roughness: 0.2,
-            },
-        })
+
+    let mesh_data_sphere_smooth = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere_smooth.vem"))
+        .expect("Model sphere_smooth.vem not found!");
+    let mesh_sphere_smooth = Mesh::bake(
+        mesh_data_sphere_smooth,
+            (*engine.vulkan_manager.allocator).clone()
+        )
         .unwrap();
 
-    let unlit_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
-        engine.vulkan_manager.device.clone(),
-        (*engine.vulkan_manager.allocator).clone(),
-        "material_solid_color",
-        engine.vulkan_manager.desc_layout_frame_data,
-        engine.vulkan_manager.renderpass,
-        unlit_lighting.as_ref()
-    ).unwrap();
-    let unlit_material0 = unlit_pipeline.create_material(
-        BrdfMaterialData {
-            color_data: BrdfColorData {
-                color: Vec4::new(1.0, 0.0, 1.0, 1.0),
-                metallic: 0.0,
-                roughness: 0.0
-            }
+    for x in 0..11 {
+        for y in 0..11 {
+            let material = brdf_pipeline.create_material(
+                BrdfMaterialData {
+                    color_data: BrdfColorData {
+                        albedo: Vec4::new(0.5, 0.5, 0.5, 0.0),
+                        metallic: (x as f32) * 0.1,
+                        roughness: (y as f32) * 0.1,
+                    }
+                }
+            ).unwrap();
+
+            let model = Model {
+                material,
+                mesh: mesh_sphere_smooth.clone(),
+                transform: Transform {
+                    position: Vec3::new(x as f32 - 5.0, y as f32 - 5.0, 10.0),
+                    rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+                    scale: Vec3::new(0.5, 0.5, 0.5),
+                },
+            };
+
+            scene.add(model);
         }
-    ).unwrap();
-
-    let mesh_data0 = MeshData {
-        vertices: vec![
-            Vertex {
-                position: Vec3::new(-1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(0.0, 1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-        ],
-        submeshes: vec![Submesh {
-            faces: vec![Face { indices: [0, 1, 2] }],
-        }],
-    };
-    let mesh0 = Mesh::bake(
-            mesh_data0,
-            (*engine.vulkan_manager.allocator).clone()
-        )
-        .unwrap();
-
-    let mesh_data1 = MeshData {
-        vertices: vec![
-            Vertex {
-                position: Vec3::new(-0.5, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(0.0, 1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-        ],
-        submeshes: vec![Submesh {
-            faces: vec![Face { indices: [0, 1, 2] }],
-        }],
-    };
-    let mesh1 = Mesh::bake(
-            mesh_data1,
-            (*engine.vulkan_manager.allocator).clone()
-        )
-        .unwrap();
-
-    let model = Model {
-        material: brdf_material0.clone(),
-        mesh: mesh0.clone(),
-        transform: Transform {
-            position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(0.0)),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
-    let model2 = Model {
-        material: brdf_material1.clone(),
-        mesh: mesh0.clone(),
-        transform: Transform {
-            position: Vec3::new(-3.0, 0.0, 4.0),
-            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(15.0)),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
-    let model3 = Model {
-        material: brdf_material0.clone(),
-        mesh: mesh1.clone(),
-        transform: Transform {
-            position: Vec3::new(3.0, 0.0, 5.0),
-            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(-15.0)),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
-    let model4 = Model {
-        material: unlit_material0.clone(),
-        mesh: mesh0.clone(),
-        transform: Transform {
-            position: Vec3::new(2.0, 1.0, 4.0),
-            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(180.0)),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
-    let model5 = Model {
-        material: brdf_material0.clone(),
-        mesh: mesh0.clone(),
-        transform: Transform {
-            position: Vec3::new(-2.5, 1.0, 4.0),
-            rotation: Quaternion::from_axis_angle(Unit::new_normalize(Vec3::new(0.0, 0.0, 1.0)), Angle::from_deg(15.0)),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
-
-    scene.add(model);
-    scene.add(model2);
-    scene.add(model3);
-    scene.add(model4);
-    scene.add(model5);
+    }
 
     // setup scene
     let lights = &mut scene.light_manager;

@@ -3,7 +3,8 @@ use std::process::exit;
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::scene::material::*;
+use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
+use vulkan_engine::scene::{material::*, model::mesh::Mesh};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -11,10 +12,7 @@ use vulkan_engine::{
         camera::Camera,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
-        model::{
-            mesh::{Face, MeshData, Submesh, Vertex},
-            Model,
-        },
+        model::Model,
         transform::Transform,
     },
 };
@@ -115,13 +113,13 @@ fn setup(engine: &mut Engine) {
 
     let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
     let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = mesh_data
-        .bake(
-            (*engine.vulkan_manager.allocator).clone(),
-            transform,
-            inv_transform,
-        )
-        .unwrap();
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        transform,
+        inv_transform,
+    )
+    .expect("Error baking mesh!");
 
     let model = Model {
         material: brdf_material0,

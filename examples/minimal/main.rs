@@ -3,17 +3,14 @@ use std::process::exit;
 
 use crystal::prelude::*;
 use log::error;
+use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
     scene::{
         camera::Camera,
-        light::DirectionalLight,
-        material::{MaterialBinding, MaterialBindingFragment, MaterialData, MaterialPipeline},
-        model::{
-            mesh::{Face, MeshData, Submesh, Vertex},
-            Model,
-        },
+        material::{MaterialData, MaterialPipeline},
+        model::{mesh::Mesh, Model},
         transform::Transform,
     },
 };
@@ -97,13 +94,13 @@ fn setup(engine: &mut Engine) {
 
     let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
     let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = mesh_data
-        .bake(
-            (*engine.vulkan_manager.allocator).clone(),
-            transform,
-            inv_transform,
-        )
-        .unwrap();
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        transform,
+        inv_transform,
+    )
+    .unwrap();
 
     scene.add(Model {
         material: material0,

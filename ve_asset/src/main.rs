@@ -7,32 +7,31 @@ pub(crate) mod utils;
 use anyhow::Result;
 use log::{debug, error, warn};
 use mesh::obj;
-use std::path::Path;
+use std::{fs, io, path::Path};
 use structopt::StructOpt;
+use walkdir::WalkDir;
 
 // Cli arguments
 #[derive(StructOpt, Debug)]
 #[structopt(name = "ve_asset")]
 struct CliArgs {
-    /// Specify the shader files to compile using glob
-    glob: String,
-    /// Output directory, to place the compiled shader in
+    /// Specify the input folder
+    input: String,
+    /// Output directory, to place the transpiled files in
     #[structopt(short = "o", long = "output")]
     output: String,
     /// Output debug info
-    #[structopt(long = "verbose")]
+    #[structopt(short = "v", long = "verbose")]
     verbose: bool,
 }
 
 /// Happens during setup
 #[derive(thiserror::Error, Debug)]
 enum CliError {
-    #[error("Invalid glob pattern")]
-    PatternError(#[from] glob::PatternError),
-    #[error("Invalid glob")]
-    GlobError(#[from] glob::GlobError),
-    #[error("Output folder does not exist: {0}")]
-    OutputFolderNonExistant(String),
+    #[error("Input folder does not exist: {0}")]
+    InputFolderNonExistant(String),
+    #[error("Output folder strcuture could not be created: {0}")]
+    ErrorCreatingOutputStructure(#[from] io::Error),
 }
 
 /// Happens during shader compilation; prints the error and continues
@@ -41,12 +40,6 @@ enum CompilerError {
     #[error("Error reading the file")]
     FileRead(#[from] std::io::Error),
 }
-
-const GLOB_OPTIONS: glob::MatchOptions = glob::MatchOptions {
-    case_sensitive: false,
-    require_literal_separator: false,
-    require_literal_leading_dot: false,
-};
 
 fn main() -> Result<()> {
     let args = CliArgs::from_args();
@@ -64,29 +57,44 @@ fn main() -> Result<()> {
 
 fn prepare(args: CliArgs) -> Result<()> {
     let output_path = Path::new(&args.output);
-    // check if output folder exists
-    if !output_path.exists() && !output_path.is_dir() {
-        return Err(CliError::OutputFolderNonExistant(
-            output_path
-                .to_str()
-                .expect("Invalid output path")
-                .to_owned(),
+
+    let input_path = Path::new(&args.input);
+    if !input_path.exists() && !input_path.is_dir() {
+        return Err(CliError::InputFolderNonExistant(
+            input_path.to_str().expect("Invalid input path").to_owned(),
         )
         .into());
     }
 
-    let glob = glob::glob_with(&args.glob, GLOB_OPTIONS)?;
-    for path in glob {
-        let path = path?;
+    for entry in WalkDir::new(input_path) {
+        let path = match &entry {
+            Err(err) => {
+                warn!("Error parsing path: {}", err);
+                continue;
+            }
+            Ok(entry) => entry.path(),
+        };
 
         if path.is_dir() {
             continue;
         }
 
+        let output = output_path.join(
+            path.strip_prefix(input_path)
+                .expect("Error handling output path: stripping prefix"),
+        );
+
+        // creating the output folder of the input file in the same structure
+        let local_output_folder = output.parent().unwrap_or(output_path);
+        if !local_output_folder.exists() {
+            fs::create_dir_all(&local_output_folder)
+                .map_err(|x| CliError::ErrorCreatingOutputStructure(x))?;
+        }
+
         // check extension
         if let Some(Some(extension)) = path.extension().map(|x| x.to_str()) {
             match extension.to_ascii_lowercase().as_ref() {
-                "obj" => obj::process(&path, &output_path)?,
+                "obj" => obj::process(&path, &local_output_folder)?,
                 "toml" => debug!("Ignored toml file: {}", &path.display()),
                 _ => warn!("Could not handle path: {}", &path.display()),
             }

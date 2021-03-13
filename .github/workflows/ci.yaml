@@ -69,6 +69,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Add universe repository
+        uses: sudo add-apt-repository universe
       - name: Update package index
         run: sudo apt-get update -y
       - name: Install build dependencies

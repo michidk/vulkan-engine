@@ -20,6 +20,7 @@ Currently implemented features are:
 ## Screenshots
 
 BRDF testing:
+
 ![brdf testing](./.github/images/examples/brdf.png)
 
 ## Examples
@@ -38,11 +39,8 @@ Examples are in the `/examples` folder. They can be run with `cargo +nightly run
 - [Rust](https://www.rust-lang.org/)
 - [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
 - Optional: [Vulkan ValidationLayers](https://github.com/KhronosGroup/Vulkan-ValidationLayers)
-- [Python 2](https://www.python.org/)
-- Git
-- cmake and ninja
 
-You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`.
+You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`. ve-shader in return requires [Python 2](https://www.python.org/), Git, cmake and ninja to run.
 
 Compile the shaders with `make shaders`. Then build with `make build` or run an exmaple with `make run`.
 

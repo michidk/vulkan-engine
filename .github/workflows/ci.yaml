@@ -69,12 +69,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Add universe repository
-        run: sudo add-apt-repository universe
       - name: Update package index
         run: sudo apt-get update -y
       - name: Install build dependencies
-        run: sudo apt-get install -y cmake git ninja-build python python-pip
+        run: sudo apt-get install -y cmake git ninja-build python
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:

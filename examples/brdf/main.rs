@@ -123,7 +123,7 @@ fn setup(engine: &mut Engine) {
 
     let model = Model {
         material: brdf_material0,
-        mesh: mesh,
+        mesh,
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),

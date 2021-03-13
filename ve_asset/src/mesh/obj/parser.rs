@@ -164,7 +164,13 @@ mod test {
 
     #[test]
     fn test_parse_token() -> Result<(), ParserError> {
-        let mut builder: ObjMeshBuilder = ObjMeshBuilder::default();
+        let mut builder: ObjMeshBuilder = ObjMeshBuilder {
+            meta: ObjMeta {
+                flip_axis: [false, false, false],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         parse_token("o", "foo bar", &mut builder)?;
         parse_token("v", "1 2 3", &mut builder)?;

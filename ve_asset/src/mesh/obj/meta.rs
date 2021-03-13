@@ -12,7 +12,7 @@ impl Default for ObjMeta {
     fn default() -> Self {
         Self {
             flip_axis: [true, false, false],
-            calculate_normals: false
+            calculate_normals: false,
         }
     }
 }

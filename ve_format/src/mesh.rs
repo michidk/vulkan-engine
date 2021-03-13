@@ -35,10 +35,10 @@ impl MeshData {
 
     pub fn from_file(path: &Path) -> Result<Self> {
         let data = std::fs::read(path)?;
-        Ok(MeshData::from_bytes(data)?)
+        MeshData::from_bytes(data)
     }
 
-    pub fn to_bytes(self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(&self)?)
     }
 }

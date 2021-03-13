@@ -1,5 +1,4 @@
 #![feature(once_cell)]
-#![feature(str_split_once)]
 
 pub(crate) mod mesh;
 pub(crate) mod utils;

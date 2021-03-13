@@ -79,11 +79,13 @@ where
             for row in 0..R {
                 unsafe {
                     *matrix.get_unchecked_mut((row, col)) =
-                        seq.next_element()?.ok_or(A::Error::custom(format!(
-                            "invalid size for matrix (expected: {}, got: {})",
-                            size_expected,
-                            row * col
-                        )))?;
+                        seq.next_element()?.ok_or_else(|| {
+                            A::Error::custom(format!(
+                                "invalid size for matrix (expected: {}, got: {})",
+                                size_expected,
+                                row * col
+                            ))
+                        })?;
                 };
             }
         }

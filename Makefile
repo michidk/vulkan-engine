@@ -36,13 +36,13 @@ build-release-linux: prepare-release-linux shaders build-release
 
 # test and lint
 check:
-	cargo +nightly check --all
+	cargo +nightly check --all --examples
 
 test:
-	cargo +nightly test --all
+	cargo +nightly test --all --examples
 
 clippy:
-	cargo +nightly clippy -- -D warnings
+	cargo +nightly clippy --all --examples -- -D warnings
 
 fmt:
 	cargo +nightly fmt --all -- --check

@@ -7,7 +7,7 @@ use crate::{
     angle::{Angle, AngleConst},
     matrix::Matrix,
     norm::Normed,
-    scalar::{One, Scalar, Sqrt, Zero},
+    scalar::{Cross, One, Scalar, Sqrt, Zero},
     unit::Unit,
 };
 
@@ -221,12 +221,14 @@ impl<T> Vec3<T> {
     }
 }
 
-impl<T> Vec3<T> {
-    pub fn cross_product<RT>(&self, rhs: &Vec3<RT>) -> Vec3<T>
-    where
-        T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
-        RT: Clone,
-    {
+impl<'a, 'b, T, RT> Cross<&'a Vec3<RT>> for &'b Vec3<T>
+where
+    T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
+    RT: Clone,
+{
+    type Output = Vec3<T>;
+
+    fn cross(self, rhs: &'a Vec3<RT>) -> Self::Output {
         let (a1, a2, a3) = unsafe {
             (
                 self.get_unchecked((0, 0)),
@@ -247,6 +249,42 @@ impl<T> Vec3<T> {
         let s3 = a1.clone() * b2.clone() - a2.clone() * b1.clone();
 
         Vec3::new(s1, s2, s3)
+    }
+}
+
+impl<'a, T, RT> Cross<&'a Vec3<RT>> for Vec3<T>
+where
+    T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
+    RT: Clone,
+{
+    type Output = Self;
+
+    fn cross(self, rhs: &'a Vec3<RT>) -> Self::Output {
+        Cross::cross(&self, rhs)
+    }
+}
+
+impl<'b, T, RT> Cross<Vec3<RT>> for &'b Vec3<T>
+where
+    T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
+    RT: Clone,
+{
+    type Output = Vec3<T>;
+
+    fn cross(self, rhs: Vec3<RT>) -> Self::Output {
+        Cross::cross(self, &rhs)
+    }
+}
+
+impl<T, RT> Cross<Vec3<RT>> for Vec3<T>
+where
+    T: Clone + Mul<RT, Output = T> + Sub<T, Output = T>,
+    RT: Clone,
+{
+    type Output = Self;
+
+    fn cross(self, rhs: Vec3<RT>) -> Self::Output {
+        Cross::cross(&self, &rhs)
     }
 }
 
@@ -307,7 +345,10 @@ mod tests {
         let a = Vec3::new(1.0, 2.0, -3.0);
         let b = Vec3::new(-6.0, 7.0, 0.2);
 
-        assert_eq!(a.cross_product(&b), Vec3::new(21.4, 17.8, 19.0));
+        assert_eq!((&a).cross(&b), Vec3::new(21.4, 17.8, 19.0));
+        assert_eq!((&a).cross(b), Vec3::new(21.4, 17.8, 19.0));
+        assert_eq!(a.cross(&b), Vec3::new(21.4, 17.8, 19.0));
+        assert_eq!(a.cross(b), Vec3::new(21.4, 17.8, 19.0));
     }
 
     #[test]

@@ -9,8 +9,6 @@
 - introduce fps counter
 - create methods to load default shaders and meshes
 - BRDF example: displays spheres again
-- calculate normals, for models, having none
-- @Michi: add axis-flipping-flags to obj parser (helps with importing from right-handed coordinate systems)
 
 ## FPS (release build; fullscreen)
 

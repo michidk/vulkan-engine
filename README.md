@@ -23,6 +23,17 @@ BRDF testing:
 
 ![brdf testing](./.github/images/examples/brdf.png)
 
+## Workspace
+
+| Folder | Description | Readme |
+| ---- | ----------- | - |
+| `crystal` | A custom math library | [here](./crystal/README.md) |
+| `ve_format` | Stores some shared structs | [here](./ve_format/README.md) |
+| `ve_asset` | Utility that converts files into our custom format | [here](./ve_asset/README.md) |
+| `vulkan-engine_derive` | Contains custom derive macros | None |
+| `src` | Main engine library | This one |
+
+
 ## Examples
 
 Examples are in the `/examples` folder. They can be run with `cargo +nightly run --example <name>`.

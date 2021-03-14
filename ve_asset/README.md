@@ -22,7 +22,7 @@ Currently, this utility supports the following file formats:
 
 | Format | Extension | Functionality | More Info/Settings |
 | --- | --- | --- | --- |
-| [Wavefront OBJ](https://en.wikipedia.org/wiki/Wavefront_.obj_file) | `.obj` | Converts to an indexed format | [here](./mesh/README.md) |
+| [Wavefront OBJ](https://en.wikipedia.org/wiki/Wavefront_.obj_file) | `.obj` | Converts to an indexed format | [here](./src/mesh/README.md) |
 
 ## Meta
 

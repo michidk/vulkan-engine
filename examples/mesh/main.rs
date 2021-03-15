@@ -3,7 +3,6 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect}};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -14,6 +13,10 @@ use vulkan_engine::{
         model::Model,
         transform::Transform,
     },
+};
+use vulkan_engine::{
+    scene::{material::*, model::mesh::Mesh},
+    vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
 
 #[repr(C)]
@@ -68,8 +71,9 @@ fn setup(engine: &mut Engine) {
         "tone_map",
         engine.vulkan_manager.pipe_layout_pp,
         engine.vulkan_manager.renderpass_pp,
-        engine.vulkan_manager.device.clone()
-    ).unwrap();
+        engine.vulkan_manager.device.clone(),
+    )
+    .unwrap();
     engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
 
     let brdf_resolve_pipeline = LightingPipeline::new(
@@ -79,9 +83,12 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.pipeline_layout_resolve_pass,
         engine.vulkan_manager.renderpass,
         engine.vulkan_manager.device.clone(),
-        1
-    ).unwrap();
-    engine.vulkan_manager.register_lighting_pipeline(brdf_resolve_pipeline.clone());
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(brdf_resolve_pipeline.clone());
 
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
@@ -89,7 +96,7 @@ fn setup(engine: &mut Engine) {
         "material_solid_color",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        brdf_resolve_pipeline.as_ref()
+        brdf_resolve_pipeline.as_ref(),
     )
     .unwrap();
     let brdf_material0 = brdf_pipeline
@@ -105,11 +112,8 @@ fn setup(engine: &mut Engine) {
     let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
         .expect("Model cube.vem not found!");
 
-    let mesh = Mesh::bake(
-        mesh_data,
-        (*engine.vulkan_manager.allocator).clone()
-    )
-    .expect("Error baking mesh!");
+    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone())
+        .expect("Error baking mesh!");
 
     let model = Model {
         material: brdf_material0,

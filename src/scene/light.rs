@@ -31,7 +31,7 @@ impl From<DirectionalLight> for Light {
 
 pub struct LightManager {
     pub directional_lights: Vec<DirectionalLight>,
-    pub point_lights: Vec<PointLight>
+    pub point_lights: Vec<PointLight>,
 }
 
 impl LightManager {

@@ -1,5 +1,3 @@
-use std::ptr::null;
-
 use ash::{version::DeviceV1_0, vk};
 
 use super::{error::VulkanError, queue, surface};
@@ -29,8 +27,8 @@ pub struct SwapchainWrapper {
     pub g1_imageview: vk::ImageView,
     pub g1_image_alloc: vk_mem::Allocation,
     pub framebuffer_deferred: vk::Framebuffer, // used for gpass and resolve pass, renders to resolve_image
-    pub framebuffer_pp_a: vk::Framebuffer, // used for pp, renders to g0_image
-    pub framebuffer_pp_b: vk::Framebuffer, // used for pp, renders to resolve_image
+    pub framebuffer_pp_a: vk::Framebuffer,     // used for pp, renders to g0_image
+    pub framebuffer_pp_b: vk::Framebuffer,     // used for pp, renders to resolve_image
 }
 
 impl SwapchainWrapper {
@@ -103,7 +101,10 @@ impl SwapchainWrapper {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT)
+            .usage(
+                vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                    | vk::ImageUsageFlags::INPUT_ATTACHMENT,
+            )
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
@@ -147,7 +148,11 @@ impl SwapchainWrapper {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED)
+            .usage(
+                vk::ImageUsageFlags::COLOR_ATTACHMENT
+                    | vk::ImageUsageFlags::TRANSFER_SRC
+                    | vk::ImageUsageFlags::SAMPLED,
+            )
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
@@ -177,7 +182,12 @@ impl SwapchainWrapper {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED)
+            .usage(
+                vk::ImageUsageFlags::COLOR_ATTACHMENT
+                    | vk::ImageUsageFlags::INPUT_ATTACHMENT
+                    | vk::ImageUsageFlags::TRANSFER_SRC
+                    | vk::ImageUsageFlags::SAMPLED,
+            )
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let allocation_info = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::GpuOnly,
@@ -278,7 +288,12 @@ impl SwapchainWrapper {
         pp_renderpass: vk::RenderPass,
     ) -> Result<(), vk::Result> {
         // deferred framebuffer
-        let views = [self.resolve_imageview, self.depth_imageview, self.g0_imageview, self.g1_imageview];
+        let views = [
+            self.resolve_imageview,
+            self.depth_imageview,
+            self.g0_imageview,
+            self.g1_imageview,
+        ];
         let fb_info = vk::FramebufferCreateInfo::builder()
             .render_pass(renderpass)
             .attachments(&views)

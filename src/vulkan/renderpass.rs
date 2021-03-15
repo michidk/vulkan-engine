@@ -1,6 +1,4 @@
-use ash::{version::DeviceV1_0, vk::{self, SubpassDependency}};
-
-use crate::utils::color;
+use ash::{version::DeviceV1_0, vk};
 
 pub fn create_deferred_pass(
     color_format: vk::Format,
@@ -62,36 +60,34 @@ pub fn create_deferred_pass(
         vk::AttachmentReference {
             attachment: 3,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        }
+        },
     ];
     let depth_attachment_reference_0 = vk::AttachmentReference {
         attachment: 1,
         layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     };
 
-    let color_attachment_references_1 = [
-        vk::AttachmentReference {
-            attachment: 0,
-            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        }
-    ];
+    let color_attachment_references_1 = [vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    }];
     let input_attachment_references_1 = [
         vk::AttachmentReference {
             attachment: 2,
-            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
         },
         vk::AttachmentReference {
             attachment: 3,
-            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
         },
         vk::AttachmentReference {
             attachment: 1,
-            layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+            layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         },
     ];
     let depth_attachment_reference_1 = vk::AttachmentReference {
         attachment: 1,
-        layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+        layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
     };
 
     let subpasses = [
@@ -130,10 +126,20 @@ pub fn create_deferred_pass(
         vk::SubpassDependency::builder()
             .src_subpass(0)
             .dst_subpass(1)
-            .src_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
-            .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::FRAGMENT_SHADER)
+            .src_stage_mask(
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                    | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+            )
+            .dst_stage_mask(
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                    | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS
+                    | vk::PipelineStageFlags::FRAGMENT_SHADER,
+            )
             .src_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
-            .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::INPUT_ATTACHMENT_READ)
+            .dst_access_mask(
+                vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                    | vk::AccessFlags::INPUT_ATTACHMENT_READ,
+            )
             .build(),
         // 1 to pp: wait for color attachment writing of 1 before sampling of PP
         vk::SubpassDependency::builder()
@@ -143,7 +149,7 @@ pub fn create_deferred_pass(
             .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
             .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::SHADER_READ)
-            .build()
+            .build(),
     ];
     let renderpass_info = vk::RenderPassCreateInfo::builder()
         .attachments(&attachments)

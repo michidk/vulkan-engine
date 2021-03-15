@@ -1,7 +1,7 @@
 use ash::{version::DeviceV1_0, vk};
 
 use super::{MaterialData, MaterialDataLayout};
-use crate::{vulkan::descriptor_manager::DescriptorData};
+use crate::vulkan::descriptor_manager::DescriptorData;
 
 pub fn compile_descriptor_set_layout(
     device: &ash::Device,
@@ -49,13 +49,11 @@ pub fn compile_pipeline_layout(
     layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout, vk::Result> {
     // all devices must at least support 128 bytes of push constants, so this is safe
-    let push_constants = [
-        vk::PushConstantRange::builder()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .offset(0)
-            .size(128)
-            .build()
-    ];
+    let push_constants = [vk::PushConstantRange::builder()
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .offset(0)
+        .size(128)
+        .build()];
     let layout_info = vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(layouts)
         .push_constant_ranges(&push_constants)

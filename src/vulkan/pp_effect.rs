@@ -10,7 +10,12 @@ pub struct PPEffect {
 }
 
 impl PPEffect {
-    pub fn new(shader: &str, pipe_layout: vk::PipelineLayout, renderpass: vk::RenderPass, device: Rc<ash::Device>) -> Result<Rc<PPEffect>, vk::Result> {
+    pub fn new(
+        shader: &str,
+        pipe_layout: vk::PipelineLayout,
+        renderpass: vk::RenderPass,
+        device: Rc<ash::Device>,
+    ) -> Result<Rc<PPEffect>, vk::Result> {
         let blend_func = vk::PipelineColorBlendAttachmentState::builder()
             .blend_enable(false)
             .color_write_mask(
@@ -31,13 +36,10 @@ impl PPEffect {
             blend_func,
             false,
             None,
-            &device
+            &device,
         )?;
 
-        Ok(Rc::new(Self {
-            pipeline,
-            device
-        }))
+        Ok(Rc::new(Self { pipeline, device }))
     }
 }
 

@@ -4,7 +4,6 @@ use std::{path::Path, process::exit};
 use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
-use vulkan_engine::{scene::{material::*, model::mesh::Mesh}, vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect}};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -12,11 +11,13 @@ use vulkan_engine::{
         camera::Camera,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
-        model::{
-            Model,
-        },
+        model::Model,
         transform::Transform,
     },
+};
+use vulkan_engine::{
+    scene::{material::*, model::mesh::Mesh},
+    vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
 
 #[repr(C)]
@@ -71,20 +72,24 @@ fn setup(engine: &mut Engine) {
         "tone_map",
         engine.vulkan_manager.pipe_layout_pp,
         engine.vulkan_manager.renderpass_pp,
-        engine.vulkan_manager.device.clone()
-    ).unwrap();
+        engine.vulkan_manager.device.clone(),
+    )
+    .unwrap();
     engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
 
     let brdf_lighting = LightingPipeline::new(
-     Some("deferred_point_brdf"), 
+        Some("deferred_point_brdf"),
         Some("deferred_directional_brdf"),
         None,
         engine.vulkan_manager.pipeline_layout_resolve_pass,
         engine.vulkan_manager.renderpass,
         engine.vulkan_manager.device.clone(),
-        1
-    ).unwrap();
-    engine.vulkan_manager.register_lighting_pipeline(brdf_lighting.clone());
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(brdf_lighting.clone());
 
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
@@ -92,29 +97,30 @@ fn setup(engine: &mut Engine) {
         "material_solid_color",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        brdf_lighting.as_ref()
+        brdf_lighting.as_ref(),
     )
     .unwrap();
 
-    let mesh_data_sphere_smooth = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere_smooth.vem"))
-        .expect("Model sphere_smooth.vem not found!");
+    let mesh_data_sphere_smooth =
+        ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere_smooth.vem"))
+            .expect("Model sphere_smooth.vem not found!");
     let mesh_sphere_smooth = Mesh::bake(
         mesh_data_sphere_smooth,
-            (*engine.vulkan_manager.allocator).clone()
-        )
-        .unwrap();
+        (*engine.vulkan_manager.allocator).clone(),
+    )
+    .unwrap();
 
     for x in 0..11 {
         for y in 0..11 {
-            let material = brdf_pipeline.create_material(
-                BrdfMaterialData {
+            let material = brdf_pipeline
+                .create_material(BrdfMaterialData {
                     color_data: BrdfColorData {
                         albedo: Vec4::new(0.5, 0.5, 0.5, 0.0),
                         metallic: (x as f32) * 0.1,
                         roughness: (y as f32) * 0.1,
-                    }
-                }
-            ).unwrap();
+                    },
+                })
+                .unwrap();
 
             let model = Model {
                 material,

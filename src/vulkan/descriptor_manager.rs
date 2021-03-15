@@ -32,7 +32,7 @@ pub enum DescriptorData {
     InputAttachment {
         image: vk::ImageView,
         layout: vk::ImageLayout,
-    }
+    },
 }
 
 struct DescriptorSetData {

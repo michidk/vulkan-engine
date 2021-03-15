@@ -195,7 +195,7 @@ impl<T> Mat4<T> {
 
         Self::from_data([
             [cos.clone(), sin.clone(), T::zero(), T::zero()],
-            [-sin.clone(), cos, T::zero(), T::zero()],
+            [-sin, cos, T::zero(), T::zero()],
             [T::zero(), T::zero(), T::one(), T::zero()],
             [T::zero(), T::zero(), T::zero(), T::one()],
         ])

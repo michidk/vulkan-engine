@@ -4,7 +4,18 @@ use std::process::exit;
 use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
-use vulkan_engine::{core::window::{self, Dimensions}, engine::{self, Engine, EngineInit}, scene::{camera::Camera, light::DirectionalLight, material::{MaterialBinding, MaterialBindingFragment, MaterialData, MaterialPipeline}, model::{Model, mesh::Mesh}, transform::Transform}, vulkan::lighting_pipeline::LightingPipeline};
+use vulkan_engine::{
+    core::window::{self, Dimensions},
+    engine::{self, Engine, EngineInit},
+    scene::{
+        camera::Camera,
+        light::DirectionalLight,
+        material::{MaterialBinding, MaterialBindingFragment, MaterialData, MaterialPipeline},
+        model::{mesh::Mesh, Model},
+        transform::Transform,
+    },
+    vulkan::lighting_pipeline::LightingPipeline,
+};
 
 #[derive(MaterialData)]
 struct VertexMaterialData {}
@@ -51,9 +62,12 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.pipeline_layout_resolve_pass,
         engine.vulkan_manager.renderpass,
         engine.vulkan_manager.device.clone(),
-        1
-    ).unwrap();
-    engine.vulkan_manager.register_lighting_pipeline(lighting_pipeline.clone());
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(lighting_pipeline.clone());
 
     let pipeline = MaterialPipeline::<VertexMaterialData>::new(
         engine.vulkan_manager.device.clone(),
@@ -61,7 +75,7 @@ fn setup(engine: &mut Engine) {
         "vertex_unlit",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        lighting_pipeline.as_ref()
+        lighting_pipeline.as_ref(),
     )
     .unwrap();
     let material0 = pipeline.create_material(VertexMaterialData {}).unwrap();
@@ -93,11 +107,7 @@ fn setup(engine: &mut Engine) {
         }],
     };
 
-    let mesh = Mesh::bake(
-            mesh_data,
-            (*engine.vulkan_manager.allocator).clone()
-        )
-        .unwrap();
+    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone()).unwrap();
 
     scene.add(Model {
         material: material0,

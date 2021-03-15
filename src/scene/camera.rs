@@ -49,19 +49,28 @@ impl Camera {
         let a = 1.0 / ((0.5 * self.fovy).tan() * self.aspect);
         let b = 1.0 / (0.5 * self.fovy).tan();
         let c = self.far / (self.far - self.near);
-        let d = - self.near * self.far / (self.far - self.near);
+        let d = -self.near * self.far / (self.far - self.near);
 
         self.projection_matrix = Mat4::new(
-            a, 0.0, 0.0, 0.0,
-            0.0, b, 0.0, 0.0,
-            0.0, 0.0, c, d,
-            0.0, 0.0, 1.0, 0.0
+            a, 0.0, 0.0, 0.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, c, d, 0.0, 0.0, 1.0, 0.0,
         );
         self.inv_projection_matrix = Mat4::new(
-            1.0 / a, 0.0, 0.0, 0.0,
-            0.0, 1.0 / b, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0 / d, -c / d
+            1.0 / a,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0 / b,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0 / d,
+            -c / d,
         );
     }
 
@@ -78,8 +87,8 @@ impl Camera {
     fn update_view_matrix(&mut self) {
         let rotation = self.get_rotation().conjugated();
 
-        let m = &Mat4::from(rotation.conjugated()) * &Mat4::translate(&-self.position);
-        let im = &Mat4::translate(&self.position) * &Mat4::from(rotation);
+        let m = Mat4::from(rotation.conjugated()) * Mat4::translate(&-self.position);
+        let im = Mat4::translate(&self.position) * Mat4::from(rotation);
 
         self.view_matrix = m;
         self.inv_view_matrix = im;

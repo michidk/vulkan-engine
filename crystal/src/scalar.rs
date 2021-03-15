@@ -30,6 +30,12 @@ pub trait Sqrt {
     fn sqrt(&self) -> Self::Output;
 }
 
+pub trait Cross<Rhs = Self> {
+    type Output;
+
+    fn cross(self, rhs: Rhs) -> Self::Output;
+}
+
 pub trait Scalar {}
 
 macro_rules! impl_nums_zero {

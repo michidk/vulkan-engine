@@ -25,7 +25,7 @@ pub mod prelude {
     pub use crate::mat3::Mat3;
     pub use crate::mat4::Mat4;
     pub use crate::quaternion::Quaternion;
-    pub use crate::scalar::{One, Zero};
+    pub use crate::scalar::{One, Zero, Cross};
     pub use crate::unit::Unit;
     pub use crate::vector::{Vec2, Vec3, Vec4};
 }

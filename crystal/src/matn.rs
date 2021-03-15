@@ -30,7 +30,7 @@ mod tests {
 
     #[test]
     fn matn_identity() {
-        let m: MatN<f32, 4> = &Matrix::identity() * 2.0;
+        let m: MatN<f32, 4> = &Matrix::identity() * 2.0f32;
 
         let res: Mat4<f32> = [
             [2.0, 0.0, 0.0, 0.0],

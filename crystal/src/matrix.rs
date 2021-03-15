@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, AddAssign, Mul, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 use crate::{
@@ -156,12 +156,13 @@ where
     }
 }
 
-impl<ST, RT, const R: usize, const C: usize> AddAssign<Matrix<RT, R, C>> for Matrix<ST, R, C>
+impl<'a, ST, RT, const R: usize, const C: usize> AddAssign<&'a Matrix<RT, R, C>>
+    for Matrix<ST, R, C>
 where
     ST: AddAssign<RT>,
     RT: Clone,
 {
-    fn add_assign(&mut self, rhs: Matrix<RT, R, C>) {
+    fn add_assign(&mut self, rhs: &'a Matrix<RT, R, C>) {
         for col_idx in 0..C {
             for row_idx in 0..R {
                 unsafe {
@@ -170,6 +171,44 @@ where
                 };
             }
         }
+    }
+}
+
+impl<ST, RT, const R: usize, const C: usize> AddAssign<Matrix<RT, R, C>> for Matrix<ST, R, C>
+where
+    ST: AddAssign<RT>,
+    RT: Clone,
+{
+    fn add_assign(&mut self, rhs: Matrix<RT, R, C>) {
+        AddAssign::add_assign(self, &rhs)
+    }
+}
+
+impl<'a, ST, RT, const R: usize, const C: usize> SubAssign<&'a Matrix<RT, R, C>>
+    for Matrix<ST, R, C>
+where
+    ST: SubAssign<RT>,
+    RT: Clone,
+{
+    fn sub_assign(&mut self, rhs: &'a Matrix<RT, R, C>) {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) -=
+                        rhs.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+    }
+}
+
+impl<ST, RT, const R: usize, const C: usize> SubAssign<Matrix<RT, R, C>> for Matrix<ST, R, C>
+where
+    ST: SubAssign<RT>,
+    RT: Clone,
+{
+    fn sub_assign(&mut self, rhs: Matrix<RT, R, C>) {
+        SubAssign::sub_assign(self, &rhs)
     }
 }
 
@@ -195,6 +234,50 @@ where
         }
 
         matrix
+    }
+}
+
+impl<'a, ST, RT, const R: usize, const C: usize> Sub<&'a Matrix<RT, R, C>> for Matrix<ST, R, C>
+where
+    ST: Clone + Sub<RT, Output = ST>,
+    RT: Clone,
+{
+    type Output = Matrix<ST, R, C>;
+
+    fn sub(mut self, rhs: &'a Matrix<RT, R, C>) -> Self::Output {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) =
+                        self.get_unchecked((row_idx, col_idx)).clone()
+                            - rhs.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        self
+    }
+}
+
+impl<ST, RT, const R: usize, const C: usize> Sub<Matrix<RT, R, C>> for Matrix<ST, R, C>
+where
+    ST: Clone + Sub<RT, Output = ST>,
+    RT: Clone,
+{
+    type Output = Matrix<ST, R, C>;
+
+    fn sub(mut self, rhs: Matrix<RT, R, C>) -> Self::Output {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) =
+                        self.get_unchecked((row_idx, col_idx)).clone()
+                            - rhs.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        self
     }
 }
 
@@ -227,24 +310,302 @@ where
     }
 }
 
-impl<'a, T, const R: usize, const C: usize> Mul<T> for &'a Matrix<T, R, C>
+impl<'a, ST, RT, const SR: usize, const SHARED: usize, const RC: usize>
+    Mul<&'a Matrix<RT, SHARED, RC>> for Matrix<ST, SR, SHARED>
 where
-    T: Clone + Mul<T, Output = T>,
+    ST: Clone + Zero + AddAssign<ST> + Mul<RT, Output = ST>,
+    RT: Clone,
+{
+    type Output = Matrix<ST, SR, RC>;
+
+    fn mul(self, rhs: &'a Matrix<RT, SHARED, RC>) -> Self::Output {
+        Mul::mul(&self, rhs)
+    }
+}
+
+impl<'b, ST, RT, const SR: usize, const SHARED: usize, const RC: usize> Mul<Matrix<RT, SHARED, RC>>
+    for &'b Matrix<ST, SR, SHARED>
+where
+    ST: Clone + Zero + AddAssign<ST> + Mul<RT, Output = ST>,
+    RT: Clone,
+{
+    type Output = Matrix<ST, SR, RC>;
+
+    fn mul(self, rhs: Matrix<RT, SHARED, RC>) -> Self::Output {
+        Mul::mul(self, &rhs)
+    }
+}
+
+impl<ST, RT, const SR: usize, const SHARED: usize, const RC: usize> Mul<Matrix<RT, SHARED, RC>>
+    for Matrix<ST, SR, SHARED>
+where
+    ST: Clone + Zero + AddAssign<ST> + Mul<RT, Output = ST>,
+    RT: Clone,
+{
+    type Output = Matrix<ST, SR, RC>;
+
+    fn mul(self, rhs: Matrix<RT, SHARED, RC>) -> Self::Output {
+        Mul::mul(&self, &rhs)
+    }
+}
+
+impl<'a, T, const R: usize, const C: usize> MulAssign<&'a T> for Matrix<T, R, C>
+where
+    T: Clone + MulAssign<T>,
+{
+    fn mul_assign(&mut self, rhs: &'a T) {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) *= rhs.clone();
+                };
+            }
+        }
+    }
+}
+
+impl<T, const R: usize, const C: usize> MulAssign<T> for Matrix<T, R, C>
+where
+    T: Clone + MulAssign<T>,
+{
+    fn mul_assign(&mut self, rhs: T) {
+        MulAssign::mul_assign(self, &rhs)
+    }
+}
+
+macro_rules! impl_mul_scalar {
+    ( $( $scalar:ty )+ ) => {
+        $(
+            impl<'a, 'b, T, const R: usize, const C: usize> Mul<&'a $scalar> for &'b Matrix<T, R, C>
+            where
+                T: Clone + Mul<$scalar, Output = T>,
+            {
+                type Output = Matrix<T, R, C>;
+
+                fn mul(self, rhs: &'a $scalar) -> Self::Output {
+                    let mut matrix = unsafe { Matrix::uninitialized() };
+
+                    for col_idx in 0..C {
+                        for row_idx in 0..R {
+                            unsafe { *matrix.get_unchecked_mut((row_idx, col_idx)) = self.get_unchecked((row_idx, col_idx)).clone() * *rhs };
+                        }
+                    }
+
+                    matrix
+                }
+            }
+
+            impl<'a, T, const R: usize, const C: usize> Mul<&'a $scalar> for Matrix<T, R, C>
+            where
+                T: Clone + MulAssign<$scalar>,
+            {
+                type Output = Self;
+
+                fn mul(mut self, rhs: &'a $scalar) -> Self::Output {
+                    for col_idx in 0..C {
+                        for row_idx in 0..R {
+                            unsafe { *self.get_unchecked_mut((row_idx, col_idx)) *= *rhs };
+                        }
+                    }
+
+                    self
+                }
+            }
+
+            impl<'b, T, const R: usize, const C: usize> Mul<$scalar> for &'b Matrix<T, R, C>
+            where
+                T: Clone + Mul<$scalar, Output = T>,
+            {
+                type Output = Matrix<T, R, C>;
+
+                fn mul(self, rhs: $scalar) -> Self::Output {
+                    let mut matrix = unsafe { Matrix::uninitialized() };
+
+                    for col_idx in 0..C {
+                        for row_idx in 0..R {
+                            unsafe { *matrix.get_unchecked_mut((row_idx, col_idx)) = self.get_unchecked((row_idx, col_idx)).clone() * rhs };
+                        }
+                    }
+
+                    matrix
+                }
+            }
+
+            impl<T, const R: usize, const C: usize> Mul<$scalar> for Matrix<T, R, C>
+            where
+                T: Clone + MulAssign<$scalar>,
+            {
+                type Output = Self;
+
+                fn mul(mut self, rhs: $scalar) -> Self::Output {
+                    for col_idx in 0..C {
+                        for row_idx in 0..R {
+                            unsafe { *self.get_unchecked_mut((row_idx, col_idx)) *= rhs };
+                        }
+                    }
+
+                    self
+                }
+            }
+        )+
+    };
+}
+
+impl_mul_scalar! { u8 i8 u16 i16 u32 i32 u64 i64 i128 u128 usize isize f32 f64 }
+
+impl<'a, 'b, T, const R: usize, const C: usize> Div<&'a T> for &'b Matrix<T, R, C>
+where
+    T: Clone + Div<T, Output = T>,
 {
     type Output = Matrix<T, R, C>;
 
-    fn mul(self, rhs: T) -> Self::Output {
+    fn div(self, rhs: &'a T) -> Self::Output {
         let mut matrix = unsafe { Matrix::uninitialized() };
 
         for col_idx in 0..C {
             for row_idx in 0..R {
                 unsafe {
                     *matrix.get_unchecked_mut((row_idx, col_idx)) =
-                        self.get_unchecked((row_idx, col_idx)).clone() * rhs.clone()
+                        self.get_unchecked((row_idx, col_idx)).clone() / rhs.clone()
                 };
             }
         }
 
         matrix
+    }
+}
+
+impl<'a, T, const R: usize, const C: usize> Div<T> for &'a Matrix<T, R, C>
+where
+    T: Clone + Div<T, Output = T>,
+{
+    type Output = Matrix<T, R, C>;
+
+    fn div(self, rhs: T) -> Self::Output {
+        Div::div(self, &rhs)
+    }
+}
+
+impl<T, const R: usize, const C: usize> Div<T> for Matrix<T, R, C>
+where
+    T: Clone + DivAssign<T>,
+{
+    type Output = Matrix<T, R, C>;
+
+    fn div(mut self, rhs: T) -> Self::Output {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    // TODO: keep using DivAssign or Clone + Div ??
+                    *self.get_unchecked_mut((row_idx, col_idx)) /= rhs.clone();
+                };
+            }
+        }
+
+        self
+    }
+}
+
+impl<'a, T, const R: usize, const C: usize> DivAssign<&'a T> for Matrix<T, R, C>
+where
+    T: Clone + DivAssign<T>,
+{
+    fn div_assign(&mut self, rhs: &'a T) {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) /= rhs.clone();
+                };
+            }
+        }
+    }
+}
+
+impl<T, const R: usize, const C: usize> DivAssign<T> for Matrix<T, R, C>
+where
+    T: Clone + DivAssign<T>,
+{
+    fn div_assign(&mut self, rhs: T) {
+        DivAssign::div_assign(self, &rhs)
+    }
+}
+
+impl<'a, T, const R: usize, const C: usize> Neg for &'a Matrix<T, R, C>
+where
+    T: Clone + Neg<Output = T>,
+{
+    type Output = Matrix<T, R, C>;
+
+    fn neg(self) -> Self::Output {
+        let mut matrix = unsafe { Matrix::uninitialized() };
+
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *matrix.get_unchecked_mut((row_idx, col_idx)) =
+                        -self.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        matrix
+    }
+}
+
+impl<T, const R: usize, const C: usize> Neg for Matrix<T, R, C>
+where
+    T: Clone + Neg<Output = T>,
+{
+    type Output = Self;
+
+    fn neg(mut self) -> Self::Output {
+        for col_idx in 0..C {
+            for row_idx in 0..R {
+                unsafe {
+                    *self.get_unchecked_mut((row_idx, col_idx)) =
+                        -self.get_unchecked((row_idx, col_idx)).clone();
+                };
+            }
+        }
+
+        self
+    }
+}
+
+impl<I, T, const R: usize, const C: usize> Index<I> for Matrix<T, R, C>
+where
+    I: MatrixIndex<Matrix<T, R, C>>,
+{
+    type Output = I::Output;
+
+    fn index(&self, index: I) -> &Self::Output {
+        index.get(self).unwrap()
+    }
+}
+
+impl<I, T, const R: usize, const C: usize> IndexMut<I> for Matrix<T, R, C>
+where
+    I: MatrixIndex<Matrix<T, R, C>>,
+    T: Clone + Neg<Output = T>,
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        index.get_mut(self).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mat4::Mat4;
+    use crate::test_util::MatrixCmp;
+
+    #[test]
+    fn mat4_mul() {
+        let is: Mat4<f32> = &Mat4::identity() * (Mat4::<f32>::identity() * 2.0f32);
+        let should = Mat4::new(
+            2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0,
+        );
+
+        MatrixCmp::<f32>::DEFAULT.eq(&is, &should);
     }
 }

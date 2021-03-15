@@ -3,7 +3,7 @@ mod debug;
 pub mod descriptor_manager;
 mod device;
 pub mod error;
-mod pipeline;
+pub mod pipeline;
 mod queue;
 mod renderpass;
 mod surface;

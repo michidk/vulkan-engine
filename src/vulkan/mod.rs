@@ -363,6 +363,97 @@ impl VulkanManager {
             .aquire_next_image(self.image_acquire_semaphores[self.current_frame_index as usize])
     }
 
+    fn set_viewport(&self, commandbuffer: vk::CommandBuffer, width: f32, height: f32) {
+        let vp = vk::Viewport {
+            x: 0.0,
+            y: height,
+            width: width,
+            height: -height,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        };
+        unsafe { self.device.cmd_set_viewport(commandbuffer, 0, &[vp]); }
+    }
+
+    fn push_constants<T>(&self, commandbuffer: vk::CommandBuffer, layout: vk::PipelineLayout, stages: vk::ShaderStageFlags, data: &T) {
+        unsafe {
+            self.device.cmd_push_constants(
+                commandbuffer,
+                layout,
+                stages,
+                0,
+                slice::from_raw_parts(data as *const T as *const u8, size_of::<T>())
+            );
+        }
+    }
+
+    fn blit_image(&self, commandbuffer: vk::CommandBuffer, src: vk::Image, dst: vk::Image, width: i32, height: i32) {
+        let blit = vk::ImageBlit {
+            src_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            src_offsets: [
+                vk::Offset3D { x: 0, y: 0, z: 0 },
+                vk::Offset3D { x: width, y: height, z: 1 }
+            ],
+            dst_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            dst_offsets: [
+                vk::Offset3D { x: 0, y: 0, z: 0 },
+                vk::Offset3D { x: width, y: height, z: 1 }
+            ],
+        };
+        unsafe {
+            self.device.cmd_blit_image(
+                commandbuffer,
+                src, vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                dst, vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &[blit],
+                vk::Filter::NEAREST
+            );
+        }
+    }
+
+    fn transition_images<const N: usize>(&self, commandbuffer: vk::CommandBuffer, src_stages: vk::PipelineStageFlags, dst_stages: vk::PipelineStageFlags, transitions: &[ImageTransition; N]) {
+        let mut vk_transitions = [vk::ImageMemoryBarrier::builder()
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .build()
+        ; N];
+
+        for (t, vk_t) in transitions.iter().zip(vk_transitions.iter_mut()) {
+            vk_t.image = t.image;
+            vk_t.old_layout = t.from;
+            vk_t.new_layout = t.to;
+            vk_t.src_access_mask = t.wait_access;
+            vk_t.dst_access_mask = t.dst_access;
+        }
+
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                commandbuffer,
+                src_stages,
+                dst_stages,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &vk_transitions
+            );
+        }
+    }
+
     fn build_render_order(models: &Vec<Model>) -> Vec<&Model> {
         let mut res: Vec<&Model> = Vec::with_capacity(models.len());
 
@@ -400,16 +491,7 @@ impl VulkanManager {
                         vk::PipelineBindPoint::GRAPHICS,
                         obj.material.get_pipeline(),
                     );
-    
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    self.set_viewport(commandbuffer, self.swapchain.extent.width as f32, self.swapchain.extent.height as f32);
 
                     last_pipeline = obj.material.get_pipeline();
                     last_mat = null();
@@ -451,12 +533,11 @@ impl VulkanManager {
                 }
 
                 let transform_data = obj.transform.get_transform_data();
-                self.device.cmd_push_constants(
+                self.push_constants(
                     commandbuffer, 
                     obj.material.get_pipeline_layout(),
                     vk::ShaderStageFlags::VERTEX,
-                    0,
-                    slice::from_raw_parts(&transform_data as *const TransformData as *const u8, size_of::<TransformData>())
+                    &transform_data
                 );
 
                 for sm in &obj.mesh.submeshes {
@@ -475,24 +556,14 @@ impl VulkanManager {
                 // point lights
                 if let Some(point_pipe) = lp.point_pipeline {
                     self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, point_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    self.set_viewport(commandbuffer, self.swapchain.extent.width as f32, self.swapchain.extent.height as f32);
     
                     for pl in &light_manager.point_lights {
-                        self.device.cmd_push_constants(
+                        self.push_constants(
                             commandbuffer, 
                             self.pipeline_layout_resolve_pass, 
                             vk::ShaderStageFlags::FRAGMENT,
-                            0,
-                            slice::from_raw_parts(pl as *const PointLight as *const u8, size_of::<PointLight>())
+                            pl
                         );
                         self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
                     }
@@ -501,24 +572,14 @@ impl VulkanManager {
                 // directional lights
                 if let Some(directional_pipe) = lp.directional_pipeline {
                     self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, directional_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    self.set_viewport(commandbuffer, self.swapchain.extent.width as f32, self.swapchain.extent.height as f32);
 
                     for dl in &light_manager.directional_lights {
-                        self.device.cmd_push_constants(
+                        self.push_constants(
                             commandbuffer, 
                             self.pipeline_layout_resolve_pass, 
                             vk::ShaderStageFlags::FRAGMENT,
-                            0,
-                            slice::from_raw_parts(dl as *const DirectionalLight as *const u8, size_of::<DirectionalLight>())
+                            dl
                         );
                         self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
                     }
@@ -527,16 +588,7 @@ impl VulkanManager {
                 // ambient
                 if let Some(ambient_pipe) = lp.ambient_pipeline {
                     self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, ambient_pipe);
-            
-                    let vp = vk::Viewport {
-                        x: 0.0,
-                        y: self.swapchain.extent.height as f32,
-                        width: self.swapchain.extent.width as f32,
-                        height: -(self.swapchain.extent.height as f32),
-                        min_depth: 0.0,
-                        max_depth: 1.0,
-                    };
-                    self.device.cmd_set_viewport(commandbuffer, 0, &[vp]);
+                    self.set_viewport(commandbuffer, self.swapchain.extent.width as f32, self.swapchain.extent.height as f32);
                     self.device.cmd_draw(commandbuffer, 6, 1, 0, 0);
                 }
             }
@@ -577,17 +629,7 @@ impl VulkanManager {
                 self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, effect.pipeline);
             }
 
-            let viewport = vk::Viewport {
-                x: 0.0,
-                y: self.swapchain.extent.height as f32,
-                width: self.swapchain.extent.width as f32,
-                height: -(self.swapchain.extent.height as f32),
-                min_depth: 0.0,
-                max_depth: 1.0,
-            };
-            unsafe {
-                self.device.cmd_set_viewport(commandbuffer, 0, &[viewport]);
-            }
+            self.set_viewport(commandbuffer, self.swapchain.extent.width as f32, self.swapchain.extent.height as f32);
 
             let desc_data = [
                 DescriptorData::ImageSampler {
@@ -617,117 +659,52 @@ impl VulkanManager {
         }
 
         // transition swapchain image to TRANSFER_DST_OPTIMAL and final pp image to TRANSFER_SRC_OPTIMAL
-        let transitions = [
-            // swapchain image
-            vk::ImageMemoryBarrier::builder()
-                .src_access_mask(vk::AccessFlags::empty())
-                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-                .old_layout(vk::ImageLayout::UNDEFINED)
-                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-                .image(self.swapchain.images[swapchain_image_index])
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .build(),
-            // pp image
-            vk::ImageMemoryBarrier::builder()
-                .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-                .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
-                .old_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
-                .image(if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image })
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .build(),
-        ];
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                commandbuffer,
-                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &transitions
-            );
-        }
+        self.transition_images(
+            commandbuffer,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            vk::PipelineStageFlags::TRANSFER,
+            &[
+                ImageTransition {
+                    image: self.swapchain.images[swapchain_image_index],
+                    from: vk::ImageLayout::UNDEFINED,
+                    to: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    wait_access: vk::AccessFlags::empty(),
+                    dst_access: vk::AccessFlags::TRANSFER_WRITE,
+                },
+                ImageTransition {
+                    image: if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image },
+                    from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    to: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                    dst_access: vk::AccessFlags::TRANSFER_READ,
+                }
+            ]
+        );
 
         // blit pp image to swapchain (automatically converts to sRGB)
-        let regions = [
-            vk::ImageBlit {
-                src_subresource: vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level: 0,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                },
-                src_offsets: [
-                    vk::Offset3D { x: 0, y: 0, z: 0 },
-                    vk::Offset3D { x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }
-                ],
-                dst_subresource: vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level: 0,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                },
-                dst_offsets: [
-                    vk::Offset3D { x: 0, y: 0, z: 0 },
-                    vk::Offset3D { x: self.swapchain.extent.width as i32, y: self.swapchain.extent.height as i32, z: 1 }
-                ],
-            }
-        ];
-
-        unsafe {
-            self.device.cmd_blit_image(
-                commandbuffer,
-                if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image },
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                self.swapchain.images[swapchain_image_index],
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &regions,
-                vk::Filter::LINEAR
-            );
-        }
+        self.blit_image(
+            commandbuffer,
+            if direction { self.swapchain.g0_image } else { self.swapchain.resolve_image },
+            self.swapchain.images[swapchain_image_index],
+            self.swapchain.extent.width as i32,
+            self.swapchain.extent.height as i32
+        );
 
         // transition swapchain image to PRESENT_SRC_KHR
-        let transitions = [
-            // swapchain image
-            vk::ImageMemoryBarrier::builder()
-                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-                .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
-                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-                .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                .image(self.swapchain.images[swapchain_image_index])
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .build()
-        ];
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                commandbuffer,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &transitions
-            );
-        }
+        self.transition_images(
+            commandbuffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::BOTTOM_OF_PIPE, // can be BOTTOM_OF_PIPE because vkQueuePresentKHR waits for a semaphore
+            &[
+                ImageTransition {
+                    image: self.swapchain.images[swapchain_image_index],
+                    from: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    to: vk::ImageLayout::PRESENT_SRC_KHR,
+                    wait_access: vk::AccessFlags::TRANSFER_WRITE,
+                    dst_access: vk::AccessFlags::empty(),   // can be empty because vkQueuePresentKHR waits for a semaphore, which automatically makes all memory writes visible
+                }
+            ]
+        );
 
         Ok(())
     }
@@ -992,4 +969,12 @@ impl Drop for VulkanManager {
             self.instance.destroy_instance(None)
         };
     }
+}
+
+struct ImageTransition {
+    image: vk::Image,
+    from: vk::ImageLayout,
+    to: vk::ImageLayout,
+    wait_access: vk::AccessFlags,
+    dst_access: vk::AccessFlags,
 }

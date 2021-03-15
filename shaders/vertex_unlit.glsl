@@ -3,28 +3,37 @@
 //# VERSION 450
 
 //# TYPE VERTEX
-layout (location = 0) in vec3 i_position;
-layout (location = 1) in vec3 i_color;
-layout (location = 4) in mat4 i_modelMatrix;
+layout (location = 0) in vec3 in_Position;
+layout (location = 1) in vec3 in_Color;
+//layout (location = 2) in vec3 in_Normal;
+//layout (location = 3) in vec2 in_UV;
 
 layout (set = 0, binding = 0) uniform FrameData {
-    mat4 view_matrix;
-    mat4 projection_matrix;
-    vec3 cam_pos;
+    mat4 viewMatrix;
+    mat4 projMatrix;
+    mat4 invViewMatrix;
+    mat4 invProjMatrix;
+    vec3 camPos;
 } u_FrameData;
 
-layout (location = 0) out vec3 o_color;
+layout (push_constant) uniform TransformData {
+    mat4 modelMatrix;
+    mat4 invModelMatrix;
+} u_TransformData;
+
+layout (location = 0) out vec3 v2f_VertexColor;
 
 void main() {
-    gl_Position = u_FrameData.projection_matrix * u_FrameData.view_matrix * i_modelMatrix * vec4(i_position, 1.0);
-    o_color = i_color;
+    gl_Position = u_FrameData.projMatrix * u_FrameData.viewMatrix * u_TransformData.modelMatrix * vec4(in_Position, 1.0);
+    v2f_VertexColor = in_Color;
 }
 
 //# TYPE FRAGMENT
-layout (location = 0) in vec3 i_color;
+layout (location = 0) in vec3 v2f_VertexColor;
 
-layout (location = 0) out vec4 o_color;
+layout (location = 0) out vec4 out_GBuffer0;
+layout (location = 1) out vec4 out_GBuffer1;
 
 void main(){
-	o_color = vec4(i_color, 1.0);
+	out_GBuffer0 = vec4(v2f_VertexColor, 0.0);
 }

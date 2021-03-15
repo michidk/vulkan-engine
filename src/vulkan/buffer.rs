@@ -112,6 +112,7 @@ pub struct BufferWrapper {
     memory_usage: vk_mem::MemoryUsage,
 }
 
+#[allow(dead_code)]
 impl BufferWrapper {
     pub fn new(
         allocator: &vk_mem::Allocator,

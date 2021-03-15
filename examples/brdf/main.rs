@@ -1,10 +1,9 @@
-use std::process::exit;
+use std::{path::Path, process::exit};
 
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
-use vulkan_engine::scene::{material::*, model::mesh::Mesh};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -16,11 +15,15 @@ use vulkan_engine::{
         transform::Transform,
     },
 };
+use vulkan_engine::{
+    scene::{material::*, model::mesh::Mesh},
+    vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
+};
 
 #[repr(C)]
 #[derive(MaterialBindingFragment)]
 struct BrdfColorData {
-    color: Vec4<f32>,
+    albedo: Vec4<f32>,
     metallic: f32,
     roughness: f32,
 }
@@ -65,103 +68,103 @@ fn main() {
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
+    let pp_tonemap = PPEffect::new(
+        "tone_map",
+        engine.vulkan_manager.pipe_layout_pp,
+        engine.vulkan_manager.renderpass_pp,
+        engine.vulkan_manager.device.clone(),
+    )
+    .unwrap();
+    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+
+    let brdf_lighting = LightingPipeline::new(
+        Some("deferred_point_brdf"),
+        Some("deferred_directional_brdf"),
+        None,
+        engine.vulkan_manager.pipeline_layout_resolve_pass,
+        engine.vulkan_manager.renderpass,
+        engine.vulkan_manager.device.clone(),
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(brdf_lighting.clone());
+
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
-        "brdf",
+        "material_solid_color",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        engine.vulkan_manager.swapchain.extent.width,
-        engine.vulkan_manager.swapchain.extent.height,
+        brdf_lighting.as_ref(),
     )
     .unwrap();
-    let brdf_material0 = brdf_pipeline
-        .create_material(BrdfMaterialData {
-            color_data: BrdfColorData {
-                color: Vec4::new(0.5, 0.5, 0.5, 1.0),
-                metallic: 0.0,
-                roughness: 0.1,
-            },
-        })
-        .unwrap();
 
-    let mesh_data = MeshData {
-        vertices: vec![
-            Vertex {
-                position: Vec3::new(-1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(1.0, -1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-            Vertex {
-                position: Vec3::new(0.0, 1.0, 0.0),
-                color: Vec3::new(1.0, 0.0, 1.0),
-                normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
-            },
-        ],
-        submeshes: vec![Submesh {
-            faces: vec![Face { indices: [0, 1, 2] }],
-        }],
-    };
-
-    let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
-    let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = Mesh::bake(
-        mesh_data,
+    let mesh_data_sphere_smooth =
+        ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere_smooth.vem"))
+            .expect("Model sphere_smooth.vem not found!");
+    let mesh_sphere_smooth = Mesh::bake(
+        mesh_data_sphere_smooth,
         (*engine.vulkan_manager.allocator).clone(),
-        transform,
-        inv_transform,
     )
-    .expect("Error baking mesh!");
+    .unwrap();
 
-    let model = Model {
-        material: brdf_material0,
-        mesh,
-        transform: Transform {
-            position: Vec3::new(0.0, 0.0, 0.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    };
+    for x in 0..11 {
+        for y in 0..11 {
+            let material = brdf_pipeline
+                .create_material(BrdfMaterialData {
+                    color_data: BrdfColorData {
+                        albedo: Vec4::new(0.5, 0.5, 0.5, 0.0),
+                        metallic: (x as f32) * 0.1,
+                        roughness: (y as f32) * 0.1,
+                    },
+                })
+                .unwrap();
 
-    scene.add(model);
+            let model = Model {
+                material,
+                mesh: mesh_sphere_smooth.clone(),
+                transform: Transform {
+                    position: Vec3::new(x as f32 - 5.0, y as f32 - 5.0, 10.0),
+                    rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+                    scale: Vec3::new(0.5, 0.5, 0.5),
+                },
+            };
+
+            scene.add(model);
+        }
+    }
 
     // setup scene
     let lights = &mut scene.light_manager;
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., 1., 0.),
-        illuminance: Vec3::new(10.1, 10.1, 10.1),
+        direction: Vec4::new(0., 1., 0., 0.0),
+        illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
     });
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., -1., 0.),
-        illuminance: Vec3::new(1.6, 1.6, 1.6),
+        direction: Vec4::new(0., -1., 0., 0.0),
+        illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.0, 0.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 0.0, 0.0),
+        position: Vec4::new(0.0, 0.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
 
     // setup camera

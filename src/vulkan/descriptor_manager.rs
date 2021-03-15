@@ -29,6 +29,10 @@ pub enum DescriptorData {
         offset: vk::DeviceSize,
         size: vk::DeviceSize,
     },
+    InputAttachment {
+        image: vk::ImageView,
+        layout: vk::ImageLayout,
+    },
 }
 
 struct DescriptorSetData {
@@ -224,6 +228,22 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
                     set_writes.push(
                         vk::WriteDescriptorSet::builder()
                             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                            .dst_binding(index as u32)
+                            .dst_set(new_set)
+                            .image_info(slice::from_ref(image_infos.last().unwrap()))
+                            .build(),
+                    );
+                }
+                DescriptorData::InputAttachment { image, layout } => {
+                    image_infos.push(
+                        vk::DescriptorImageInfo::builder()
+                            .image_view(*image)
+                            .image_layout(*layout)
+                            .build(),
+                    );
+                    set_writes.push(
+                        vk::WriteDescriptorSet::builder()
+                            .descriptor_type(vk::DescriptorType::INPUT_ATTACHMENT)
                             .dst_binding(index as u32)
                             .dst_set(new_set)
                             .image_info(slice::from_ref(image_infos.last().unwrap()))

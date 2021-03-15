@@ -5,6 +5,8 @@ use crate::vulkan::buffer::{self, MutableBuffer};
 pub struct CamData {
     pub view_matrix: [[f32; 4]; 4],
     pub projection_matrix: [[f32; 4]; 4],
+    pub inv_view_matrix: [[f32; 4]; 4],
+    pub inv_projection_matrix: [[f32; 4]; 4],
     pub pos: [[f32; 3]; 1],
 }
 
@@ -20,6 +22,8 @@ pub struct Camera {
     near: f32,
     far: f32,
     projection_matrix: Mat4<f32>,
+    inv_view_matrix: Mat4<f32>,
+    inv_projection_matrix: Mat4<f32>,
 }
 
 impl Camera {
@@ -32,6 +36,8 @@ impl Camera {
         let cam_data = CamData {
             view_matrix: self.view_matrix.into(),
             projection_matrix: self.projection_matrix.into(),
+            inv_view_matrix: self.inv_view_matrix.into(),
+            inv_projection_matrix: self.inv_projection_matrix.into(),
             pos: self.position.into(),
         };
         buffer
@@ -40,24 +46,31 @@ impl Camera {
     }
 
     fn update_projection_matrix(&mut self) {
-        let d = 1.0 / (0.5 * self.fovy).tan();
+        let a = 1.0 / ((0.5 * self.fovy).tan() * self.aspect);
+        let b = 1.0 / (0.5 * self.fovy).tan();
+        let c = self.far / (self.far - self.near);
+        let d = -self.near * self.far / (self.far - self.near);
+
         self.projection_matrix = Mat4::new(
-            d / self.aspect,
+            a, 0.0, 0.0, 0.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, c, d, 0.0, 0.0, 1.0, 0.0,
+        );
+        self.inv_projection_matrix = Mat4::new(
+            1.0 / a,
             0.0,
             0.0,
             0.0,
             0.0,
-            d,
+            1.0 / b,
             0.0,
             0.0,
             0.0,
-            0.0,
-            self.far / (self.far - self.near),
-            -self.near * self.far / (self.far - self.near),
             0.0,
             0.0,
             1.0,
             0.0,
+            0.0,
+            1.0 / d,
+            -c / d,
         );
     }
 
@@ -72,34 +85,13 @@ impl Camera {
     }
 
     fn update_view_matrix(&mut self) {
-        let rotation = self.get_rotation();
+        let rotation = self.get_rotation().conjugated();
 
-        let forward_dir = rotation.forward();
-        let right_dir = rotation.right();
-        let up_dir = rotation.up();
+        let m = Mat4::from(rotation.conjugated()) * Mat4::translate(&-self.position);
+        let im = Mat4::translate(&self.position) * Mat4::from(rotation);
 
-        let m: Mat4<f32> = Mat4::new(
-            *right_dir.x(),
-            *right_dir.y(),
-            *right_dir.z(),
-            -right_dir.dot_product(&self.position),
-            //
-            *up_dir.x(),
-            *up_dir.y(),
-            *up_dir.z(),
-            -up_dir.dot_product(&self.position),
-            //
-            *forward_dir.x(),
-            *forward_dir.y(),
-            *forward_dir.z(),
-            -forward_dir.dot_product(&self.position),
-            //
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-        );
         self.view_matrix = m;
+        self.inv_view_matrix = im;
     }
 
     pub fn move_in_view_direction(&mut self, movement: &Vec3<f32>) {
@@ -218,6 +210,8 @@ impl CameraBuilder {
             far: self.far,
             view_matrix: Mat4::identity(),
             projection_matrix: Mat4::identity(),
+            inv_view_matrix: Mat4::identity(),
+            inv_projection_matrix: Mat4::identity(),
         };
         cam.update_projection_matrix();
         cam.update_view_matrix();

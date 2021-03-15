@@ -3,7 +3,6 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::scene::{material::*, model::mesh::Mesh};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -14,6 +13,10 @@ use vulkan_engine::{
         model::Model,
         transform::Transform,
     },
+};
+use vulkan_engine::{
+    scene::{material::*, model::mesh::Mesh},
+    vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
 
 #[repr(C)]
@@ -64,14 +67,36 @@ fn main() {
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
+    let pp_tonemap = PPEffect::new(
+        "tone_map",
+        engine.vulkan_manager.pipe_layout_pp,
+        engine.vulkan_manager.renderpass_pp,
+        engine.vulkan_manager.device.clone(),
+    )
+    .unwrap();
+    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+
+    let brdf_resolve_pipeline = LightingPipeline::new(
+        Some("deferred_point_brdf"),
+        Some("deferred_directional_brdf"),
+        None,
+        engine.vulkan_manager.pipeline_layout_resolve_pass,
+        engine.vulkan_manager.renderpass,
+        engine.vulkan_manager.device.clone(),
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(brdf_resolve_pipeline.clone());
+
     let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
-        "brdf",
+        "material_solid_color",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        engine.vulkan_manager.swapchain.extent.width,
-        engine.vulkan_manager.swapchain.extent.height,
+        brdf_resolve_pipeline.as_ref(),
     )
     .unwrap();
     let brdf_material0 = brdf_pipeline
@@ -84,24 +109,17 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/cube.vem"))
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
         .expect("Model cube.vem not found!");
 
-    let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
-    let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = Mesh::bake(
-        mesh_data,
-        (*engine.vulkan_manager.allocator).clone(),
-        transform,
-        inv_transform,
-    )
-    .expect("Error baking mesh!");
+    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone())
+        .expect("Error baking mesh!");
 
     let model = Model {
         material: brdf_material0,
         mesh,
         transform: Transform {
-            position: Vec3::new(0.0, 0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::from_axis_angle(
                 Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
                 Angle::from_deg(180.0),
@@ -115,32 +133,32 @@ fn setup(engine: &mut Engine) {
     // setup scene
     let lights = &mut scene.light_manager;
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(-1., 1., -1.),
-        illuminance: Vec3::new(10.1, 10.1, 10.1),
+        direction: Vec4::new(-1., 1., -1., 0.0),
+        illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
     });
     lights.add_light(DirectionalLight {
-        direction: Vec3::new(0., 1., 0.),
-        illuminance: Vec3::new(1.6, 1.6, 1.6),
+        direction: Vec4::new(0., 1., 0., 0.0),
+        illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 100.0, 100.0),
+        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
     });
     lights.add_light(PointLight {
-        position: Vec3::new(0.0, 0.0, -3.0),
-        luminous_flux: Vec3::new(100.0, 0.0, 0.0),
+        position: Vec4::new(0.0, 0.0, -3.0, 0.0),
+        luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
 
     // setup camera

@@ -5,7 +5,9 @@ pub use vulkan_engine_derive::MaterialBindingFragment;
 pub use vulkan_engine_derive::MaterialBindingVertex;
 pub use vulkan_engine_derive::MaterialData;
 
-use crate::vulkan::descriptor_manager::DescriptorData;
+use crate::vulkan::{
+    descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline,
+};
 
 mod material_compiler;
 
@@ -67,8 +69,7 @@ impl<T: MaterialData> MaterialPipeline<T> {
         shader: &str,
         frame_data_layout: vk::DescriptorSetLayout,
         renderpass: vk::RenderPass,
-        width: u32,
-        height: u32,
+        lighting_pipeline: &LightingPipeline,
     ) -> Result<Rc<MaterialPipeline<T>>, MaterialError> {
         let descriptor_set_layout = material_compiler::compile_descriptor_set_layout(
             device.as_ref(),
@@ -78,13 +79,36 @@ impl<T: MaterialData> MaterialPipeline<T> {
             device.as_ref(),
             &[frame_data_layout, descriptor_set_layout],
         )?;
-        let pipeline = material_compiler::compile_pipeline(
-            device.as_ref(),
-            pipeline_layout,
+
+        let blend_func = vk::PipelineColorBlendAttachmentState::builder()
+            .blend_enable(false)
+            .color_write_mask(
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
+            )
+            .build();
+        let stencil_func = vk::StencilOpState::builder()
+            .fail_op(vk::StencilOp::KEEP)
+            .depth_fail_op(vk::StencilOp::KEEP)
+            .pass_op(vk::StencilOp::REPLACE)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .write_mask(0xFF)
+            .compare_mask(0xFF)
+            .reference(lighting_pipeline.stencil_id as u32)
+            .build();
+        let pipeline = pipeline::create_pipeline(
             shader,
+            pipeline_layout,
             renderpass,
-            width,
-            height,
+            0,
+            true,
+            2,
+            blend_func,
+            true,
+            Some(stencil_func),
+            &device,
         )?;
 
         Ok(Rc::new(MaterialPipeline {

@@ -1,5 +1,6 @@
 use crate::{
     angle::{Angle, AngleConst},
+    prelude::Quaternion,
     scalar::{Cos, Sin},
     unit::Unit,
 };
@@ -32,16 +33,30 @@ impl<T> Mat4<T> {
         ])
     }
 
-    pub fn scale(factor: T) -> Self
+    pub fn scale_uniform(factor: T) -> Self
     where
-        T: Clone + Zero + One + Mul<T, Output = T>,
+        T: Clone + Zero + One + MulAssign<T>,
     {
-        let mut matrix = &Self::identity() * factor;
+        let mut matrix = Self::identity();
+        matrix *= factor;
         unsafe { *matrix.get_unchecked_mut((3, 3)) = T::one() };
         matrix
     }
 
-    pub fn translate(direction: Vec3<T>) -> Self
+    #[rustfmt::skip]
+    pub fn scale(scale: &Vec3<T>) -> Self
+    where
+        T: Clone + Zero + One + Mul<T, Output = T>,
+    {
+        Self::new(
+            scale.x().clone(), T::zero(), T::zero(), T::zero(),
+            T::zero(), scale.y().clone(), T::zero(), T::zero(),
+            T::zero(), T::zero(), scale.z().clone(), T::zero(),
+            T::zero(), T::zero(), T::zero(), T::one(),
+        )
+    }
+
+    pub fn translate(direction: &Vec3<T>) -> Self
     where
         T: Clone + Zero + One + Mul<T, Output = T>,
     {
@@ -106,6 +121,84 @@ impl<T> Mat4<T> {
                 T::one(),
             )
         }
+    }
+
+    #[rustfmt::skip]
+    pub fn rotation_x(angle: Angle<T>) -> Self
+    where
+        T: Clone
+            + AngleConst
+            + Zero
+            + One
+            + Mul<T, Output = T>
+            + Div<T, Output = T>
+            + Rem<T, Output = T>
+            + Neg<Output = T>
+            + Sin<Output = T>
+            + Cos<Output = T>,
+    {
+        let rad = angle.to_rad_clamped();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_data([
+            [T::one(), T::zero(), T::zero(), T::zero()],
+            [T::zero(), cos.clone(), -sin.clone(), T::zero()],
+            [T::zero(), sin, cos, T::zero()],
+            [T::zero(), T::zero(), T::zero(), T::one()],
+        ])
+    }
+
+    #[rustfmt::skip]
+    pub fn rotation_y(angle: Angle<T>) -> Self
+    where
+        T: Clone
+            + AngleConst
+            + Zero
+            + One
+            + Mul<T, Output = T>
+            + Div<T, Output = T>
+            + Rem<T, Output = T>
+            + Neg<Output = T>
+            + Sin<Output = T>
+            + Cos<Output = T>,
+    {
+        let rad = angle.to_rad_clamped();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_data([
+            [cos.clone(), T::zero(), sin.clone(), T::zero()],
+            [T::zero(), T::one(), T::zero(), T::zero()],
+            [-sin, T::zero(), cos, T::zero()],
+            [T::zero(), T::zero(), T::zero(), T::one()],
+        ])
+    }
+
+    #[rustfmt::skip]
+    pub fn rotation_z(angle: Angle<T>) -> Self
+    where
+        T: Clone
+            + AngleConst
+            + Zero
+            + One
+            + Mul<T, Output = T>
+            + Div<T, Output = T>
+            + Rem<T, Output = T>
+            + Neg<Output = T>
+            + Sin<Output = T>
+            + Cos<Output = T>,
+    {
+        let rad = angle.to_rad_clamped();
+        let sin = rad.sin();
+        let cos = rad.cos();
+
+        Self::from_data([
+            [cos.clone(), sin.clone(), T::zero(), T::zero()],
+            [-sin, cos, T::zero(), T::zero()],
+            [T::zero(), T::zero(), T::one(), T::zero()],
+            [T::zero(), T::zero(), T::zero(), T::one()],
+        ])
     }
 
     // This function only works for a matrix backed by an continues storage
@@ -245,45 +338,54 @@ impl<T> Mat4<T> {
     }
 }
 
-// TODO: make generic for Zero + Sin + Cos
-impl Mat4<f32> {
-    pub fn rotation_x(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad_clamped();
-        let sin = rad.sin();
-        let cos = rad.cos();
+impl<'a, T> From<&'a Quaternion<T>> for Mat4<T>
+where
+    T: Clone + Zero + One + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T>,
+{
+    fn from(value: &'a Quaternion<T>) -> Self {
+        let two = T::one() + T::one();
+
+        let xy = value.x().clone() * value.y().clone();
+        let xz = value.x().clone() * value.z().clone();
+        let xw = value.x().clone() * value.w().clone();
+        let yz = value.y().clone() * value.z().clone();
+        let yw = value.y().clone() * value.w().clone();
+        let zw = value.z().clone() * value.w().clone();
+        let x2 = value.x().clone() * value.x().clone();
+        let y2 = value.y().clone() * value.y().clone();
+        let z2 = value.z().clone() * value.z().clone();
+        let w2 = value.w().clone() * value.w().clone();
 
         Self::from_data([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, cos, -sin, 0.0],
-            [0.0, sin, cos, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
+            [
+                two.clone() * (x2 + w2.clone()) - T::one(),
+                two.clone() * (xy.clone() + zw.clone()),
+                two.clone() * (xz.clone() - yw.clone()),
+                T::zero(),
+            ],
+            [
+                two.clone() * (xy - zw),
+                two.clone() * (y2 + w2.clone()) - T::one(),
+                two.clone() * (xw.clone() + yz.clone()),
+                T::zero(),
+            ],
+            [
+                two.clone() * (xz + yw),
+                two.clone() * (yz - xw),
+                two * (z2 + w2) - T::one(),
+                T::zero(),
+            ],
+            [T::zero(), T::zero(), T::zero(), T::one()],
         ])
     }
+}
 
-    pub fn rotation_y(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad_clamped();
-        let sin = rad.sin();
-        let cos = rad.cos();
-
-        Self::from_data([
-            [cos, 0.0, sin, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [-sin, 0.0, cos, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ])
-    }
-
-    pub fn rotation_z(angle: Angle<f32>) -> Self {
-        let rad = angle.to_rad_clamped();
-        let sin = rad.sin();
-        let cos = rad.cos();
-
-        Self::from_data([
-            [cos, sin, 0.0, 0.0],
-            [-sin, cos, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ])
+impl<T> From<Quaternion<T>> for Mat4<T>
+where
+    T: Clone + Zero + One + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T>,
+{
+    fn from(value: Quaternion<T>) -> Self {
+        Self::from(&value)
     }
 }
 
@@ -296,7 +398,7 @@ mod tests {
 
     #[test]
     fn mat4_scaling() {
-        let is = Mat4::scale(4.2);
+        let is = Mat4::scale_uniform(4.2);
         let should = Mat4::new(
             4.2, 0.0, 0.0, 0.0,
             0.0, 4.2, 0.0, 0.0,
@@ -309,7 +411,7 @@ mod tests {
 
     #[test]
     fn mat4_translate() {
-        let is = Mat4::translate(Vec3::new(0.2, 1.7, 7.0));
+        let is = Mat4::translate(&Vec3::new(0.2, 1.7, 7.0));
         let should = Mat4::new(
             1.0, 0.0, 0.0, 0.2,
             0.0, 1.0, 0.0, 1.7,
@@ -328,19 +430,6 @@ mod tests {
             0.9098000079779422, -0.41486784839954377, 0.012190727938444015, 0.0,
             -0.057598245781191326, -0.09711554093899513, 0.9936050592620064, 0.0,
             0.0, 0.0, 0.0, 1.0
-        );
-
-        MatrixCmp::<f32>::DEFAULT.eq(&is, &should);
-    }
-
-    #[test]
-    fn mat4_try_inverse() {
-        let is = Mat4::scale(2.0);
-        let should = Mat4::new(
-            0.5, 0.0, 0.0, 0.0,
-            0.0, 0.5, 0.0, 0.0,
-            0.0, 0.0, 0.5, 0.0,
-            0.0, 0.0, 0.0, 0.5,
         );
 
         MatrixCmp::<f32>::DEFAULT.eq(&is, &should);

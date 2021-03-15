@@ -13,6 +13,7 @@ use vulkan_engine::{
         model::{mesh::Mesh, Model},
         transform::Transform,
     },
+    vulkan::lighting_pipeline::LightingPipeline,
 };
 
 #[derive(MaterialData)]
@@ -53,14 +54,27 @@ fn main() {
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
+    let lighting_pipeline = LightingPipeline::new(
+        None,
+        None,
+        Some("deferred_unlit"),
+        engine.vulkan_manager.pipeline_layout_resolve_pass,
+        engine.vulkan_manager.renderpass,
+        engine.vulkan_manager.device.clone(),
+        1,
+    )
+    .unwrap();
+    engine
+        .vulkan_manager
+        .register_lighting_pipeline(lighting_pipeline.clone());
+
     let pipeline = MaterialPipeline::<VertexMaterialData>::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
         "vertex_unlit",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        engine.vulkan_manager.swapchain.extent.width,
-        engine.vulkan_manager.swapchain.extent.height,
+        lighting_pipeline.as_ref(),
     )
     .unwrap();
     let material0 = pipeline.create_material(VertexMaterialData {}).unwrap();
@@ -92,21 +106,13 @@ fn setup(engine: &mut Engine) {
         }],
     };
 
-    let transform = Mat4::translate(Vec3::new(0.0, 0.0, 5.0));
-    let inv_transform = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-    let mesh = Mesh::bake(
-        mesh_data,
-        (*engine.vulkan_manager.allocator).clone(),
-        transform,
-        inv_transform,
-    )
-    .unwrap();
+    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone()).unwrap();
 
     scene.add(Model {
         material: material0,
         mesh,
         transform: Transform {
-            position: Vec3::new(0.0, 0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },

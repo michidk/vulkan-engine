@@ -33,4 +33,4 @@ anyhow = "1.0.38"
 lto = "thin"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0

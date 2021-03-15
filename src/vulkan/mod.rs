@@ -13,7 +13,8 @@ pub mod pp_effect;
 
 use std::{collections::BTreeMap, ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, AttachmentDescription, AttachmentReference, Handle, ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, SubpassDependency, SubpassDescription}};
+use ash::{extensions::ext, version::{DeviceV1_0, EntryV1_0, InstanceV1_0}, vk::{self, AttachmentDescription, AttachmentReference, ClearDepthStencilValue, CommandBuffer, Handle, ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, RenderPassBeginInfo, SubpassDependency, SubpassDescription}};
+use crystal::prelude::Vec4;
 
 use crate::{assets::shader, engine::Info, scene::{Scene, camera, light::{DirectionalLight, LightManager, PointLight}, material::{MaterialInterface, MaterialPipeline}, model::{Model, mesh::Mesh}, transform::TransformData}};
 
@@ -454,6 +455,20 @@ impl VulkanManager {
         }
     }
 
+    fn begin_renderpass(&self, commandbuffer: vk::CommandBuffer, renderpass: vk::RenderPass, framebuffer: vk::Framebuffer, clear_values: &[vk::ClearValue]) {
+        let info = vk::RenderPassBeginInfo::builder()
+            .render_pass(renderpass)
+            .framebuffer(framebuffer)
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain.extent,
+            })
+            .clear_values(&clear_values);
+        unsafe {
+            self.device.cmd_begin_render_pass(commandbuffer, &info, vk::SubpassContents::INLINE);
+        }
+    }
+
     fn build_render_order(models: &Vec<Model>) -> Vec<&Model> {
         let mut res: Vec<&Model> = Vec::with_capacity(models.len());
 
@@ -612,17 +627,12 @@ impl VulkanManager {
 
         for effect in &self.pp_effects {
             // begin renderpass
-            let rp_info = vk::RenderPassBeginInfo::builder()
-                .render_pass(self.renderpass_pp)
-                .framebuffer(if !direction { self.swapchain.framebuffer_pp_a } else { self.swapchain.framebuffer_pp_b })
-                .render_area(vk::Rect2D {
-                    offset: vk::Offset2D{x: 0, y: 0},
-                    extent: self.swapchain.extent,
-                })
-                .build();
-            unsafe {
-                self.device.cmd_begin_render_pass(commandbuffer, &rp_info, vk::SubpassContents::INLINE);
-            }
+            self.begin_renderpass(
+                commandbuffer,
+                self.renderpass_pp,
+                if !direction { self.swapchain.framebuffer_pp_a } else { self.swapchain.framebuffer_pp_b },
+                &[]
+            );
 
             // bind pp pipeline and descriptor set
             unsafe {
@@ -721,27 +731,24 @@ impl VulkanManager {
                 .begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
         }
 
-        let clearvalues = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.2, 0.2, 0.2, 0.0],
+        self.begin_renderpass(
+            commandbuffer,
+            self.renderpass,
+            self.swapchain.framebuffer_deferred,
+            &[
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.2, 0.2, 0.2, 0.0]
+                    },
                 },
-            },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            },
-        ];
-        let renderpass_begininfo = vk::RenderPassBeginInfo::builder()
-            .render_pass(self.renderpass)
-            .framebuffer(self.swapchain.framebuffer_deferred)
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: self.swapchain.extent,
-            })
-            .clear_values(&clearvalues);
+                vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0
+                    }
+                }
+            ]
+        );
 
         let desc_values_frame_data = [
             DescriptorData::DynamicUniformBuffer {
@@ -765,14 +772,6 @@ impl VulkanManager {
         let desc_set_camera = self
             .descriptor_manager
             .get_descriptor_set(self.desc_layout_frame_data, &desc_values_frame_data)?;
-
-        unsafe {
-            self.device.cmd_begin_render_pass(
-                commandbuffer,
-                &renderpass_begininfo,
-                vk::SubpassContents::INLINE,
-            );
-        }
 
         unsafe {
             self.device.cmd_bind_descriptor_sets(

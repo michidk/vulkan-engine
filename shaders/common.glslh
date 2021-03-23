@@ -1,0 +1,11 @@
+
+#define UNIFORM_CAMDATA layout (set = 0, binding = 0) uniform CamData { \
+    mat4 viewMatrix; \
+    mat4 projMatrix; \
+    mat4 invViewMatrix; \
+    mat4 invProjMatrix; \
+    vec3 camPos; \
+}
+
+#define VERTEX_OUT layout (location = 0) out V2F
+#define FRAGMENT_IN layout(location = 0) in V2F

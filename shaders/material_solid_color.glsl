@@ -3,38 +3,35 @@
 //# VERSION 450
 
 //# TYPE VERTEX
-layout (location = 0) in vec3 in_Position;
-//layout (location = 1) in vec3 in_Color;
-layout (location = 2) in vec3 in_Normal;
-//layout (location = 3) in vec2 in_UV;
+#include "gpass_defines.glslh"
 
-layout (set = 0, binding = 0) uniform CamData {
-    mat4 viewMatrix;
-    mat4 projMatrix;
-    mat4 invViewMatrix;
-    mat4 invProjMatrix;
-    vec3 camPos;
-} u_CamData;
+IN_POSITION in_Position;
+IN_NORMAL in_Normal;
 
-layout (push_constant) uniform TransformData {
-    mat4 modelMatrix;
-    mat4 invModelMatrix;
-} u_TransformData;
+UNIFORM_CAMDATA u_CamData;
 
-layout (location = 0) out vec3 v2f_WorldNormal;
+UNIFORM_TRANSFORM u_TransformData;
+
+VERTEX_OUT {
+    vec3 worldNormal;
+} v2f;
 
 void main() {
     gl_Position = u_CamData.projMatrix * u_CamData.viewMatrix * u_TransformData.modelMatrix * vec4(in_Position, 1.0);
-    v2f_WorldNormal = (transpose(u_TransformData.invModelMatrix) * vec4(in_Normal, 0.0)).xyz;
+    v2f.worldNormal = (transpose(u_TransformData.invModelMatrix) * vec4(in_Normal, 0.0)).xyz;
 }
 
 //# TYPE FRAGMENT
-layout (location = 0) in vec3 v2f_WorldNormal;
+#include "gpass_defines.glslh"
 
-layout (location = 0) out vec4 out_AlbedoRoughness;
-layout (location = 1) out vec4 out_NormalMetallic;
+FRAGMENT_IN {
+    vec3 worldNormal;
+} v2f;
 
-layout (set = 1, binding = 0) uniform MaterialData {
+OUT_GPASS0 out_AlbedoRoughness;
+OUT_GPASS1 out_NormalMetallic;
+
+MAT_UNIFORM(0) {
     vec4 albedo;
     float metallic;
     float roughness;
@@ -42,5 +39,5 @@ layout (set = 1, binding = 0) uniform MaterialData {
 
 void main() {
     out_AlbedoRoughness = vec4(u_MaterialData.albedo.xyz, u_MaterialData.roughness);
-    out_NormalMetallic = vec4(v2f_WorldNormal, u_MaterialData.metallic);
+    out_NormalMetallic = vec4(v2f.worldNormal, u_MaterialData.metallic);
 }

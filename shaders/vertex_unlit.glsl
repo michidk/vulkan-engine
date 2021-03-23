@@ -3,37 +3,33 @@
 //# VERSION 450
 
 //# TYPE VERTEX
-layout (location = 0) in vec3 in_Position;
-layout (location = 1) in vec3 in_Color;
-//layout (location = 2) in vec3 in_Normal;
-//layout (location = 3) in vec2 in_UV;
+#include "gpass_defines.glslh"
 
-layout (set = 0, binding = 0) uniform FrameData {
-    mat4 viewMatrix;
-    mat4 projMatrix;
-    mat4 invViewMatrix;
-    mat4 invProjMatrix;
-    vec3 camPos;
-} u_FrameData;
+IN_POSITION in_Position;
+IN_COLOR in_Color;
 
-layout (push_constant) uniform TransformData {
-    mat4 modelMatrix;
-    mat4 invModelMatrix;
-} u_TransformData;
+UNIFORM_CAMDATA u_CamData;
 
-layout (location = 0) out vec3 v2f_VertexColor;
+UNIFORM_TRANSFORM u_TransformData;
+
+VERTEX_OUT {
+    vec3 vertexColor;
+} v2f;
 
 void main() {
-    gl_Position = u_FrameData.projMatrix * u_FrameData.viewMatrix * u_TransformData.modelMatrix * vec4(in_Position, 1.0);
-    v2f_VertexColor = in_Color;
+    gl_Position = u_CamData.projMatrix * u_CamData.viewMatrix * u_TransformData.modelMatrix * vec4(in_Position, 1.0);
+    v2f.vertexColor = in_Color;
 }
 
 //# TYPE FRAGMENT
-layout (location = 0) in vec3 v2f_VertexColor;
+#include "gpass_defines.glslh"
 
-layout (location = 0) out vec4 out_GBuffer0;
-layout (location = 1) out vec4 out_GBuffer1;
+FRAGMENT_IN {
+    vec3 vertexColor;
+} v2f;
+
+OUT_GPASS0 out_VertexColor;
 
 void main(){
-	out_GBuffer0 = vec4(v2f_VertexColor, 0.0);
+	out_VertexColor = vec4(v2f.vertexColor, 0.0);
 }

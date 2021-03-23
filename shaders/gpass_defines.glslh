@@ -1,0 +1,17 @@
+
+#include "common.glslh"
+
+#define IN_POSITION layout (location = 0) in vec3
+#define IN_COLOR layout (location = 1) in vec3 
+#define IN_NORMAL layout (location = 2) in vec3
+#define IN_UV layout (location = 3) in vec2
+
+#define UNIFORM_TRANSFORM layout (push_constant) uniform TransformData { \
+    mat4 modelMatrix; \
+    mat4 invModelMatrix; \
+}
+
+#define MAT_UNIFORM(bind) layout (set = 1, binding = bind) uniform MaterialData##bind 
+
+#define OUT_GPASS0 layout (location = 0) out vec4 
+#define OUT_GPASS1 layout (location = 1) out vec4

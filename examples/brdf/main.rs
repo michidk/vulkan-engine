@@ -5,10 +5,12 @@ use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
-    core::window::{self, Dimensions},
+    core::{
+        camera::Camera,
+        window::{self, Dimensions},
+    },
     engine::{self, Engine, EngineInit},
     scene::{
-        camera::Camera,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -38,8 +40,8 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // initialize engine
-    let engine_info = engine::Info {
-        window_info: window::Info {
+    let engine_info = engine::EngineInfo {
+        window_info: window::WindowInfo {
             initial_dimensions: Dimensions {
                 width: 1920,
                 height: 1080,
@@ -49,8 +51,18 @@ fn main() {
         app_name: "Vulkan BRDF Example",
     };
 
+    // setup camera
+    let camera = Camera::builder()
+        //.fovy(30.0.deg())
+        .position(Vec3::new(0.0, 0.0, -5.0))
+        .aspect(
+            engine_info.window_info.initial_dimensions.width as f32
+                / engine_info.window_info.initial_dimensions.height as f32,
+        )
+        .build();
+
     // setup engine
-    let engine_init = EngineInit::new(engine_info);
+    let engine_init = EngineInit::new(engine_info, camera);
 
     // start engine
     match engine_init {
@@ -68,6 +80,7 @@ fn main() {
 fn setup(engine: &mut Engine) {
     let scene = &mut engine.scene;
 
+    // pipeline setup
     let pp_tonemap = PPEffect::new(
         "tone_map",
         engine.vulkan_manager.pipe_layout_pp,
@@ -110,6 +123,7 @@ fn setup(engine: &mut Engine) {
     )
     .unwrap();
 
+    // setup models
     for x in 0..11 {
         for y in 0..11 {
             let material = brdf_pipeline
@@ -136,7 +150,7 @@ fn setup(engine: &mut Engine) {
         }
     }
 
-    // setup scene
+    // setup lights
     let lights = &mut scene.light_manager;
     lights.add_light(DirectionalLight {
         direction: Vec4::new(0., 1., 0., 0.0),
@@ -166,20 +180,4 @@ fn setup(engine: &mut Engine) {
         position: Vec4::new(0.0, 0.0, -3.0, 0.0),
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
-
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine.info.window_info.initial_dimensions.width as f32
-                / engine.info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
-    camera.update_buffer(
-        &engine.vulkan_manager.allocator,
-        &mut engine.vulkan_manager.uniform_buffer,
-        0,
-    );
 }

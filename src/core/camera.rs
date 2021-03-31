@@ -1,6 +1,14 @@
-use crystal::prelude::*;
+use std::time::Instant;
 
-use crate::vulkan::buffer::{self, MutableBuffer};
+use crystal::prelude::*;
+use winit::event::VirtualKeyCode;
+
+use crate::vulkan::{
+    buffer::{self, MutableBuffer},
+    VulkanManager,
+};
+
+use super::input::Input;
 
 pub struct CamData {
     pub view_matrix: [[f32; 4]; 4],
@@ -24,6 +32,7 @@ pub struct Camera {
     projection_matrix: Mat4<f32>,
     inv_view_matrix: Mat4<f32>,
     inv_projection_matrix: Mat4<f32>,
+    last_render: Instant,
 }
 
 impl Camera {
@@ -139,6 +148,41 @@ impl Camera {
             far: 100.0,
         }
     }
+
+    // TODO: refine
+    pub(crate) fn movement(&mut self, input: &Input) {
+        let delta = self.last_render.elapsed().as_nanos() as f32 / 1_000_000_000.0f32;
+        self.last_render = Instant::now();
+
+        let sens = 0.123f32;
+
+        &self.rotate(
+            Angle::from_deg(input.mouse_delta().1 as f32 * sens),
+            Angle::from_deg(input.mouse_delta().0 as f32 * sens),
+        );
+
+        let mut vec: Vec3<f32> = Vec3::new(0f32, 0f32, 0f32);
+
+        if input.button_down(VirtualKeyCode::W) {
+            vec += Vec3::new(0.0, 0.0, 1.0);
+        }
+        if input.button_down(VirtualKeyCode::A) {
+            vec += Vec3::new(-1.0, 0.0, 0.0);
+        }
+        if input.button_down(VirtualKeyCode::S) {
+            vec += Vec3::new(0.0, 0.0, -1.0);
+        }
+        if input.button_down(VirtualKeyCode::D) {
+            vec += Vec3::new(1.0, 0.0, 0.0);
+        }
+
+        // TODO: normalize vec
+
+        let speed: f32 = 5.0;
+
+        let f = &speed * &delta;
+        self.move_in_view_direction(&Vec3::new(vec.x() * f, vec.y() * f, vec.z() * f));
+    }
 }
 
 #[allow(dead_code)]
@@ -212,6 +256,7 @@ impl CameraBuilder {
             projection_matrix: Mat4::identity(),
             inv_view_matrix: Mat4::identity(),
             inv_projection_matrix: Mat4::identity(),
+            last_render: Instant::now(),
         };
         cam.update_projection_matrix();
         cam.update_view_matrix();

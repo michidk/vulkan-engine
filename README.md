@@ -11,7 +11,8 @@ The goal is to build a somewhat useable game engine and a demo using it. While w
 ## Features
 
 Currently implemented features are:
-- BRDF rendering
+- BRDF shading
+- Deferred rendering
 - `.obj` parser
 - Runs on both Linux and Windows
 - Own math library (named `Crystal`)

@@ -37,8 +37,8 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // initialize engine
-    let engine_info = engine::Info {
-        window_info: window::Info {
+    let engine_info = engine::EngineInfo {
+        window_info: window::WindowInfo {
             initial_dimensions: Dimensions {
                 width: 1920,
                 height: 1080,

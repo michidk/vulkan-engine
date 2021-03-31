@@ -20,15 +20,15 @@ pub fn startup_debug_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT {
 
 pub fn startup_debug_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
     vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-        | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
-        | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+    // | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
+    // | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
 }
 
 pub fn debug_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT {
-    vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-        | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
-        | vk::DebugUtilsMessageSeverityFlagsEXT::INFO
-        | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+    // vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+    //     | vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
+    //     | vk::DebugUtilsMessageSeverityFlagsEXT::INFO
+    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
 }
 
 pub fn debug_type() -> vk::DebugUtilsMessageTypeFlagsEXT {

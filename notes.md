@@ -6,9 +6,9 @@
 - rework textures
 - check access modifier (especially package ones)
 - put example resources into example itself, and build a seperate output folder for each example
-- introduce fps counter
+- introduce fps counter again
 - create methods to load default shaders and meshes
-- BRDF example: displays spheres again
+- create render thread
 
 ## FPS (release build; fullscreen)
 

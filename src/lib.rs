@@ -1,5 +1,6 @@
 #![feature(map_first_last)]
 #![feature(once_cell)]
+#![feature(never_type)]
 
 pub mod assets;
 pub mod core;

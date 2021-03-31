@@ -6,7 +6,7 @@ use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::window::{self, Dimensions},
-    engine::{self, Engine, EngineInit},
+    engine::{self, Engine},
     scene::{
         camera::Camera,
         material::{MaterialData, MaterialPipeline},
@@ -24,8 +24,8 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // initialize engine
-    let engine_info = engine::Info {
-        window_info: window::Info {
+    let engine_info = engine::EngineInfo {
+        window_info: window::WindowInfo {
             initial_dimensions: Dimensions {
                 width: 1920,
                 height: 1080,
@@ -36,13 +36,13 @@ fn main() {
     };
 
     // setup engine
-    let engine_init = EngineInit::new(engine_info);
+    let engine = Engine::new(engine_info);
 
     // start engine
-    match engine_init {
-        Ok(mut engine_init) => {
-            setup(&mut engine_init.engine);
-            engine_init.start();
+    match engine {
+        Ok(mut engine) => {
+            setup(&mut engine);
+            engine.start();
         }
         Err(err) => {
             error!("{}", err);

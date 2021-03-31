@@ -20,9 +20,9 @@ use ash::{
 };
 
 use crate::{
-    engine::Info,
+    core::camera::{self, CamData},
+    engine::EngineInfo,
     scene::{
-        camera,
         light::LightManager,
         material::MaterialInterface,
         model::{mesh::Mesh, Model},
@@ -80,7 +80,7 @@ pub struct VulkanManager {
 
 impl VulkanManager {
     pub fn new(
-        engine_info: Info,
+        engine_info: EngineInfo,
         window: winit::window::Window,
         max_frames_in_flight: u8,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -158,7 +158,7 @@ impl VulkanManager {
         let commandbuffers =
             queue::create_commandbuffers(&logical_device, &pools, max_frames_in_flight as usize)?;
 
-        let uniform_buffer = PerFrameUniformBuffer::new(
+        let uniform_buffer = PerFrameUniformBuffer::<CamData>::new(
             &physical_device_properties,
             &allocator,
             max_frames_in_flight as u64,
@@ -329,7 +329,7 @@ impl VulkanManager {
     }
 
     fn init_instance(
-        engine_info: Info,
+        engine_info: EngineInfo,
         entry: &ash::Entry,
         window: &winit::window::Window,
     ) -> Result<ash::Instance, ash::InstanceError> {

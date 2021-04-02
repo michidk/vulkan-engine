@@ -94,7 +94,7 @@ impl Camera {
     }
 
     fn update_view_matrix(&mut self) {
-        let rotation = self.get_rotation().conjugated();
+        let rotation = self.get_rotation();
 
         let m = Mat4::from(rotation.conjugated()) * Mat4::translate(&-self.position);
         let im = Mat4::translate(&self.position) * Mat4::from(rotation);
@@ -174,6 +174,12 @@ impl Camera {
         }
         if input.button_down(VirtualKeyCode::D) {
             vec += Vec3::new(1.0, 0.0, 0.0);
+        }
+        if input.button_down(VirtualKeyCode::Space) {
+            vec += Vec3::new(0.0, 1.0, 0.0);
+        }
+        if input.button_down(VirtualKeyCode::Back) {
+            vec += Vec3::new(0.0, -1.0, 0.0);
         }
 
         // TODO: normalize vec

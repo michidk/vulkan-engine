@@ -247,7 +247,7 @@ impl ObjMeshBuilder {
                 );
                 let u: Vec3<f32> = &v1.position - &v0.position;
                 let v: Vec3<f32> = &v2.position - &v0.position;
-                let normal = &v.cross_product(&u); // left handed
+                let normal = &v.cross(&u); // left handed
 
                 f_normals.push(*normal);
 

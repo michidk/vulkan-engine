@@ -3,17 +3,12 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::{
-    core::window::{self, Dimensions},
-    engine::{self, Engine, EngineInit},
-    scene::{
-        camera::Camera,
+use vulkan_engine::{core::{camera::Camera, window::{self, Dimensions}}, engine::{self, Engine, EngineInit}, scene::{
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
         transform::Transform,
-    },
-};
+    }};
 use vulkan_engine::{
     scene::{material::*, model::mesh::Mesh},
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
@@ -48,8 +43,19 @@ fn main() {
         app_name: "Vulkan Mesh Example",
     };
 
+    // setup camera
+    let camera = Camera::builder()
+        //.fovy(30.0.deg())
+        .position(Vec3::new(0.0, 0.0, -5.0))
+        .aspect(
+            engine_info.window_info.initial_dimensions.width as f32
+                / engine_info.window_info.initial_dimensions.height as f32,
+        )
+        .build();
+
+
     // setup engine
-    let engine_init = EngineInit::new(engine_info);
+    let engine_init = EngineInit::new(engine_info, camera);
 
     // start engine
     match engine_init {
@@ -109,7 +115,7 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/hide/airboat.vem"))
         .expect("Model cube.vem not found!");
 
     let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone())
@@ -161,19 +167,4 @@ fn setup(engine: &mut Engine) {
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
 
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine.info.window_info.initial_dimensions.width as f32
-                / engine.info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
-    camera.update_buffer(
-        &engine.vulkan_manager.allocator,
-        &mut engine.vulkan_manager.uniform_buffer,
-        0,
-    );
 }

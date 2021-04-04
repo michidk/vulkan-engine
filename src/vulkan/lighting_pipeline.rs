@@ -48,8 +48,16 @@ impl LightingPipeline {
             .build();
 
         let point_pipeline = if let Some(point_shader) = point_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 point_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            Some(pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -59,14 +67,24 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
+                vertex_shader,
+                fragment_shader,
             )?)
         } else {
             None
         };
 
         let directional_pipeline = if let Some(directional_shader) = directional_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 directional_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            Some(pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -76,14 +94,24 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
+                vertex_shader,
+                fragment_shader,
             )?)
         } else {
             None
         };
 
         let ambient_pipeline = if let Some(ambient_shader) = ambient_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 ambient_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            Some(pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -93,6 +121,8 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
+                vertex_shader,
+                fragment_shader,
             )?)
         } else {
             None

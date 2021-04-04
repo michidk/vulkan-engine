@@ -3,7 +3,6 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
@@ -16,22 +15,9 @@ use vulkan_engine::{
     },
 };
 use vulkan_engine::{
-    scene::{material::*, model::mesh::Mesh},
+    scene::model::mesh::Mesh,
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
-
-#[repr(C)]
-#[derive(MaterialBindingFragment)]
-struct BrdfColorData {
-    albedo: Vec4<f32>,
-    metallic: f32,
-    roughness: f32,
-}
-
-#[derive(MaterialData)]
-struct BrdfMaterialData {
-    color_data: BrdfColorData,
-}
 
 fn main() {
     // setting up logger
@@ -75,7 +61,7 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.device.clone(),
     )
     .unwrap();
-    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+    engine.vulkan_manager.register_pp_effect(pp_tonemap);
 
     let brdf_lighting = LightingPipeline::new(
         Some("deferred_point_brdf"),
@@ -91,7 +77,7 @@ fn setup(engine: &mut Engine) {
         .vulkan_manager
         .register_lighting_pipeline(brdf_lighting.clone());
 
-    let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
+    let brdf_pipeline = MaterialPipeline::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
         "material_solid_color",
@@ -112,15 +98,13 @@ fn setup(engine: &mut Engine) {
 
     for x in 0..11 {
         for y in 0..11 {
-            let material = brdf_pipeline
-                .create_material(BrdfMaterialData {
-                    color_data: BrdfColorData {
-                        albedo: Vec4::new(0.5, 0.5, 0.5, 0.0),
-                        metallic: (x as f32) * 0.1,
-                        roughness: (y as f32) * 0.1,
-                    },
-                })
+            let material = brdf_pipeline.create_material().unwrap();
+
+            material
+                .set_vec4("albedo", Vec4::new(0.5, 0.5, 0.5, 0.0))
                 .unwrap();
+            material.set_float("metallic", (x as f32) * 0.1).unwrap();
+            material.set_float("roughness", (y as f32) * 0.1).unwrap();
 
             let model = Model {
                 material,

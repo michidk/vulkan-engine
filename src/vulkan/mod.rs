@@ -24,7 +24,7 @@ use crate::{
     scene::{
         camera,
         light::LightManager,
-        material::MaterialInterface,
+        material::Material,
         model::{mesh::Mesh, Model},
         Scene,
     },
@@ -529,8 +529,8 @@ impl VulkanManager {
                 if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
                     break;
                 }
-                if cmp.material.as_ref() as *const dyn MaterialInterface as *const u8
-                    > obj.material.as_ref() as *const dyn MaterialInterface as *const u8
+                if cmp.material.as_ref() as *const Material as *const u8
+                    > obj.material.as_ref() as *const Material as *const u8
                 {
                     break;
                 }
@@ -572,7 +572,7 @@ impl VulkanManager {
                     last_mat = null();
                 }
 
-                let mat = obj.material.as_ref() as *const dyn MaterialInterface as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
+                let mat = obj.material.as_ref() as *const Material as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
                 if mat != last_mat {
                     let mat_desc_set = self.descriptor_manager.get_descriptor_set(
                         obj.material.get_descriptor_set_layout(),

@@ -9,15 +9,12 @@ use vulkan_engine::{
     engine::{self, Engine, EngineInit},
     scene::{
         camera::Camera,
-        material::{MaterialData, MaterialPipeline},
+        material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
     },
     vulkan::lighting_pipeline::LightingPipeline,
 };
-
-#[derive(MaterialData)]
-struct VertexMaterialData {}
 
 fn main() {
     // setting up logger
@@ -68,7 +65,7 @@ fn setup(engine: &mut Engine) {
         .vulkan_manager
         .register_lighting_pipeline(lighting_pipeline.clone());
 
-    let pipeline = MaterialPipeline::<VertexMaterialData>::new(
+    let pipeline = MaterialPipeline::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
         "vertex_unlit",
@@ -77,7 +74,7 @@ fn setup(engine: &mut Engine) {
         lighting_pipeline.as_ref(),
     )
     .unwrap();
-    let material0 = pipeline.create_material(VertexMaterialData {}).unwrap();
+    let material0 = pipeline.create_material().unwrap();
 
     // create triangle
     let mesh_data = MeshData {

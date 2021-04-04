@@ -9,6 +9,7 @@ use ash::{version::DeviceV1_0, vk};
 #[allow(dead_code)]
 #[derive(Hash, Copy, Clone, PartialEq, Eq)]
 pub enum DescriptorData {
+    None,
     UniformBuffer {
         buffer: vk::Buffer,
         offset: vk::DeviceSize,
@@ -150,6 +151,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         let mut set_writes = Vec::with_capacity(bindings.len());
         for (index, b) in bindings.iter().enumerate() {
             match b {
+                DescriptorData::None => continue,
                 DescriptorData::UniformBuffer {
                     buffer,
                     offset,

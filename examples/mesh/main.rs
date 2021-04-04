@@ -15,22 +15,9 @@ use vulkan_engine::{
     },
 };
 use vulkan_engine::{
-    scene::{material::*, model::mesh::Mesh},
+    scene::model::mesh::Mesh,
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
-
-#[repr(C)]
-#[derive(MaterialBindingFragment)]
-struct BrdfColorData {
-    color: Vec4<f32>,
-    metallic: f32,
-    roughness: f32,
-}
-
-#[derive(MaterialData)]
-struct BrdfMaterialData {
-    color_data: BrdfColorData,
-}
 
 fn main() {
     // setting up logger
@@ -74,7 +61,7 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.device.clone(),
     )
     .unwrap();
-    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+    engine.vulkan_manager.register_pp_effect(pp_tonemap);
 
     let brdf_resolve_pipeline = LightingPipeline::new(
         Some("deferred_point_brdf"),
@@ -90,7 +77,7 @@ fn setup(engine: &mut Engine) {
         .vulkan_manager
         .register_lighting_pipeline(brdf_resolve_pipeline.clone());
 
-    let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
+    let brdf_pipeline = MaterialPipeline::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
         "material_solid_color",
@@ -99,15 +86,13 @@ fn setup(engine: &mut Engine) {
         brdf_resolve_pipeline.as_ref(),
     )
     .unwrap();
-    let brdf_material0 = brdf_pipeline
-        .create_material(BrdfMaterialData {
-            color_data: BrdfColorData {
-                color: Vec4::new(0.5, 0.5, 0.5, 1.0),
-                metallic: 0.0,
-                roughness: 0.1,
-            },
-        })
+    let brdf_material0 = brdf_pipeline.create_material().unwrap();
+
+    brdf_material0
+        .set_vec4("albedo", Vec4::new(0.5, 0.5, 0.5, 1.0))
         .unwrap();
+    brdf_material0.set_float("metallic", 0.0).unwrap();
+    brdf_material0.set_float("roughness", 0.1).unwrap();
 
     let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
         .expect("Model cube.vem not found!");

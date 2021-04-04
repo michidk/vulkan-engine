@@ -26,8 +26,16 @@ impl PPEffect {
             )
             .build();
 
-        let pipeline = pipeline::create_pipeline(
+        let mut vertexshader_code = Vec::new();
+        let mut fragmentshader_code = Vec::new();
+        let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
             shader,
+            &device,
+            &mut vertexshader_code,
+            &mut fragmentshader_code,
+        )?;
+
+        let pipeline = pipeline::create_pipeline(
             pipe_layout,
             renderpass,
             0,
@@ -37,6 +45,8 @@ impl PPEffect {
             false,
             None,
             &device,
+            vertex_shader,
+            fragment_shader,
         )?;
 
         Ok(Rc::new(Self { pipeline, device }))

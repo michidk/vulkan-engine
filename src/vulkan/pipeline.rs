@@ -2,9 +2,26 @@ use ash::{version::DeviceV1_0, vk};
 
 use crate::assets::shader;
 
+pub fn create_shader_modules(
+    shader: &str,
+    device: &ash::Device,
+    out_spv_vert: &mut Vec<u32>,
+    out_spv_frag: &mut Vec<u32>,
+) -> Result<(vk::ShaderModule, vk::ShaderModule), vk::Result> {
+    let vertexshader_createinfo = shader::load(shader, shader::ShaderKind::Vertex, out_spv_vert);
+    let vertexshader_module =
+        unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
+
+    let fragmentshader_createinfo =
+        shader::load(shader, shader::ShaderKind::Fragment, out_spv_frag);
+    let fragmentshader_module =
+        unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
+
+    Ok((vertexshader_module, fragmentshader_module))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn create_pipeline(
-    shader: &str,
     layout: vk::PipelineLayout,
     renderpass: vk::RenderPass,
     subpass: u32,
@@ -14,20 +31,9 @@ pub fn create_pipeline(
     depth_test: bool,
     stencil_func: Option<vk::StencilOpState>,
     device: &ash::Device,
+    vertexshader_module: vk::ShaderModule,
+    fragmentshader_module: vk::ShaderModule,
 ) -> Result<vk::Pipeline, vk::Result> {
-    let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
-    let vertexshader_createinfo =
-        shader::load(shader, shader::ShaderKind::Vertex, &mut vertexshader_code);
-    let vertexshader_module =
-        unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
-    let fragmentshader_createinfo = shader::load(
-        shader,
-        shader::ShaderKind::Fragment,
-        &mut fragmentshader_code,
-    );
-    let fragmentshader_module =
-        unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
-
     let mainfunctionname = std::ffi::CString::new("main").unwrap();
 
     let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()

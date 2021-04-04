@@ -1408,15 +1408,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vulkan-engine_derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "vulkan_engine"
 version = "0.1.0"
 dependencies = [
@@ -1431,7 +1422,6 @@ dependencies = [
  "ve-shader-reflect",
  "ve_format",
  "vk-mem",
- "vulkan-engine_derive",
  "winit",
 ]
 

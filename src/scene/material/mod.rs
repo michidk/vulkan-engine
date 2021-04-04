@@ -2,10 +2,6 @@ use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::{Vec2, Vec3, Vec4};
 use std::{collections::HashMap, mem::size_of, rc::Rc};
 
-pub use vulkan_engine_derive::MaterialBindingFragment;
-pub use vulkan_engine_derive::MaterialBindingVertex;
-pub use vulkan_engine_derive::MaterialData;
-
 use crate::vulkan::{
     descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline,
 };

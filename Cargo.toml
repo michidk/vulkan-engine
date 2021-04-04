@@ -10,7 +10,6 @@ name = "vulkan_engine"
 [workspace]
 members = [
     "crystal",
-    "vulkan-engine_derive",
     "ve_format",
     "ve_asset",
     "ve_shader_reflect"
@@ -26,7 +25,6 @@ vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs", version = "0.2.3" }
 winit = "0.24.0"
 crystal = { path = "crystal" }
 image = "0.23.13"
-vulkan-engine_derive = { path = "vulkan-engine_derive" }
 ve-shader-reflect = { path = "ve_shader_reflect" }
 ve_format = { path = "ve_format"}
 anyhow = "1.0.38"

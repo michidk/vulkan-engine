@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use winit::event::{Event, WindowEvent};
 
 use crate::engine::EngineInit;

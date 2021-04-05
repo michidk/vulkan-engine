@@ -1,8 +1,6 @@
 use std::usize;
 
-use winit::event::{
-    DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode, WindowEvent,
-};
+use winit::event::{DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct InputState {
@@ -75,7 +73,7 @@ impl Input {
                     self.state.scroll_delta = (*x, *y);
                 }
                 // this does not work for some reason
-                MouseScrollDelta::PixelDelta(pos) => {}
+                MouseScrollDelta::PixelDelta(_pos) => {}
             },
             Event::DeviceEvent {
                 event: DeviceEvent::Key(input),
@@ -101,7 +99,7 @@ impl Input {
     pub(crate) fn rollover_state(&mut self) {
         // reset state and assign prev
         // self.state_prev = InputState::default();
-        self.state_prev = self.state.clone();
+        self.state_prev = self.state;
         self.state.rollover();
         // swap(&mut self.state_prev, &mut self.state);
     }

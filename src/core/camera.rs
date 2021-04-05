@@ -3,10 +3,7 @@ use std::time::Instant;
 use crystal::prelude::*;
 use winit::event::VirtualKeyCode;
 
-use crate::vulkan::{
-    buffer::{self, MutableBuffer},
-    VulkanManager,
-};
+use crate::vulkan::buffer::{self, MutableBuffer};
 
 use super::input::Input;
 
@@ -156,7 +153,7 @@ impl Camera {
 
         let sens = 0.123f32;
 
-        &self.rotate(
+        self.rotate(
             Angle::from_deg(input.mouse_delta().1 as f32 * sens),
             Angle::from_deg(input.mouse_delta().0 as f32 * sens),
         );
@@ -186,7 +183,7 @@ impl Camera {
 
         let speed: f32 = 5.0;
 
-        let f = &speed * &delta;
+        let f = speed * delta;
         self.move_in_view_direction(&Vec3::new(vec.x() * f, vec.y() * f, vec.z() * f));
     }
 }

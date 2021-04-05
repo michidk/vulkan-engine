@@ -3,7 +3,6 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::{
         camera::Camera,
@@ -88,7 +87,7 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.device.clone(),
     )
     .unwrap();
-    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+    engine.vulkan_manager.register_pp_effect(pp_tonemap);
 
     let brdf_lighting = LightingPipeline::new(
         Some("deferred_point_brdf"),

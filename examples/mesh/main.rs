@@ -3,12 +3,19 @@ use std::{path::Path, process::exit};
 /// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
-use vulkan_engine::{core::{camera::Camera, window::{self, Dimensions}}, engine::{self, Engine, EngineInit}, scene::{
+use vulkan_engine::{
+    core::{
+        camera::Camera,
+        window::{self, Dimensions},
+    },
+    engine::{self, Engine, EngineInit},
+    scene::{
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
         transform::Transform,
-    }};
+    },
+};
 use vulkan_engine::{
     scene::{material::*, model::mesh::Mesh},
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
@@ -53,7 +60,6 @@ fn main() {
         )
         .build();
 
-
     // setup engine
     let engine_init = EngineInit::new(engine_info, camera);
 
@@ -80,7 +86,7 @@ fn setup(engine: &mut Engine) {
         engine.vulkan_manager.device.clone(),
     )
     .unwrap();
-    engine.vulkan_manager.register_pp_effect(pp_tonemap.clone());
+    engine.vulkan_manager.register_pp_effect(pp_tonemap);
 
     let brdf_resolve_pipeline = LightingPipeline::new(
         Some("deferred_point_brdf"),
@@ -115,7 +121,7 @@ fn setup(engine: &mut Engine) {
         })
         .unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/hide/airboat.vem"))
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/cube.vem"))
         .expect("Model cube.vem not found!");
 
     let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone())
@@ -128,7 +134,7 @@ fn setup(engine: &mut Engine) {
             position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::from_axis_angle(
                 Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-                Angle::from_deg(180.0),
+                Angle::from_deg(0.0),
             ),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
@@ -166,5 +172,4 @@ fn setup(engine: &mut Engine) {
         position: Vec4::new(0.0, 0.0, -3.0, 0.0),
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
-
 }

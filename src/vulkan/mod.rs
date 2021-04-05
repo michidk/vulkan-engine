@@ -11,6 +11,7 @@ mod renderpass;
 mod surface;
 mod swapchain;
 pub mod uploader;
+pub mod texture;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
@@ -573,7 +574,7 @@ impl VulkanManager {
                 if mat != last_mat {
                     let mat_desc_set = self.descriptor_manager.get_descriptor_set(
                         obj.material.get_descriptor_set_layout(),
-                        obj.material.get_descriptor_data(),
+                        &obj.material.get_descriptor_data(),
                     )?;
                     self.device.cmd_bind_descriptor_sets(
                         commandbuffer,

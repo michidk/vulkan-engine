@@ -1,22 +1,21 @@
-use std::{path::Path, process::exit};
+/// A minimal example that just initializes the engine but does not display anything
+use std::process::exit;
 
-/// Renders a brdf example
 use crystal::prelude::*;
 use log::error;
+use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
     scene::{
-        camera::Camera,
-        light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
-        model::Model,
+        model::{mesh::Mesh, Model},
         transform::Transform,
+        light::*,
     },
-};
-use vulkan_engine::{
-    scene::model::mesh::Mesh,
-    vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
+    vulkan::lighting_pipeline::LightingPipeline,
+    vulkan::texture::{Texture2D, TextureFilterMode},
+    vulkan::pp_effect::PPEffect,
 };
 
 fn main() {
@@ -30,9 +29,9 @@ fn main() {
                 width: 1920,
                 height: 1080,
             },
-            title: "Vulkan Mesh Example",
+            title: "Vulkan Minimal Example",
         },
-        app_name: "Vulkan Mesh Example",
+        app_name: "Vulkan Minimal Example",
     };
 
     // setup engine
@@ -63,7 +62,7 @@ fn setup(engine: &mut Engine) {
     .unwrap();
     engine.vulkan_manager.register_pp_effect(pp_tonemap);
 
-    let brdf_resolve_pipeline = LightingPipeline::new(
+    let lighting_pipeline = LightingPipeline::new(
         Some("deferred_point_brdf"),
         Some("deferred_directional_brdf"),
         None,
@@ -75,54 +74,83 @@ fn setup(engine: &mut Engine) {
     .unwrap();
     engine
         .vulkan_manager
-        .register_lighting_pipeline(brdf_resolve_pipeline.clone());
+        .register_lighting_pipeline(lighting_pipeline.clone());
 
-    let brdf_pipeline = MaterialPipeline::new(
+    let pipeline = MaterialPipeline::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
-        "material_solid_color",
+        "material_albedo_tex",
         engine.vulkan_manager.desc_layout_frame_data,
         engine.vulkan_manager.renderpass,
-        brdf_resolve_pipeline.as_ref(),
+        lighting_pipeline.as_ref(),
     )
     .unwrap();
-    let brdf_material0 = brdf_pipeline.create_material().unwrap();
 
-    brdf_material0
-        .set_vec4("albedo", Vec4::new(0.5, 0.5, 0.5, 1.0))
-        .unwrap();
-    brdf_material0.set_float("metallic", 0.0).unwrap();
-    brdf_material0.set_float("roughness", 0.1).unwrap();
+    let pixels = [
+        255u8, 0, 255, 255,
+        255u8, 255, 255, 255,
+        255u8, 255, 255, 255,
+        255u8, 0, 255, 255,
+    ];
+    let albedo_tex = Texture2D::new(
+        2, 2, &pixels,
+        TextureFilterMode::Nearest,
+        (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
+        engine.vulkan_manager.device.clone()
+    ).unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
-        .expect("Model cube.vem not found!");
+    let material0 = pipeline.create_material().unwrap();
+    material0.set_float("metallic", 0.0).unwrap();
+    material0.set_float("roughness", 0.5).unwrap();
+    material0.set_texture("u_AlbedoTex", albedo_tex).unwrap();
 
-    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone(), &mut engine.vulkan_manager.uploader)
-        .expect("Error baking mesh!");
-
-    let model = Model {
-        material: brdf_material0,
-        mesh,
-        transform: Transform {
-            position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::from_axis_angle(
-                Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-                Angle::from_deg(180.0),
-            ),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
+    // create triangle
+    let mesh_data = MeshData {
+        vertices: vec![
+            Vertex {
+                position: Vec3::new(-1.0, -1.0, 0.0),
+                color: Vec3::new(1.0, 0.0, 0.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(0.0, 0.0),
+            },
+            Vertex {
+                position: Vec3::new(1.0, -1.0, 0.0),
+                color: Vec3::new(0.0, 1.0, 0.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(1.0, 0.0),
+            },
+            Vertex {
+                position: Vec3::new(0.0, 1.0, 0.0),
+                color: Vec3::new(0.0, 0.0, 1.0),
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                uv: Vec2::new(0.5, 1.0),
+            },
+        ],
+        submeshes: vec![Submesh {
+            faces: vec![Face { indices: [0, 1, 2] }],
+        }],
     };
 
-    scene.add(model);
+    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone(), &mut engine.vulkan_manager.uploader).unwrap();
 
-    // setup scene
+    scene.add(Model {
+        material: material0,
+        mesh,
+        transform: Transform {
+            position: Vec3::new(0.0, 0.0, 10.0),
+            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        },
+    });
+
     let lights = &mut scene.light_manager;
     lights.add_light(DirectionalLight {
-        direction: Vec4::new(-1., 1., -1., 0.0),
+        direction: Vec4::new(0., 1., 0., 0.0),
         illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
     });
     lights.add_light(DirectionalLight {
-        direction: Vec4::new(0., 1., 0., 0.0),
+        direction: Vec4::new(0., -1., 0., 0.0),
         illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
     });
     lights.add_light(PointLight {
@@ -145,20 +173,4 @@ fn setup(engine: &mut Engine) {
         position: Vec4::new(0.0, 0.0, -3.0, 0.0),
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
-
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine.info.window_info.initial_dimensions.width as f32
-                / engine.info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
-    camera.update_buffer(
-        &engine.vulkan_manager.allocator,
-        &mut engine.vulkan_manager.uniform_buffer,
-        0,
-    );
 }

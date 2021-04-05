@@ -12,6 +12,7 @@
 }
 
 #define MAT_UNIFORM(bind) layout (set = 1, binding = bind) uniform MaterialData##bind 
+#define MAT_TEX2D(bind) layout (set = 1, binding = bind) uniform sampler2D 
 
 #define OUT_GPASS0 layout (location = 0) out vec4 
 #define OUT_GPASS1 layout (location = 1) out vec4

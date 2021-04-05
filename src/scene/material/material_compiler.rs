@@ -86,6 +86,13 @@ pub fn compile_resources(
                     size: *size,
                 });
             }
+            DescriptorData::ImageSampler { .. } => {
+                resources.push(DescriptorData::ImageSampler {
+                    image: vk::ImageView::null(),
+                    layout: vk::ImageLayout::UNDEFINED,
+                    sampler: vk::Sampler::null(),
+                });
+            }
             _ => continue,
         }
     }

@@ -47,7 +47,7 @@ impl Mesh {
         }
         let index_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .size(index_buffer_size as u64)
+            .size(index_buffer_size)
             .usage(vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST)
             .build();
         let index_buffer_alloc_info = vk_mem::AllocationCreateInfo {

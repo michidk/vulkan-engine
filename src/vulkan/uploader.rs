@@ -148,6 +148,98 @@ impl Uploader {
         staging_buffer.last_used_frame = self.frame_counter;
     }
 
+    pub fn enqueue_image_upload(&mut self, dst_image: vk::Image, layout: vk::ImageLayout, width: u32, height: u32, pixels: &[u8]) {
+        let size = width as u64 * height as u64 * 4;
+        let staging_buffer_index = self.find_staging_buffer(size);
+        let staging_buffer = &mut self.staging_buffers[staging_buffer_index];
+
+        let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
+
+        unsafe {
+            staging_buffer.mapping.offset(staging_buffer.pos as isize).copy_from_nonoverlapping(pixels.as_ptr() as *const u8, size as usize);
+
+            let transition = vk::ImageMemoryBarrier::builder()
+                .src_access_mask(vk::AccessFlags::empty())
+                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .old_layout(vk::ImageLayout::UNDEFINED)
+                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .src_queue_family_index(0)
+                .dst_queue_family_index(0)
+                .image(dst_image)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .build();
+            self.device.cmd_pipeline_barrier(
+                command_buffer, 
+                vk::PipelineStageFlags::TOP_OF_PIPE, 
+                vk::PipelineStageFlags::TRANSFER, 
+                vk::DependencyFlags::BY_REGION, 
+                &[], 
+                &[], 
+                &[transition]
+            );
+
+            let regions = [
+                vk::BufferImageCopy::builder()
+                    .buffer_offset(staging_buffer.pos)
+                    .buffer_row_length(0)
+                    .buffer_image_height(0)
+                    .image_subresource(vk::ImageSubresourceLayers {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        mip_level: 0,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    })
+                    .image_offset(vk::Offset3D {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                    })
+                    .image_extent(vk::Extent3D {
+                        width,
+                        height,
+                        depth: 1,
+                    })
+                    .build()
+            ];
+            self.device.cmd_copy_buffer_to_image(command_buffer, staging_buffer.buffer, dst_image, vk::ImageLayout::TRANSFER_DST_OPTIMAL, &regions);
+
+            let transition = vk::ImageMemoryBarrier::builder()
+                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .dst_access_mask(vk::AccessFlags::empty())
+                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .new_layout(layout)
+                .src_queue_family_index(0)
+                .dst_queue_family_index(0)
+                .image(dst_image)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .build();
+            self.device.cmd_pipeline_barrier(
+                command_buffer, 
+                vk::PipelineStageFlags::TRANSFER, 
+                vk::PipelineStageFlags::TOP_OF_PIPE, 
+                vk::DependencyFlags::BY_REGION, 
+                &[], 
+                &[], 
+                &[transition]
+            );
+        }
+
+        staging_buffer.pos += size;
+        staging_buffer.last_used_frame = self.frame_counter;
+    }
+
     pub fn submit_uploads(&mut self, queue: vk::Queue) {
         let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
 

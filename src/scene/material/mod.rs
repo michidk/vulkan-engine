@@ -1,10 +1,8 @@
 use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::{Vec2, Vec3, Vec4};
-use std::{collections::HashMap, mem::size_of, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
-use crate::vulkan::{
-    descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline,
-};
+use crate::vulkan::{descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline, texture::Texture2D};
 
 mod material_compiler;
 
@@ -30,6 +28,7 @@ enum MaterialProperty {
     Vec2 { binding: u32, offset: u32 },
     Vec3 { binding: u32, offset: u32 },
     Vec4 { binding: u32, offset: u32 },
+    Sampler2D { binding: u32 },
 }
 
 pub struct MaterialPipeline {
@@ -114,6 +113,17 @@ impl MaterialPipeline {
                         size: layout.total_size as u64,
                     }
                 }
+                ve_shader_reflect::SetBindingData::SampledImage { dim: ve_shader_reflect::ImageDimension::Two } => {
+                    properties.insert(binding.var_name.clone(), MaterialProperty::Sampler2D {
+                        binding: binding.binding,
+                    });
+
+                    DescriptorData::ImageSampler {
+                        image: vk::ImageView::null(),
+                        layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        sampler: vk::Sampler::null(),
+                    }
+                }
                 _ => DescriptorData::None,
             };
 
@@ -179,8 +189,9 @@ impl MaterialPipeline {
 
         Ok(Rc::new(Material {
             pipeline: self.clone(),
-            resources,
+            resources: RefCell::new(resources),
             allocations,
+            textures: RefCell::new(HashMap::new()),
         }))
     }
 }
@@ -199,8 +210,9 @@ impl Drop for MaterialPipeline {
 
 pub struct Material {
     pipeline: Rc<MaterialPipeline>,
-    resources: Vec<DescriptorData>,
+    resources: RefCell<Vec<DescriptorData>>,
     allocations: Vec<vk_mem::Allocation>,
+    textures: RefCell<HashMap<String, Rc<Texture2D>>>,
 }
 
 impl Material {
@@ -302,6 +314,28 @@ impl Material {
         Ok(())
     }
 
+    pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> Result<(), MaterialError> {
+        let prop = self.pipeline.properties.get(name).ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+        match prop {
+            &MaterialProperty::Sampler2D { binding } => {
+                self.textures.borrow_mut().insert(String::from(name), val.clone());
+                
+                let res = &mut self.resources.borrow_mut()[binding as usize];
+                match res {
+                    DescriptorData::ImageSampler { image, layout, sampler } => {
+                        *image = val.view;
+                        *layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+                        *sampler = val.sampler;
+                    }
+                    _ => return Err(MaterialError::IncompatiblePropertyType),
+                }
+            }
+            _ => return Err(MaterialError::IncompatiblePropertyType),
+        }
+
+        Ok(())
+    }
+
     pub fn get_pipeline_layout(&self) -> vk::PipelineLayout {
         self.pipeline.pipeline_layout
     }
@@ -311,15 +345,15 @@ impl Material {
     pub fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.pipeline.descriptor_set_layout
     }
-    pub fn get_descriptor_data(&self) -> &Vec<DescriptorData> {
-        &self.resources
+    pub fn get_descriptor_data(&self) -> Vec<DescriptorData> {
+        self.resources.borrow().clone()
     }
 }
 
 impl Drop for Material {
     fn drop(&mut self) {
         unsafe {
-            for r in &self.resources {
+            for r in &*self.resources.borrow() {
                 if let DescriptorData::UniformBuffer { buffer, .. } = r {
                     self.pipeline.device.destroy_buffer(*buffer, None);
                 }

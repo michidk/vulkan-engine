@@ -96,3 +96,13 @@ impl Texture2D {
         }))
     }
 }
+
+impl Drop for Texture2D {
+    fn drop(&mut self) {
+        unsafe{
+            self.device.destroy_sampler(self.sampler, None);
+            self.device.destroy_image_view(self.view, None);
+        }
+        self.allocator.destroy_image(self.image, &self.alloc);
+    }
+}

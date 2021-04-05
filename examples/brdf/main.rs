@@ -93,6 +93,7 @@ fn setup(engine: &mut Engine) {
     let mesh_sphere_smooth = Mesh::bake(
         mesh_data_sphere_smooth,
         (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
     )
     .unwrap();
 

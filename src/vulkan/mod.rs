@@ -10,6 +10,7 @@ mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
+pub mod uploader;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
@@ -30,16 +31,7 @@ use crate::{
     },
 };
 
-use self::{
-    buffer::{PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
-    descriptor_manager::{DescriptorData, DescriptorManager},
-    lighting_pipeline::LightingPipeline,
-    pp_effect::PPEffect,
-    queue::{PoolsWrapper, QueueFamilies, Queues},
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-};
+use self::{buffer::{PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, lighting_pipeline::LightingPipeline, pp_effect::PPEffect, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper, uploader::Uploader};
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
@@ -76,6 +68,7 @@ pub struct VulkanManager {
     pub pipe_layout_pp: vk::PipelineLayout,
     pub renderpass_pp: vk::RenderPass,
     pp_effects: Vec<Rc<PPEffect>>,
+    pub uploader: std::mem::ManuallyDrop<Uploader>,
 }
 
 impl VulkanManager {
@@ -98,13 +91,15 @@ impl VulkanManager {
         let (logical_device, queues) =
             queue::init_device_and_queues(&instance, physical_device, &queue_families)?;
 
+        let logical_device = Rc::new(logical_device);
+
         let allocator_create_info = vk_mem::AllocatorCreateInfo {
             physical_device,
-            device: logical_device.clone(),
+            device: (*logical_device).clone(),
             instance: instance.clone(),
             ..Default::default()
         };
-        let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
+        let allocator = Rc::new(vk_mem::Allocator::new(&allocator_create_info)?);
 
         let mut swapchain = SwapchainWrapper::init(
             &instance,
@@ -229,7 +224,7 @@ impl VulkanManager {
             logical_device.create_pipeline_layout(&pipeline_layout_resolve_pass_info, None)?
         };
 
-        let descriptor_manager = DescriptorManager::new(logical_device.clone())?;
+        let descriptor_manager = DescriptorManager::new((*logical_device).clone())?;
 
         let sem_info = vk::SemaphoreCreateInfo::builder().build();
         let fence_info = vk::FenceCreateInfo::builder()
@@ -281,6 +276,8 @@ impl VulkanManager {
         let pipe_layout_pp =
             unsafe { logical_device.create_pipeline_layout(&pipe_layout_pp_info, None)? };
 
+        let uploader = Uploader::new(logical_device.clone(), allocator.clone(), max_frames_in_flight as u64, queue_families.graphics_q_index);
+
         Ok(Self {
             window,
             entry,
@@ -291,12 +288,12 @@ impl VulkanManager {
             physical_device_properties,
             queue_families,
             queues,
-            device: Rc::new(logical_device),
+            device: logical_device,
             swapchain,
             renderpass,
             pools,
             commandbuffers,
-            allocator: std::mem::ManuallyDrop::new(Rc::new(allocator)),
+            allocator: std::mem::ManuallyDrop::new(allocator),
             uniform_buffer,
             desc_layout_frame_data,
             pipeline_layout_gpass,
@@ -313,6 +310,7 @@ impl VulkanManager {
             pipe_layout_pp,
             renderpass_pp,
             pp_effects: Vec::new(),
+            uploader: std::mem::ManuallyDrop::new(uploader),
         })
     }
 
@@ -371,7 +369,6 @@ impl VulkanManager {
 
     pub fn next_frame(&mut self) -> u32 {
         self.current_frame_index = (self.current_frame_index + 1) % self.max_frames_in_flight;
-        self.descriptor_manager.next_frame();
 
         self.swapchain
             .aquire_next_image(self.image_acquire_semaphores[self.current_frame_index as usize])
@@ -947,7 +944,7 @@ impl VulkanManager {
         Ok(())
     }
 
-    pub fn wait_for_fence(&self) {
+    pub fn wait_for_fence(&mut self) {
         unsafe {
             self.device
                 .wait_for_fences(
@@ -960,6 +957,9 @@ impl VulkanManager {
                 .reset_fences(&[self.frame_resource_fences[self.current_frame_index as usize]])
                 .expect("resetting fences");
         }
+
+        self.descriptor_manager.next_frame();
+        self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 
     /// submits queued commands
@@ -1047,6 +1047,9 @@ impl Drop for VulkanManager {
             }
 
             self.descriptor_manager.destroy();
+            
+            self.uploader.destroy();
+            std::mem::ManuallyDrop::drop(&mut self.uploader);
 
             self.uniform_buffer.destroy(&self.allocator);
 

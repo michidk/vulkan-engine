@@ -1,5 +1,9 @@
 # Mesh Importers
 
+## Triangulation
+
+Triangulation of convex polygons is supported and automatically applied.
+
 ## Meta file example
 
 Default settings:

@@ -10,8 +10,8 @@ mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
-pub mod uploader;
 pub mod texture;
+pub mod uploader;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
@@ -32,7 +32,17 @@ use crate::{
     },
 };
 
-use self::{buffer::{PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, lighting_pipeline::LightingPipeline, pp_effect::PPEffect, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper, uploader::Uploader};
+use self::{
+    buffer::{PerFrameUniformBuffer, VulkanBuffer},
+    debug::DebugMessenger,
+    descriptor_manager::{DescriptorData, DescriptorManager},
+    lighting_pipeline::LightingPipeline,
+    pp_effect::PPEffect,
+    queue::{PoolsWrapper, QueueFamilies, Queues},
+    surface::SurfaceWrapper,
+    swapchain::SwapchainWrapper,
+    uploader::Uploader,
+};
 
 pub struct VulkanManager {
     pub window: winit::window::Window,
@@ -277,7 +287,12 @@ impl VulkanManager {
         let pipe_layout_pp =
             unsafe { logical_device.create_pipeline_layout(&pipe_layout_pp_info, None)? };
 
-        let uploader = Uploader::new(logical_device.clone(), allocator.clone(), max_frames_in_flight as u64, queue_families.graphics_q_index);
+        let uploader = Uploader::new(
+            logical_device.clone(),
+            allocator.clone(),
+            max_frames_in_flight as u64,
+            queue_families.graphics_q_index,
+        );
 
         Ok(Self {
             window,
@@ -1048,7 +1063,7 @@ impl Drop for VulkanManager {
             }
 
             self.descriptor_manager.destroy();
-            
+
             self.uploader.destroy();
             std::mem::ManuallyDrop::drop(&mut self.uploader);
 

@@ -8,14 +8,14 @@ use vulkan_engine::{
     core::window::{self, Dimensions},
     engine::{self, Engine, EngineInit},
     scene::{
+        light::*,
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
-        light::*,
     },
     vulkan::lighting_pipeline::LightingPipeline,
-    vulkan::texture::{Texture2D, TextureFilterMode},
     vulkan::pp_effect::PPEffect,
+    vulkan::texture::{Texture2D, TextureFilterMode},
 };
 
 fn main() {
@@ -87,18 +87,18 @@ fn setup(engine: &mut Engine) {
     .unwrap();
 
     let pixels = [
-        255u8, 0, 255, 255,
-        255u8, 255, 255, 255,
-        255u8, 255, 255, 255,
-        255u8, 0, 255, 255,
+        255u8, 0, 255, 255, 255u8, 255, 255, 255, 255u8, 255, 255, 255, 255u8, 0, 255, 255,
     ];
     let albedo_tex = Texture2D::new(
-        2, 2, &pixels,
+        2,
+        2,
+        &pixels,
         TextureFilterMode::Nearest,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
-        engine.vulkan_manager.device.clone()
-    ).unwrap();
+        engine.vulkan_manager.device.clone(),
+    )
+    .unwrap();
 
     let material0 = pipeline.create_material().unwrap();
     material0.set_float("metallic", 0.0).unwrap();
@@ -132,7 +132,12 @@ fn setup(engine: &mut Engine) {
         }],
     };
 
-    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone(), &mut engine.vulkan_manager.uploader).unwrap();
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
+    )
+    .unwrap();
 
     scene.add(Model {
         material: material0,

@@ -25,28 +25,35 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    pub fn new(device: Rc<ash::Device>, allocator: Rc<vk_mem::Allocator>, max_frames_ahead: u64, queue_family: u32) -> Uploader {
+    pub fn new(
+        device: Rc<ash::Device>,
+        allocator: Rc<vk_mem::Allocator>,
+        max_frames_ahead: u64,
+        queue_family: u32,
+    ) -> Uploader {
         let pool_info = vk::CommandPoolCreateInfo::builder()
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
             .queue_family_index(queue_family)
             .build();
-        
-        let command_pool = unsafe{ device.create_command_pool(&pool_info, None) }.unwrap();
+
+        let command_pool = unsafe { device.create_command_pool(&pool_info, None) }.unwrap();
 
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .command_buffer_count(max_frames_ahead as u32)
             .command_pool(command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .build();
-        let command_buffers = unsafe{device.allocate_command_buffers(&alloc_info)}.unwrap();
+        let command_buffers = unsafe { device.allocate_command_buffers(&alloc_info) }.unwrap();
 
-        let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED).build();
+        let fence_info = vk::FenceCreateInfo::builder()
+            .flags(vk::FenceCreateFlags::SIGNALED)
+            .build();
         let mut fences = Vec::with_capacity(max_frames_ahead as usize);
         for _ in 0..max_frames_ahead as usize {
-            fences.push(unsafe{device.create_fence(&fence_info, None)}.unwrap());
+            fences.push(unsafe { device.create_fence(&fence_info, None) }.unwrap());
         }
-        
-        let res = Uploader{
+
+        let res = Uploader {
             device,
             allocator,
             staging_buffers: Vec::new(),
@@ -56,14 +63,16 @@ impl Uploader {
             command_buffers,
             fences,
         };
-        
+
         let command_buffer = res.command_buffers[0];
 
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
             .build();
         unsafe {
-            res.device.begin_command_buffer(command_buffer, &begin_info).unwrap();
+            res.device
+                .begin_command_buffer(command_buffer, &begin_info)
+                .unwrap();
             res.device.reset_fences(&[res.fences[0]]).unwrap();
         }
 
@@ -72,7 +81,9 @@ impl Uploader {
 
     pub fn destroy(&mut self) {
         for fence in &self.fences {
-            unsafe{self.device.destroy_fence(*fence, None);}
+            unsafe {
+                self.device.destroy_fence(*fence, None);
+            }
         }
 
         for buf in &self.staging_buffers {
@@ -109,7 +120,10 @@ impl Uploader {
             ..Default::default()
         };
 
-        let (buffer, alloc, _) = self.allocator.create_buffer(&buffer_info, &alloc_info).unwrap();
+        let (buffer, alloc, _) = self
+            .allocator
+            .create_buffer(&buffer_info, &alloc_info)
+            .unwrap();
         let mapping = self.allocator.map_memory(&alloc).unwrap();
 
         self.staging_buffers.push(StagingBuffer {
@@ -124,39 +138,62 @@ impl Uploader {
         self.staging_buffers.len() - 1
     }
 
-    pub fn enqueue_buffer_upload<T>(&mut self, dest_buffer: vk::Buffer, dst_offset: u64, data: &[T]) {
+    pub fn enqueue_buffer_upload<T>(
+        &mut self,
+        dest_buffer: vk::Buffer,
+        dst_offset: u64,
+        data: &[T],
+    ) {
         let size = size_of::<T>() as u64 * data.len() as u64;
         let staging_buffer_index = self.find_staging_buffer(size);
         let staging_buffer = &mut self.staging_buffers[staging_buffer_index];
 
-        let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
+        let command_buffer =
+            self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
 
         unsafe {
-            staging_buffer.mapping.offset(staging_buffer.pos as isize).copy_from_nonoverlapping(data.as_ptr() as *const u8, size as usize);
+            staging_buffer
+                .mapping
+                .offset(staging_buffer.pos as isize)
+                .copy_from_nonoverlapping(data.as_ptr() as *const u8, size as usize);
 
-            let regions = [
-                vk::BufferCopy {
-                    src_offset: staging_buffer.pos,
-                    dst_offset,
-                    size,
-                }
-            ];
-            self.device.cmd_copy_buffer(command_buffer, staging_buffer.buffer, dest_buffer, &regions);
+            let regions = [vk::BufferCopy {
+                src_offset: staging_buffer.pos,
+                dst_offset,
+                size,
+            }];
+            self.device.cmd_copy_buffer(
+                command_buffer,
+                staging_buffer.buffer,
+                dest_buffer,
+                &regions,
+            );
         }
 
         staging_buffer.pos += size;
         staging_buffer.last_used_frame = self.frame_counter;
     }
 
-    pub fn enqueue_image_upload(&mut self, dst_image: vk::Image, layout: vk::ImageLayout, width: u32, height: u32, pixels: &[u8]) {
+    pub fn enqueue_image_upload(
+        &mut self,
+        dst_image: vk::Image,
+        layout: vk::ImageLayout,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) {
         let size = width as u64 * height as u64 * 4;
         let staging_buffer_index = self.find_staging_buffer(size);
         let staging_buffer = &mut self.staging_buffers[staging_buffer_index];
 
-        let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
+        let command_buffer =
+            self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
 
         unsafe {
-            staging_buffer.mapping.offset(staging_buffer.pos as isize).copy_from_nonoverlapping(pixels.as_ptr() as *const u8, size as usize);
+            staging_buffer
+                .mapping
+                .offset(staging_buffer.pos as isize)
+                .copy_from_nonoverlapping(pixels.as_ptr() as *const u8, size as usize);
 
             let transition = vk::ImageMemoryBarrier::builder()
                 .src_access_mask(vk::AccessFlags::empty())
@@ -175,39 +212,39 @@ impl Uploader {
                 })
                 .build();
             self.device.cmd_pipeline_barrier(
-                command_buffer, 
-                vk::PipelineStageFlags::TOP_OF_PIPE, 
-                vk::PipelineStageFlags::TRANSFER, 
-                vk::DependencyFlags::BY_REGION, 
-                &[], 
-                &[], 
-                &[transition]
+                command_buffer,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[transition],
             );
 
-            let regions = [
-                vk::BufferImageCopy::builder()
-                    .buffer_offset(staging_buffer.pos)
-                    .buffer_row_length(0)
-                    .buffer_image_height(0)
-                    .image_subresource(vk::ImageSubresourceLayers {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        mip_level: 0,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    })
-                    .image_offset(vk::Offset3D {
-                        x: 0,
-                        y: 0,
-                        z: 0,
-                    })
-                    .image_extent(vk::Extent3D {
-                        width,
-                        height,
-                        depth: 1,
-                    })
-                    .build()
-            ];
-            self.device.cmd_copy_buffer_to_image(command_buffer, staging_buffer.buffer, dst_image, vk::ImageLayout::TRANSFER_DST_OPTIMAL, &regions);
+            let regions = [vk::BufferImageCopy::builder()
+                .buffer_offset(staging_buffer.pos)
+                .buffer_row_length(0)
+                .buffer_image_height(0)
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+                .image_extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                })
+                .build()];
+            self.device.cmd_copy_buffer_to_image(
+                command_buffer,
+                staging_buffer.buffer,
+                dst_image,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &regions,
+            );
 
             let transition = vk::ImageMemoryBarrier::builder()
                 .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
@@ -226,13 +263,13 @@ impl Uploader {
                 })
                 .build();
             self.device.cmd_pipeline_barrier(
-                command_buffer, 
-                vk::PipelineStageFlags::TRANSFER, 
-                vk::PipelineStageFlags::TOP_OF_PIPE, 
-                vk::DependencyFlags::BY_REGION, 
-                &[], 
-                &[], 
-                &[transition]
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[transition],
             );
         }
 
@@ -241,7 +278,8 @@ impl Uploader {
     }
 
     pub fn submit_uploads(&mut self, queue: vk::Queue) {
-        let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
+        let command_buffer =
+            self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
 
         unsafe {
             let mem_barrier = vk::MemoryBarrier::builder()
@@ -255,7 +293,7 @@ impl Uploader {
                 vk::DependencyFlags::BY_REGION,
                 &[mem_barrier],
                 &[],
-                &[]
+                &[],
             );
             self.device.end_command_buffer(command_buffer).unwrap();
         }
@@ -265,16 +303,25 @@ impl Uploader {
             .command_buffers(&command_buffers)
             .build();
         unsafe {
-            self.device.queue_submit(queue, &[submit_info], self.fences[(self.frame_counter % self.max_frames_ahead) as usize]).unwrap();
+            self.device
+                .queue_submit(
+                    queue,
+                    &[submit_info],
+                    self.fences[(self.frame_counter % self.max_frames_ahead) as usize],
+                )
+                .unwrap();
         }
 
         self.frame_counter += 1;
 
-        let command_buffer = self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
+        let command_buffer =
+            self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];
         let fence = self.fences[(self.frame_counter % self.max_frames_ahead) as usize];
 
         unsafe {
-            self.device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
+            self.device
+                .wait_for_fences(&[fence], true, u64::MAX)
+                .unwrap();
             self.device.reset_fences(&[fence]).unwrap();
         }
 
@@ -282,7 +329,9 @@ impl Uploader {
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
             .build();
         unsafe {
-            self.device.begin_command_buffer(command_buffer, &begin_info).unwrap();
+            self.device
+                .begin_command_buffer(command_buffer, &begin_info)
+                .unwrap();
         }
     }
 }

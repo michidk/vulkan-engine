@@ -26,7 +26,7 @@ impl Mesh {
     pub fn bake(
         mesh_data: MeshData,
         allocator: Rc<vk_mem::Allocator>,
-        uploader: &mut Uploader
+        uploader: &mut Uploader,
     ) -> Result<Rc<Mesh>, vk_mem::Error> {
         let vertex_buffer_size = mesh_data.vertices.len() * size_of::<Vertex>();
         let vertex_buffer_info = vk::BufferCreateInfo::builder()

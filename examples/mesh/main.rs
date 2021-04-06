@@ -97,8 +97,12 @@ fn setup(engine: &mut Engine) {
     let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
         .expect("Model cube.vem not found!");
 
-    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone(), &mut engine.vulkan_manager.uploader)
-        .expect("Error baking mesh!");
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
+    )
+    .expect("Error baking mesh!");
 
     let model = Model {
         material: brdf_material0,

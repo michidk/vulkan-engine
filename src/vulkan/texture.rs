@@ -21,11 +21,23 @@ pub struct Texture2D {
 }
 
 impl Texture2D {
-    pub fn new(width: u32, height: u32, pixels: &[u8], filter: TextureFilterMode, allocator: Rc<vk_mem::Allocator>, uploader: &mut Uploader, device: Rc<ash::Device>) -> Result<Rc<Texture2D>, vk_mem::Error> {
+    pub fn new(
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        filter: TextureFilterMode,
+        allocator: Rc<vk_mem::Allocator>,
+        uploader: &mut Uploader,
+        device: Rc<ash::Device>,
+    ) -> Result<Rc<Texture2D>, vk_mem::Error> {
         let image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
             .format(vk::Format::R8G8B8A8_SRGB)
-            .extent(vk::Extent3D{ width, height, depth: 1})
+            .extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            })
             .mip_levels(1)
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -41,7 +53,13 @@ impl Texture2D {
 
         let (image, alloc, _) = allocator.create_image(&image_info, &alloc_info)?;
 
-        uploader.enqueue_image_upload(image, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, width, height, pixels);
+        uploader.enqueue_image_upload(
+            image,
+            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            width,
+            height,
+            pixels,
+        );
 
         let view_info = vk::ImageViewCreateInfo::builder()
             .image(image)
@@ -61,7 +79,7 @@ impl Texture2D {
                 layer_count: 1,
             })
             .build();
-        let view = unsafe{device.create_image_view(&view_info, None)}.unwrap();
+        let view = unsafe { device.create_image_view(&view_info, None) }.unwrap();
 
         let vk_filter = match filter {
             TextureFilterMode::Linear => vk::Filter::LINEAR,
@@ -82,7 +100,7 @@ impl Texture2D {
             .max_lod(vk::LOD_CLAMP_NONE)
             .unnormalized_coordinates(false)
             .build();
-        let sampler = unsafe{device.create_sampler(&sampler_info, None)}.unwrap();
+        let sampler = unsafe { device.create_sampler(&sampler_info, None) }.unwrap();
 
         Ok(Rc::new(Texture2D {
             allocator,
@@ -99,7 +117,7 @@ impl Texture2D {
 
 impl Drop for Texture2D {
     fn drop(&mut self) {
-        unsafe{
+        unsafe {
             self.device.destroy_sampler(self.sampler, None);
             self.device.destroy_image_view(self.view, None);
         }

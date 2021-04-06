@@ -103,7 +103,12 @@ fn setup(engine: &mut Engine) {
         }],
     };
 
-    let mesh = Mesh::bake(mesh_data, (*engine.vulkan_manager.allocator).clone(), &mut engine.vulkan_manager.uploader).unwrap();
+    let mesh = Mesh::bake(
+        mesh_data,
+        (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
+    )
+    .unwrap();
 
     scene.add(Model {
         material: material0,

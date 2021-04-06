@@ -2,7 +2,10 @@ use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::{Vec2, Vec3, Vec4};
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
-use crate::vulkan::{descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline, texture::Texture2D};
+use crate::vulkan::{
+    descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline,
+    texture::Texture2D,
+};
 
 mod material_compiler;
 
@@ -113,10 +116,15 @@ impl MaterialPipeline {
                         size: layout.total_size as u64,
                     }
                 }
-                ve_shader_reflect::SetBindingData::SampledImage { dim: ve_shader_reflect::ImageDimension::Two } => {
-                    properties.insert(binding.var_name.clone(), MaterialProperty::Sampler2D {
-                        binding: binding.binding,
-                    });
+                ve_shader_reflect::SetBindingData::SampledImage {
+                    dim: ve_shader_reflect::ImageDimension::Two,
+                } => {
+                    properties.insert(
+                        binding.var_name.clone(),
+                        MaterialProperty::Sampler2D {
+                            binding: binding.binding,
+                        },
+                    );
 
                     DescriptorData::ImageSampler {
                         image: vk::ImageView::null(),
@@ -315,14 +323,24 @@ impl Material {
     }
 
     pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> Result<(), MaterialError> {
-        let prop = self.pipeline.properties.get(name).ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+        let prop = self
+            .pipeline
+            .properties
+            .get(name)
+            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
         match prop {
-            &MaterialProperty::Sampler2D { binding } => {
-                self.textures.borrow_mut().insert(String::from(name), val.clone());
-                
-                let res = &mut self.resources.borrow_mut()[binding as usize];
+            MaterialProperty::Sampler2D { binding } => {
+                self.textures
+                    .borrow_mut()
+                    .insert(String::from(name), val.clone());
+
+                let res = &mut self.resources.borrow_mut()[*binding as usize];
                 match res {
-                    DescriptorData::ImageSampler { image, layout, sampler } => {
+                    DescriptorData::ImageSampler {
+                        image,
+                        layout,
+                        sampler,
+                    } => {
                         *image = val.view;
                         *layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
                         *sampler = val.sampler;

@@ -19,7 +19,7 @@ impl GameLoop {
 
     // TODO: implement Update, Render traits and then create type def of combined type; then have a list of them in SceneManager, and call update for all of them
     pub(crate) fn update(&self, _vulkan_manager: &mut VulkanManager, _scene: &Scene) {
-        if self.input.borrow().button_was_down(VirtualKeyCode::W) {
+        if self.input.borrow().get_button_was_down(VirtualKeyCode::W) {
             println!("key was pressed!")
         }
         // let key = VirtualKeyCode::W;

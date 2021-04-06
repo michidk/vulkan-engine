@@ -154,28 +154,28 @@ impl Camera {
         let sens = 0.123f32;
 
         self.rotate(
-            Angle::from_deg(input.mouse_delta().1 as f32 * sens),
-            Angle::from_deg(input.mouse_delta().0 as f32 * sens),
+            Angle::from_deg(input.get_mouse_delta().1 as f32 * sens),
+            Angle::from_deg(input.get_mouse_delta().0 as f32 * sens),
         );
 
         let mut vec: Vec3<f32> = Vec3::new(0f32, 0f32, 0f32);
 
-        if input.button_down(VirtualKeyCode::W) {
+        if input.get_button_down(VirtualKeyCode::W) {
             vec += Vec3::new(0.0, 0.0, 1.0);
         }
-        if input.button_down(VirtualKeyCode::A) {
+        if input.get_button_down(VirtualKeyCode::A) {
             vec += Vec3::new(-1.0, 0.0, 0.0);
         }
-        if input.button_down(VirtualKeyCode::S) {
+        if input.get_button_down(VirtualKeyCode::S) {
             vec += Vec3::new(0.0, 0.0, -1.0);
         }
-        if input.button_down(VirtualKeyCode::D) {
+        if input.get_button_down(VirtualKeyCode::D) {
             vec += Vec3::new(1.0, 0.0, 0.0);
         }
-        if input.button_down(VirtualKeyCode::Space) {
+        if input.get_button_down(VirtualKeyCode::Space) {
             vec += Vec3::new(0.0, 1.0, 0.0);
         }
-        if input.button_down(VirtualKeyCode::Back) {
+        if input.get_button_down(VirtualKeyCode::LControl) {
             vec += Vec3::new(0.0, -1.0, 0.0);
         }
 

@@ -105,27 +105,32 @@ impl Input {
     }
 
     /// Returns whether the button was pressed this frame
-    pub fn button_was_down(&self, key: VirtualKeyCode) -> bool {
+    pub fn get_button_was_down(&self, key: VirtualKeyCode) -> bool {
         !self.state_prev.key_held[key as usize] && self.state.key_held[key as usize]
     }
 
     /// Returns whether the button is pressed down right now
-    pub fn button_down(&self, key: VirtualKeyCode) -> bool {
+    pub fn get_button_down(&self, key: VirtualKeyCode) -> bool {
         self.state.key_held[key as usize]
     }
 
     /// Returns whether the button is not pressed right now
-    pub fn button_up(&self, key: VirtualKeyCode) -> bool {
-        !self.button_down(key)
+    pub fn get_button_up(&self, key: VirtualKeyCode) -> bool {
+        !self.get_button_down(key)
     }
 
     /// Returns the mouse delta
-    pub fn mouse_delta(&self) -> (f64, f64) {
+    pub fn get_mouse_delta(&self) -> (f64, f64) {
         self.state.mouse_delta
     }
 
     /// Returns the scroll delta
-    pub fn scroll_delta(&self) -> (f32, f32) {
+    pub fn get_scroll_delta(&self) -> (f32, f32) {
         self.state.scroll_delta
+    }
+
+    /// Set whether events should be recieved even though the window is not focused
+    pub fn set_recieve_events_during_unfocus(&mut self, events_during_unfocus: bool) {
+        self.events_during_unfocus = events_during_unfocus;
     }
 }

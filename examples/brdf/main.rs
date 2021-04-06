@@ -42,8 +42,8 @@ fn main() {
     let engine_info = engine::EngineInfo {
         window_info: window::InitialWindowInfo {
             initial_dimensions: Dimensions {
-                width: 192,
-                height: 108,
+                width: 1920,
+                height: 1080,
             },
             title: "Vulkan BRDF Example",
         },

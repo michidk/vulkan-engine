@@ -1,6 +1,10 @@
 use std::usize;
 
-use winit::event::{DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode};
+use winit::event::{
+    DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode, WindowEvent,
+};
+
+use super::engine::Engine;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct InputState {
@@ -34,8 +38,12 @@ impl InputState {
 }
 
 pub struct Input {
+    /// The current input state
     state: InputState,
+    /// The input state last frame
     state_prev: InputState,
+    /// Whether we should keep sending events even when the window is not focused
+    events_during_unfocus: bool,
 }
 
 impl Input {
@@ -43,11 +51,18 @@ impl Input {
         Self {
             state: InputState::default(),
             state_prev: InputState::default(),
+            events_during_unfocus: false,
         }
     }
 
-    pub(crate) fn update(&mut self, event: &Event<()>) {
+    pub(crate) fn update(&mut self, event: &Event<()>, engine: &Engine) {
+        // match other events only if the window is focused
+        if !(engine.window.is_focused() || self.events_during_unfocus) {
+            return;
+        }
+
         match event {
+            // mouse button
             Event::DeviceEvent {
                 event: DeviceEvent::Button { button, state },
                 ..
@@ -59,12 +74,14 @@ impl Input {
                     self.state.mouse_held[*button as usize] = false;
                 }
             },
+            // mouse motion
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
                 self.state.mouse_delta = *delta;
             }
+            // mouse wheel
             Event::DeviceEvent {
                 event: DeviceEvent::MouseWheel { delta },
                 ..
@@ -75,6 +92,7 @@ impl Input {
                 // this does not work for some reason
                 MouseScrollDelta::PixelDelta(_pos) => {}
             },
+            // key press
             Event::DeviceEvent {
                 event: DeviceEvent::Key(input),
                 ..

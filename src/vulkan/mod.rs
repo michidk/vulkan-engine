@@ -42,7 +42,6 @@ use self::{
 };
 
 pub struct VulkanManager {
-    pub window: winit::window::Window,
     #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
@@ -81,7 +80,7 @@ pub struct VulkanManager {
 impl VulkanManager {
     pub fn new(
         engine_info: EngineInfo,
-        window: winit::window::Window,
+        window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let entry = ash::Entry::new()?;
@@ -282,7 +281,6 @@ impl VulkanManager {
             unsafe { logical_device.create_pipeline_layout(&pipe_layout_pp_info, None)? };
 
         Ok(Self {
-            window,
             entry,
             instance,
             debug: std::mem::ManuallyDrop::new(debug),

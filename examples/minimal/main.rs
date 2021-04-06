@@ -7,9 +7,9 @@ use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::{
         camera::Camera,
+        engine::{self, Engine, EngineInit},
         window::{self, Dimensions},
     },
-    engine::{self, Engine, EngineInit},
     scene::{
         material::{MaterialData, MaterialPipeline},
         model::{mesh::Mesh, Model},

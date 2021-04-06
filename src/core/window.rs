@@ -1,6 +1,5 @@
-use winit::event::{Event, WindowEvent};
-
-use crate::engine::EngineInit;
+use crate::core::engine::EngineInit;
+use winit::event::Event;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Dimensions {

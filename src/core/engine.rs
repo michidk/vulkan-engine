@@ -6,9 +6,11 @@ use crate::{
     vulkan::VulkanManager,
 };
 
+use super::window::Window;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EngineInfo {
-    pub window_info: window::WindowInfo,
+    pub window_info: window::InitialWindowInfo,
     pub app_name: &'static str,
 }
 
@@ -21,9 +23,9 @@ impl EngineInit {
     pub fn new(info: EngineInfo, camera: Camera) -> Result<Self, Box<dyn std::error::Error>> {
         let scene = Scene::new();
         let eventloop = winit::event_loop::EventLoop::new();
-        let window = info.window_info.into_window(&eventloop)?;
+        let window = info.window_info.build(&eventloop)?;
 
-        let vulkan_manager = VulkanManager::new(info, window, 3)?;
+        let vulkan_manager = VulkanManager::new(info, &window.winit_window, 3)?;
         let input = Rc::new(RefCell::new(Input::new()));
         let gameloop = GameLoop::new(input.clone());
 
@@ -36,6 +38,7 @@ impl EngineInit {
                 scene,
                 camera,
                 vulkan_manager,
+                window,
             },
         })
     }
@@ -52,6 +55,7 @@ pub struct Engine {
     pub scene: Scene,
     pub camera: Camera,
     pub vulkan_manager: VulkanManager,
+    pub window: Window,
 }
 
 impl Engine {

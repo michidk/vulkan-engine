@@ -6,9 +6,9 @@ use log::error;
 use vulkan_engine::{
     core::{
         camera::Camera,
+        engine::{self, Engine, EngineInit},
         window::{self, Dimensions},
     },
-    engine::{self, Engine, EngineInit},
     scene::{
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,

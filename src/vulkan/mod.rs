@@ -21,7 +21,7 @@ use ash::{
 
 use crate::{
     core::camera::{self, CamData},
-    engine::EngineInfo,
+    core::engine::EngineInfo,
     scene::{
         light::LightManager,
         material::MaterialInterface,

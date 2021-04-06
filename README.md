@@ -2,7 +2,7 @@
 
 ![Continuous integration](https://github.com/michidk/vulkan-renderer/workflows/Continuous%20Integration/badge.svg)
 
-This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309) and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
+This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309), and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
 
 ## Goal
 
@@ -11,13 +11,38 @@ The goal is to build a somewhat useable game engine and a demo using it. While w
 ## Features
 
 Currently implemented features are:
-- Own math library
+- BRDF shading
+- Deferred rendering
+- `.obj` parser
+- Runs on both Linux and Windows
+- Own math library (named `Crystal`)
 - Custom shader format ([ve-shader](https://github.com/michidk/ve-shader))
-- BRDF rendering
 
 ## Screenshots
 
-BRDF testing: ![brdf testing](./.github/images/brdf.png)
+BRDF testing:
+
+![brdf testing](./.github/images/examples/brdf.png)
+
+## Workspace
+
+| Folder | Description | Readme |
+| ---- | ----------- | - |
+| `crystal` | A custom math library | [here](./crystal/README.md) |
+| `ve_format` | Stores some shared structs | [here](./ve_format/README.md) |
+| `ve_asset` | Utility that converts files into our custom format | [here](./ve_asset/README.md) |
+| `vulkan-engine_derive` | Contains custom derive macros | None |
+| `src` | Main engine library | This one |
+
+
+## Examples
+
+Examples are in the `/examples` folder. They can be run with `cargo +nightly run --example <name>`.
+| Name | Description |
+| ---- | ----------- |
+| minimal | Displays a triangle using vertex colors |
+| brdf | Renders using physically-based rendering |
+| mesh | Loads and renders a custom mesh |
 
 ## Building
 
@@ -26,13 +51,10 @@ BRDF testing: ![brdf testing](./.github/images/brdf.png)
 - [Rust](https://www.rust-lang.org/)
 - [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
 - Optional: [Vulkan ValidationLayers](https://github.com/KhronosGroup/Vulkan-ValidationLayers)
-- [Python 2](https://www.python.org/)
-- Git
-- cmake and ninja
 
-You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`.
+You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`. ve-shader in return requires [Python 2](https://www.python.org/), Git, cmake and ninja to run.
 
-Compile the shaders with `make shaders`. Then build with `make build` or run with `make run`.
+Compile the shaders with `make shaders`. Then build with `make build` or run an exmaple with `make run`.
 
 ## Resources
 

@@ -19,11 +19,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-      - name: Run cargo check (math package)
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: -p math
+          args: --all --examples
 
   test:
     name: Test Suite
@@ -41,11 +37,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-      - name: Run cargo test (math package)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p math
+          args: --all --examples
 
   lints:
     name: Lints
@@ -69,7 +61,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-targets -- -D warnings
+          args: --all --examples -- -D warnings
 
   build-linux:
     name: Linux Build
@@ -80,21 +72,17 @@ jobs:
       - name: Update package index
         run: sudo apt-get update -y
       - name: Install build dependencies
-        run: sudo apt-get install -y cmake git ninja-build python python-pip
+        run: sudo apt-get install -y cmake git ninja-build python
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           target: x86_64-unknown-linux-gnu
           override: true
-      - name: Compile shaders
-        run: cargo install ve_shader && mkdir -p ./assets/shaders && ve_shader "./shaders/*" -o ./assets/shaders/
+      - name: Install ve_shader
+        run: cargo install ve_shader
       - name: Build
-        run: cargo build --release --target=x86_64-unknown-linux-gnu
-      - name: Copy assets
-        run: mkdir -p ./out/assets/ && cp -R ./assets/* ./out/assets/
-      - name: Copy application files
-        run: cp ./target/x86_64-unknown-linux-gnu/release/vulkan_engine ./out/
+        run: make build-release-linux
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
@@ -122,14 +110,10 @@ jobs:
           toolchain: nightly
           target: x86_64-pc-windows-gnu
           override: true
-      - name: Compile shaders
-        run: cargo install ve_shader; mkdir -p ./assets/shaders; ve_shader ./shaders/* -o ./assets/shaders/
+      - name: Install ve_shader
+        run: cargo install ve_shader
       - name: Build
-        run: cargo build --release
-      - name: Copy assets
-        run: mkdir ./out/assets; cp -R ./assets/* ./out/assets/
-      - name: Copy application files
-        run: cp ./target/release/vulkan_engine.exe ./out/
+        run: make build-release-mingw
       - name: Upload
         uses: actions/upload-artifact@v2
         with:

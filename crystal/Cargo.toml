@@ -1,0 +1,18 @@
+[package]
+name = "crystal"
+version = "0.1.1"
+authors = ["Shemnei", "Michael Lohr <michael@lohr-ffb.de>", "Robin Quint <rob2309@hotmail.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["serde-serialize"]
+serde-serialize = ["serde"]
+
+[dependencies]
+serde = { version = "1.0", optional = true }
+
+[dev-dependencies]
+serde = { version = "1.0" }
+bincode = { version = "1.3" }

@@ -25,6 +25,7 @@ pub enum MaterialError {
     IncompatiblePropertyType,
 }
 
+/// Description of a single named property in a shader
 enum MaterialProperty {
     Unsupported,
     Float { binding: u32, offset: u32 },
@@ -34,6 +35,25 @@ enum MaterialProperty {
     Sampler2D { binding: u32 },
 }
 
+/// A MaterialPipeline represents a GPass shader and its corresponding material properties.
+/// 
+/// Each MaterialPipeline can be used to create multiple [`Materials`](Material).
+/// 
+/// # MaterialProperties
+/// Material properties are directly reflected from the shaders SPIRV code, 
+/// meaning Debug information has to be enabled when compiling the GLSL files.
+/// 
+/// Standalone properties are named after their variable name, e.g.
+/// `uniform sampler2D u_AlbedoTex` will be named "u_AlbedoTex".
+/// 
+/// Properties inside uniform blocks are named after their inner names (i.e. the name of the surrounding block is ignored).
+/// ```glsl
+/// uniform MaterialData {
+///     vec3 albedo;
+/// } u_MaterialData;
+/// ```
+/// In the above code, a MaterialProperty named "albedo" will be exposed.
+/// This means, multiple variables with the same name in different uniform blocks will clash in the material properties.
 pub struct MaterialPipeline {
     device: Rc<ash::Device>,
     allocator: Rc<vk_mem::Allocator>,
@@ -45,6 +65,17 @@ pub struct MaterialPipeline {
 }
 
 impl MaterialPipeline {
+    /// Create a new MaterialPipeline from a given shader and [`LightingPipeline`].
+    /// 
+    /// This function creates a new MaterialPipeline by loading the shader with the given name and reflecting its properties.
+    /// 
+    /// # Parameters
+    /// - `device`: Handle to the Vulkan Device
+    /// - `allocator`: Handle to the Vulkan Allocator
+    /// - `shader`: Name of the shader to use for this pipeline (minus the .glsl extension)
+    /// - `frame_data_layout`: A DescriptorSetLayout describing the layout of descriptor set 0 of the pipeline (currently used for Camera matrices)
+    /// - `renderpass`: The Deferred RenderPass (of which subpass 0 will be used for this pipeline)
+    /// - `lighing_pipeline`: The [LightingPipeline] which will be used in the Deferred Resolve Pass for Materials created with this MaterialPipeline
     pub fn new(
         device: Rc<ash::Device>,
         allocator: Rc<vk_mem::Allocator>,
@@ -191,6 +222,7 @@ impl MaterialPipeline {
         }))
     }
 
+    /// Creates a new [`Material`] from the given MaterialPipeline.
     pub fn create_material(self: &Rc<Self>) -> Result<Rc<Material>, MaterialError> {
         let (resources, allocations) =
             material_compiler::compile_resources(&self.resource_infos, self.allocator.as_ref())?;
@@ -216,6 +248,10 @@ impl Drop for MaterialPipeline {
     }
 }
 
+/// A Material is an instance of a [`MaterialPipeline`].
+/// 
+/// While a [`MaterialPipeline`] stores information about which properties a Material exposes, a Material stores the values of each exposed Property. 
+/// Thus a [`MaterialPipeline`] can be viewed as a Material Template, while a Material is an instantiation of such a template.
 pub struct Material {
     pipeline: Rc<MaterialPipeline>,
     resources: RefCell<Vec<DescriptorData>>,
@@ -241,6 +277,9 @@ impl Material {
         Ok(())
     }
 
+    /// Sets a MaterialProperty of type float
+    /// 
+    /// For naming scheme, see [`MaterialPipeline`]
     pub fn set_float(&self, name: &str, val: f32) -> Result<(), MaterialError> {
         let prop = self
             .pipeline
@@ -261,6 +300,10 @@ impl Material {
 
         Ok(())
     }
+
+    /// Sets a MaterialProperty of type vec2
+    /// 
+    /// For naming scheme, see [`MaterialPipeline`]
     pub fn set_vec2(&self, name: &str, val: Vec2<f32>) -> Result<(), MaterialError> {
         let prop = self
             .pipeline
@@ -281,6 +324,10 @@ impl Material {
 
         Ok(())
     }
+
+    /// Sets a MaterialProperty of type vec3
+    /// 
+    /// For naming scheme, see [`MaterialPipeline`]
     pub fn set_vec3(&self, name: &str, val: Vec3<f32>) -> Result<(), MaterialError> {
         let prop = self
             .pipeline
@@ -301,6 +348,10 @@ impl Material {
 
         Ok(())
     }
+
+    /// Sets a MaterialProperty of type vec4
+    /// 
+    /// For naming scheme, see [`MaterialPipeline`]
     pub fn set_vec4(&self, name: &str, val: Vec4<f32>) -> Result<(), MaterialError> {
         let prop = self
             .pipeline
@@ -322,6 +373,9 @@ impl Material {
         Ok(())
     }
 
+    /// Sets a MaterialProperty of type sampler2D
+    /// 
+    /// For naming scheme, see [`MaterialPipeline`]
     pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> Result<(), MaterialError> {
         let prop = self
             .pipeline
@@ -354,15 +408,25 @@ impl Material {
         Ok(())
     }
 
+    /// Returns the vk::PipelineLayout associated with this Material
     pub fn get_pipeline_layout(&self) -> vk::PipelineLayout {
         self.pipeline.pipeline_layout
     }
+
+    /// Returns the vk::Pipeline that has to be used with this Material
     pub fn get_pipeline(&self) -> vk::Pipeline {
         self.pipeline.pipeline
     }
+
+    /// Returns the vk::DescriptorSetLayout of set #1 of this Material's Pipeline.
+    /// 
+    /// Set #1 should contain all MaterialProperties
     pub fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.pipeline.descriptor_set_layout
     }
+
+    /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet 
+    /// from the [DescriptorManager](crate::vulkan::descriptor_manager::DescriptorManager).
     pub fn get_descriptor_data(&self) -> Vec<DescriptorData> {
         self.resources.borrow().clone()
     }

@@ -1,8 +1,6 @@
 use std::usize;
 
-use winit::event::{
-    DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode, WindowEvent,
-};
+use winit::event::{DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode};
 
 use super::engine::Engine;
 

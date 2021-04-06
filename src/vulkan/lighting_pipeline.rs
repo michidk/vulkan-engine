@@ -4,15 +4,31 @@ use ash::{version::DeviceV1_0, vk};
 
 use super::pipeline;
 
+/// This struct describes a Deferred Resolve shader and its associated state.
+/// 
+/// A LightingPipeline can be thought of as a specific lighting equation to be applied to a specific set of [`Materials`](crate::scene::material::Material).
 pub struct LightingPipeline {
+    /// The [`vk::Pipeline`] to be used for rendering point lights
     pub point_pipeline: Option<vk::Pipeline>,
+    /// The [`vk::Pipeline`] to be used for rendering directional lights
     pub directional_pipeline: Option<vk::Pipeline>,
+    /// The [`vk::Pipeline`] to be used for rendering ambient lighting (or unlit materials).
+    /// Will be rendered exactly once each frame.
     pub ambient_pipeline: Option<vk::Pipeline>,
+    /// The stencil value that identifies this LightingPipeline in the GPass attachments.
     pub stencil_id: u8,
     device: Rc<ash::Device>,
 }
 
 impl LightingPipeline {
+    /// Creates a new [`LightingPipeline`].
+    /// 
+    /// # Parameters
+    /// - `point_shader`, `directional_shader`, `ambient_shader`: names of the shaders to be used for rendering
+    ///   point lights, directional lights and ambient light respectively. All three are optional.
+    /// - `pipe_layout_resolve`: The [`vk::PipelineLayout`] of the deferred resolve SubPass.
+    /// - `renderpass`: The [`vk::RenderPass`] that describes the deferred RenderPass. SubPass 1 will be used for the [`LightingPipeline`].
+    /// - `stencil_id`: The stencil value used to identify this [`LightingPipeline`]. This value has to be unique among all [`LightingPipelines`](LightingPipeline).
     pub fn new(
         point_shader: Option<&str>,
         directional_shader: Option<&str>,

@@ -13,6 +13,10 @@ struct StagingBuffer {
     last_used_frame: u64,
 }
 
+/// This struct automatically manages a pool of staging buffers that can be used to upload data to GPU-only buffers and images.
+/// 
+/// # Notes
+/// This struct has to be cleaned up manually by calling [`destroy()`](Uploader::destroy()).
 pub struct Uploader {
     device: Rc<ash::Device>,
     allocator: Rc<vk_mem::Allocator>,
@@ -25,6 +29,7 @@ pub struct Uploader {
 }
 
 impl Uploader {
+    /// Creates a new [`Uploader`].
     pub fn new(
         device: Rc<ash::Device>,
         allocator: Rc<vk_mem::Allocator>,
@@ -79,6 +84,9 @@ impl Uploader {
         res
     }
 
+    /// Destroys a [`Uploader`].
+    /// 
+    /// The object *must not* be used after calling this method.
     pub fn destroy(&mut self) {
         for fence in &self.fences {
             unsafe {
@@ -138,6 +146,9 @@ impl Uploader {
         self.staging_buffers.len() - 1
     }
 
+    /// Enqueues a buffer upload command.
+    /// 
+    /// The data upload will happend before any other vulkan commands are executed this frame.
     pub fn enqueue_buffer_upload<T>(
         &mut self,
         dest_buffer: vk::Buffer,
@@ -174,6 +185,12 @@ impl Uploader {
         staging_buffer.last_used_frame = self.frame_counter;
     }
 
+    /// Enqueues an image upload command.
+    /// 
+    /// The image upload will happend before any other vulkan commands are executed this frame.
+    /// 
+    /// Any previous contents of the image will be discarded. After upload, 
+    /// the image will be transitioned to the given `layout`.
     pub fn enqueue_image_upload(
         &mut self,
         dst_image: vk::Image,
@@ -277,6 +294,9 @@ impl Uploader {
         staging_buffer.last_used_frame = self.frame_counter;
     }
 
+    /// Submits all upload commands for the current frame.
+    /// 
+    /// This method should be called once per frame before any rendering takes place.
     pub fn submit_uploads(&mut self, queue: vk::Queue) {
         let command_buffer =
             self.command_buffers[(self.frame_counter % self.max_frames_ahead) as usize];

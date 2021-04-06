@@ -4,23 +4,36 @@ use ash::{version::DeviceV1_0, vk};
 
 use super::uploader::Uploader;
 
+/// The filtering mode with which a [`Texture2D`] should be sampled.
 pub enum TextureFilterMode {
+    /// Take the average of the surrounding texels
     Linear,
+    // Take the texel nearest to the UV coords
     Nearest,
 }
 
+/// Manages a 2D Texture.
+/// 
+/// A Texture2D will always be in R8G8B8A8 format.
 pub struct Texture2D {
     allocator: Rc<vk_mem::Allocator>,
     device: Rc<ash::Device>,
-    pub image: vk::Image,
-    pub alloc: vk_mem::Allocation,
+    image: vk::Image,
+    alloc: vk_mem::Allocation,
+    /// The [`vk::ImageView`] that can be used to refer to this [`Texture2D`].
     pub view: vk::ImageView,
     pub width: u32,
     pub height: u32,
+    /// The [`vk::Sampler`] that can be used to sample from this [`Texture2D`].
     pub sampler: vk::Sampler,
 }
 
 impl Texture2D {
+    /// Creates a new [`Texture2D`].
+    /// 
+    /// # Parameters
+    /// - `pixels`: A `width` * `height` * 4 slice of u8. A group of 4 bytes is a single pixel.
+    ///   The slice must be in row major memory order and tightly packed.
     pub fn new(
         width: u32,
         height: u32,

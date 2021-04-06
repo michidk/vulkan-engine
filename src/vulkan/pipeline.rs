@@ -2,6 +2,7 @@ use ash::{version::DeviceV1_0, vk};
 
 use crate::assets::shader;
 
+/// Loads a vertex and fragment shader from the filesystem and creates a [`vk::ShaderModule`] for each.
 pub fn create_shader_modules(
     shader: &str,
     device: &ash::Device,
@@ -20,6 +21,16 @@ pub fn create_shader_modules(
     Ok((vertexshader_module, fragmentshader_module))
 }
 
+/// Creates a [`vk::Pipeline`] with the given options.
+/// 
+/// Used to reduce code duplication.
+/// 
+/// # Parameters
+/// - `uses_vertex_attribs`: set to true if the Pipeline expects vertex data to be passed into the vertex shader, false is useful for PP Effects.
+/// - `attachment_count`: the number of color attachments the pipeline expects.
+/// - `blend_func`: a single [`vk::PipelineColorBlendAttachmentState`] to be used for every color attachment.
+/// - `depth_test`: true if the Pipeline should have depth testing and writing enabled, false otherwise.
+/// - `stencil_func`: an optional [`vk::StencilOpState`] to be used for stencil testing.
 #[allow(clippy::too_many_arguments)]
 pub fn create_pipeline(
     layout: vk::PipelineLayout,

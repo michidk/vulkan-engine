@@ -2,7 +2,10 @@ use std::usize;
 
 use winit::event::{DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode};
 
-use super::engine::Engine;
+use super::{
+    engine::Engine,
+    window::{Window, WindowMode},
+};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct InputState {
@@ -114,14 +117,14 @@ impl Input {
     }
 
     // handles built-in key presses
-    pub(crate) fn handle_builtin(&self, engine: &Engine) {
+    pub(crate) fn handle_builtin(&self, window: &mut Window) {
         if self.get_button_down(VirtualKeyCode::LAlt)
             && self.get_button_was_down(VirtualKeyCode::Return)
         {
-            if !engine.window.get_fullscreen() {
-                engine.window.set_fullscreen();
+            if window.get_mode() == WindowMode::Windowed {
+                window.set_mode(WindowMode::Exclusive);
             } else {
-                engine.window.set_windowed();
+                window.set_mode(WindowMode::Windowed);
             }
         }
     }

@@ -30,6 +30,17 @@ impl InitialWindowInfo {
     }
 }
 
+/// The window mode
+#[derive(PartialEq, Clone, Copy)]
+pub enum WindowMode {
+    /// Window is windowed and not fullscreen
+    Windowed,
+    /// Full-sized window without borders, no real fullscreen
+    Borderless,
+    /// Exclusive fullscreen - more performant
+    Exclusive,
+}
+
 pub struct Window {
     /// The winit window
     pub(crate) winit_window: winit::window::Window,
@@ -37,6 +48,8 @@ pub struct Window {
     capture_cursor: bool,
     /// Whether the window is currently in focus
     focused: bool,
+    /// The current window ode
+    mode: WindowMode,
 }
 
 impl Window {
@@ -45,6 +58,7 @@ impl Window {
             winit_window,
             capture_cursor: true,
             focused: true, // in the beginning, the windows is always focused
+            mode: WindowMode::Windowed,
         }
     }
 
@@ -53,55 +67,34 @@ impl Window {
         self.focused
     }
 
-    /// Enables fullscreen mode
-    /// Mutally exclusive with borderless and windowed mode
-    pub fn set_fullscreen(&self) {
-        // select best video mode by ord
-        let vm = self
-            .winit_window
-            .current_monitor()
-            .expect("No monitor detected")
-            .video_modes()
-            .min()
-            .expect("No video modes found");
-        self.winit_window
-            .set_fullscreen(Some(winit::window::Fullscreen::Exclusive(vm)));
+    /// Sets the current window mode
+    pub fn set_mode(&mut self, mode: WindowMode) {
+        match mode {
+            WindowMode::Windowed => self.winit_window.set_fullscreen(None),
+            WindowMode::Borderless => {
+                self.winit_window
+                    .set_fullscreen(Some(winit::window::Fullscreen::Borderless(
+                        self.winit_window.current_monitor(),
+                    )))
+            }
+            WindowMode::Exclusive => {
+                // select best video mode by ord
+                let vm = self
+                    .winit_window
+                    .current_monitor()
+                    .expect("No monitor detected")
+                    .video_modes()
+                    .min()
+                    .expect("No video modes found");
+                self.winit_window
+                    .set_fullscreen(Some(winit::window::Fullscreen::Exclusive(vm)));
+            }
+        }
+        self.mode = mode;
     }
 
-    /// Returns whether fullscreen is enabled
-    pub fn get_fullscreen(&self) -> bool {
-        matches!(
-            self.winit_window.fullscreen(),
-            Some(winit::window::Fullscreen::Exclusive(_))
-        )
-    }
-
-    /// Enables borderless window mode
-    /// Mutally exclusive with fulscreen and windowed mode
-    pub fn set_borderless(&self) {
-        self.winit_window
-            .set_fullscreen(Some(winit::window::Fullscreen::Borderless(
-                self.winit_window.current_monitor(),
-            )));
-    }
-
-    /// Returns whether borderless is enabled
-    pub fn get_borderless(&self) -> bool {
-        matches!(
-            self.winit_window.fullscreen(),
-            Some(winit::window::Fullscreen::Borderless(_))
-        )
-    }
-
-    /// Enables windowed mode
-    /// Mutally exclusive with fulscreen and borderless mode
-    pub fn set_windowed(&self) {
-        self.winit_window.set_fullscreen(None);
-    }
-
-    /// Returns whether engine is in windowed mode
-    pub fn get_windowed(&self) -> bool {
-        self.winit_window.fullscreen().is_none()
+    pub fn get_mode(&self) -> WindowMode {
+        self.mode
     }
 
     /// Set the visibility of the mouse cursor and wether it should be captured (when window is focused)
@@ -160,7 +153,7 @@ pub fn start(engine_init: EngineInit) -> ! {
             }
             // render
             Event::MainEventsCleared => {
-                engine.input.borrow_mut().handle_builtin(&engine);
+                engine.input.borrow_mut().handle_builtin(&mut engine.window);
                 engine
                     .gameloop
                     .update(&mut engine.vulkan_manager, &engine.scene);

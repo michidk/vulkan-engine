@@ -53,6 +53,57 @@ impl Window {
         self.focused
     }
 
+    /// Enables fullscreen mode
+    /// Mutally exclusive with borderless and windowed mode
+    pub fn set_fullscreen(&self) {
+        // select best video mode by ord
+        let vm = self
+            .winit_window
+            .current_monitor()
+            .expect("No monitor detected")
+            .video_modes()
+            .min()
+            .expect("No video modes found");
+        self.winit_window
+            .set_fullscreen(Some(winit::window::Fullscreen::Exclusive(vm)));
+    }
+
+    /// Returns whether fullscreen is enabled
+    pub fn get_fullscreen(&self) -> bool {
+        matches!(
+            self.winit_window.fullscreen(),
+            Some(winit::window::Fullscreen::Exclusive(_))
+        )
+    }
+
+    /// Enables borderless window mode
+    /// Mutally exclusive with fulscreen and windowed mode
+    pub fn set_borderless(&self) {
+        self.winit_window
+            .set_fullscreen(Some(winit::window::Fullscreen::Borderless(
+                self.winit_window.current_monitor(),
+            )));
+    }
+
+    /// Returns whether borderless is enabled
+    pub fn get_borderless(&self) -> bool {
+        matches!(
+            self.winit_window.fullscreen(),
+            Some(winit::window::Fullscreen::Borderless(_))
+        )
+    }
+
+    /// Enables windowed mode
+    /// Mutally exclusive with fulscreen and borderless mode
+    pub fn set_windowed(&self) {
+        self.winit_window.set_fullscreen(None);
+    }
+
+    /// Returns whether engine is in windowed mode
+    pub fn get_windowed(&self) -> bool {
+        self.winit_window.fullscreen().is_none()
+    }
+
     /// Set the visibility of the mouse cursor and wether it should be captured (when window is focused)
     pub fn set_capture_cursor(&mut self, capture: bool) {
         self.capture_cursor = capture;
@@ -62,7 +113,9 @@ impl Window {
     // actually perform the capture
     fn actually_capture_cursor(&mut self, capture: bool) {
         self.winit_window.set_cursor_visible(!capture);
-        self.winit_window.set_cursor_grab(capture).unwrap();
+        self.winit_window
+            .set_cursor_grab(capture)
+            .expect("Could not enable cursor grab");
     }
 
     // window is started with focused state
@@ -82,6 +135,7 @@ impl Window {
             // lost focus
             self.actually_capture_cursor(false);
         }
+        self.focused = focus;
     }
 }
 
@@ -106,6 +160,7 @@ pub fn start(engine_init: EngineInit) -> ! {
             }
             // render
             Event::MainEventsCleared => {
+                engine.input.borrow_mut().handle_builtin(&engine);
                 engine
                     .gameloop
                     .update(&mut engine.vulkan_manager, &engine.scene);

@@ -55,10 +55,13 @@ impl Input {
 
     pub(crate) fn update(&mut self, event: &Event<()>, engine: &Engine) {
         // match other events only if the window is focused
-        if !(engine.window.is_focused() || self.events_during_unfocus) {
-            return;
+        if engine.window.is_focused() || self.events_during_unfocus {
+            self.handle_input(event);
         }
+    }
 
+    // handle input events
+    fn handle_input(&mut self, event: &Event<()>) {
         match event {
             // mouse button
             Event::DeviceEvent {
@@ -110,14 +113,25 @@ impl Input {
         }
     }
 
+    // handles built-in key presses
+    pub(crate) fn handle_builtin(&self, engine: &Engine) {
+        if self.get_button_down(VirtualKeyCode::LAlt)
+            && self.get_button_was_down(VirtualKeyCode::Return)
+        {
+            if !engine.window.get_fullscreen() {
+                engine.window.set_fullscreen();
+            } else {
+                engine.window.set_windowed();
+            }
+        }
+    }
+
     // run this right after the gameloop update
     /// Rolls the input state over to next frame
     pub(crate) fn rollover_state(&mut self) {
         // reset state and assign prev
-        // self.state_prev = InputState::default();
         self.state_prev = self.state;
         self.state.rollover();
-        // swap(&mut self.state_prev, &mut self.state);
     }
 
     /// Returns whether the button was pressed this frame

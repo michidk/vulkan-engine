@@ -4,15 +4,31 @@ use ash::{version::DeviceV1_0, vk};
 
 use super::pipeline;
 
+/// This struct describes a Deferred Resolve shader and its associated state.
+/// 
+/// A LightingPipeline can be thought of as a specific lighting equation to be applied to a specific set of [`Materials`](crate::scene::material::Material).
 pub struct LightingPipeline {
+    /// The [`vk::Pipeline`] to be used for rendering point lights
     pub point_pipeline: Option<vk::Pipeline>,
+    /// The [`vk::Pipeline`] to be used for rendering directional lights
     pub directional_pipeline: Option<vk::Pipeline>,
+    /// The [`vk::Pipeline`] to be used for rendering ambient lighting (or unlit materials).
+    /// Will be rendered exactly once each frame.
     pub ambient_pipeline: Option<vk::Pipeline>,
+    /// The stencil value that identifies this LightingPipeline in the GPass attachments.
     pub stencil_id: u8,
     device: Rc<ash::Device>,
 }
 
 impl LightingPipeline {
+    /// Creates a new [`LightingPipeline`].
+    /// 
+    /// # Parameters
+    /// - `point_shader`, `directional_shader`, `ambient_shader`: names of the shaders to be used for rendering
+    ///   point lights, directional lights and ambient light respectively. All three are optional.
+    /// - `pipe_layout_resolve`: The [`vk::PipelineLayout`] of the deferred resolve SubPass.
+    /// - `renderpass`: The [`vk::RenderPass`] that describes the deferred RenderPass. SubPass 1 will be used for the [`LightingPipeline`].
+    /// - `stencil_id`: The stencil value used to identify this [`LightingPipeline`]. This value has to be unique among all [`LightingPipelines`](LightingPipeline).
     pub fn new(
         point_shader: Option<&str>,
         directional_shader: Option<&str>,
@@ -48,8 +64,16 @@ impl LightingPipeline {
             .build();
 
         let point_pipeline = if let Some(point_shader) = point_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 point_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -59,14 +83,32 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
-            )?)
+                vertex_shader,
+                fragment_shader,
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };
 
         let directional_pipeline = if let Some(directional_shader) = directional_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 directional_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -76,14 +118,32 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
-            )?)
+                vertex_shader,
+                fragment_shader,
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };
 
         let ambient_pipeline = if let Some(ambient_shader) = ambient_shader {
-            Some(pipeline::create_pipeline(
+            let mut vertexshader_code = Vec::new();
+            let mut fragmentshader_code = Vec::new();
+            let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
                 ambient_shader,
+                &device,
+                &mut vertexshader_code,
+                &mut fragmentshader_code,
+            )?;
+
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -93,7 +153,17 @@ impl LightingPipeline {
                 false,
                 Some(stencil_func),
                 &device,
-            )?)
+                vertex_shader,
+                fragment_shader,
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };

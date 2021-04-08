@@ -3,6 +3,7 @@ use std::{mem::size_of, rc::Rc};
 use ash::vk;
 use ve_format::mesh::{Face, MeshData, Vertex};
 
+use crate::vulkan::uploader::Uploader;
 pub struct Mesh {
     allocator: Rc<vk_mem::Allocator>,
     pub vertex_buffer: vk::Buffer,
@@ -25,15 +26,16 @@ impl Mesh {
     pub fn bake(
         mesh_data: MeshData,
         allocator: Rc<vk_mem::Allocator>,
+        uploader: &mut Uploader,
     ) -> Result<Rc<Mesh>, vk_mem::Error> {
         let vertex_buffer_size = mesh_data.vertices.len() * size_of::<Vertex>();
         let vertex_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .size(vertex_buffer_size as u64)
-            .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
+            .usage(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST)
             .build();
         let vertex_buffer_alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::CpuToGpu,
+            usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()
         };
         let (vertex_buffer, vertex_buffer_alloc, _) =
@@ -45,32 +47,23 @@ impl Mesh {
         }
         let index_buffer_info = vk::BufferCreateInfo::builder()
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .size(index_buffer_size as u64)
-            .usage(vk::BufferUsageFlags::INDEX_BUFFER)
+            .size(index_buffer_size)
+            .usage(vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST)
             .build();
         let index_buffer_alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::CpuToGpu,
+            usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()
         };
         let (index_buffer, index_buffer_alloc, _) =
             allocator.create_buffer(&index_buffer_info, &index_buffer_alloc_info)?;
 
-        let map = allocator.map_memory(&vertex_buffer_alloc)? as *mut Vertex;
-        unsafe {
-            map.copy_from_nonoverlapping(mesh_data.vertices.as_ptr(), mesh_data.vertices.len());
-        }
-        allocator.unmap_memory(&vertex_buffer_alloc);
+        uploader.enqueue_buffer_upload(vertex_buffer, 0, &mesh_data.vertices);
 
-        let map = allocator.map_memory(&index_buffer_alloc)? as *mut Face;
-        let mut offset = 0usize;
+        let mut offset = 0u64;
         for sm in &mesh_data.submeshes {
-            unsafe {
-                map.add(offset)
-                    .copy_from_nonoverlapping(sm.faces.as_ptr(), sm.faces.len())
-            };
-            offset += sm.faces.len();
+            uploader.enqueue_buffer_upload(index_buffer, offset, &sm.faces);
+            offset += (sm.faces.len() * size_of::<Face>()) as u64;
         }
-        allocator.unmap_memory(&index_buffer_alloc);
 
         let mut submeshes = Vec::with_capacity(mesh_data.submeshes.len());
         let mut start_index = 0u32;

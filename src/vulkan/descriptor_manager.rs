@@ -6,9 +6,12 @@ use std::{
 
 use ash::{version::DeviceV1_0, vk};
 
+/// This enum holds the necessary state for a single DescriptorSet binding.
+/// For usage, see [`DescriptorManager`]
 #[allow(dead_code)]
 #[derive(Hash, Copy, Clone, PartialEq, Eq)]
 pub enum DescriptorData {
+    None,
     UniformBuffer {
         buffer: vk::Buffer,
         offset: vk::DeviceSize,
@@ -35,6 +38,8 @@ pub enum DescriptorData {
     },
 }
 
+/// This struct holds the necessary data for a complete DescriptorSet.
+/// For usage, see [`DescriptorManager`]
 struct DescriptorSetData {
     data_hash: u64,
     frame_index: u16,
@@ -43,7 +48,12 @@ struct DescriptorSetData {
 
 /// This class automatically creates, caches and updates descriptor sets
 /// The descriptor caching mechanism is losely inspired by the system the Granite Engine uses
-/// (http://themaister.net/blog/2019/04/20/a-tour-of-granites-vulkan-backend-part-3/).
+/// (<http://themaister.net/blog/2019/04/20/a-tour-of-granites-vulkan-backend-part-3/>).
+/// 
+/// # Generic Parameters
+/// - `HISTORY_SIZE`: The number of frames a DescriptorSet has to be unused for
+/// before it is destroyed. This value has to be greater or equal to the maximum number
+/// of frames in flight.
 pub struct DescriptorManager<const HISTORY_SIZE: usize> {
     device: ash::Device,
     pool: vk::DescriptorPool,
@@ -53,6 +63,7 @@ pub struct DescriptorManager<const HISTORY_SIZE: usize> {
 }
 
 impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
+    /// Creates a new [`DescriptorManager`]
     pub fn new(device: ash::Device) -> Result<DescriptorManager<HISTORY_SIZE>, vk::Result> {
         let pool_sizes = [
             vk::DescriptorPoolSize::builder()
@@ -91,6 +102,9 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         })
     }
 
+    /// Advances the [`DescriptorManager`] to the next frame.
+    /// 
+    /// This frees unused DescriptorSets and should be called every frame.
     pub fn next_frame(&mut self) {
         self.frame_index = (self.frame_index + 1) % HISTORY_SIZE as u16;
 
@@ -120,6 +134,10 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         set.frame_index = frame_index;
     }
 
+    /// Creates or recycles a DescriptorSet with the given layout and contents.
+    /// 
+    /// The data in `bindings` is interpreted as a packed array of DescriptorSet bindings,
+    /// meaning entry `n` is expected to be DescriptorSet binding `n`.
     pub fn get_descriptor_set(
         &mut self,
         layout: vk::DescriptorSetLayout,
@@ -150,6 +168,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         let mut set_writes = Vec::with_capacity(bindings.len());
         for (index, b) in bindings.iter().enumerate() {
             match b {
+                DescriptorData::None => continue,
                 DescriptorData::UniformBuffer {
                     buffer,
                     offset,
@@ -270,6 +289,9 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         Ok(new_set)
     }
 
+    /// Deinitializes a [`DescriptorManager`].
+    /// 
+    /// Simply dropping the [`DescriptorManager`] will also call this method automatically.
     pub fn destroy(&mut self) {
         if self.pool != vk::DescriptorPool::null() {
             unsafe {

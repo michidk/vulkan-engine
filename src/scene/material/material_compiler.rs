@@ -1,37 +1,30 @@
 use ash::{version::DeviceV1_0, vk};
 
-use super::{MaterialData, MaterialDataLayout};
 use crate::vulkan::descriptor_manager::DescriptorData;
 
 pub fn compile_descriptor_set_layout(
     device: &ash::Device,
-    layout: &MaterialDataLayout,
+    resources: &[DescriptorData],
 ) -> Result<vk::DescriptorSetLayout, vk::Result> {
-    let mut bindings = Vec::with_capacity(layout.bindings.len());
-    for (i, b) in layout.bindings.iter().enumerate() {
-        let stage;
-        match &b.binding_stage {
-            super::MaterialDataBindingStage::Vertex => {
-                stage = vk::ShaderStageFlags::VERTEX;
+    let mut bindings = Vec::with_capacity(resources.len());
+    for (i, r) in resources.iter().enumerate() {
+        let vk_type = match r {
+            DescriptorData::None => continue,
+            DescriptorData::UniformBuffer { .. } => vk::DescriptorType::UNIFORM_BUFFER,
+            DescriptorData::DynamicUniformBuffer { .. } => {
+                vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC
             }
-            super::MaterialDataBindingStage::Fragment => {
-                stage = vk::ShaderStageFlags::FRAGMENT;
-            }
-        }
-
-        let vk_type;
-        match &b.binding_type {
-            super::MaterialDataBindingType::Uniform => {
-                vk_type = vk::DescriptorType::UNIFORM_BUFFER;
-            }
-        }
+            DescriptorData::ImageSampler { .. } => vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            DescriptorData::StorageBuffer { .. } => vk::DescriptorType::STORAGE_BUFFER,
+            DescriptorData::InputAttachment { .. } => vk::DescriptorType::INPUT_ATTACHMENT,
+        };
 
         bindings.push(
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(i as u32)
                 .descriptor_count(1)
                 .descriptor_type(vk_type)
-                .stage_flags(stage)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .build(),
         );
     }
@@ -61,21 +54,23 @@ pub fn compile_pipeline_layout(
     unsafe { device.create_pipeline_layout(&layout_info, None) }
 }
 
-pub fn compile_resources<T: MaterialData>(
-    resources: &T,
+pub fn compile_resources(
+    data: &[DescriptorData],
     allocator: &vk_mem::Allocator,
 ) -> Result<(Vec<DescriptorData>, Vec<vk_mem::Allocation>), vk_mem::Error> {
-    let helpers = resources.get_material_resource_helpers();
+    let mut resources = Vec::with_capacity(data.len());
+    let mut allocations = Vec::with_capacity(data.len());
 
-    let mut resources = Vec::with_capacity(helpers.len());
-    let mut allocations = Vec::with_capacity(helpers.len());
-
-    for res in helpers {
+    for res in data {
         match res {
-            super::MaterialResourceHelper::UniformBuffer(data) => {
+            DescriptorData::UniformBuffer {
+                buffer: _,
+                offset: _,
+                size,
+            } => {
                 let buffer_info = vk::BufferCreateInfo::builder()
                     .usage(vk::BufferUsageFlags::UNIFORM_BUFFER)
-                    .size(data.len() as u64)
+                    .size(*size)
                     .sharing_mode(vk::SharingMode::EXCLUSIVE)
                     .build();
                 let alloc_info = vk_mem::AllocationCreateInfo {
@@ -84,19 +79,21 @@ pub fn compile_resources<T: MaterialData>(
                 };
                 let (buffer, alloc, _) = allocator.create_buffer(&buffer_info, &alloc_info)?;
 
-                let map = allocator.map_memory(&alloc)?;
-                unsafe {
-                    map.copy_from_nonoverlapping(data.as_ptr(), data.len());
-                }
-                allocator.unmap_memory(&alloc);
-
                 allocations.push(alloc);
                 resources.push(DescriptorData::UniformBuffer {
                     buffer,
                     offset: 0,
-                    size: data.len() as u64,
+                    size: *size,
                 });
             }
+            DescriptorData::ImageSampler { .. } => {
+                resources.push(DescriptorData::ImageSampler {
+                    image: vk::ImageView::null(),
+                    layout: vk::ImageLayout::UNDEFINED,
+                    sampler: vk::Sampler::null(),
+                });
+            }
+            _ => continue,
         }
     }
 

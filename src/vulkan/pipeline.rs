@@ -2,9 +2,37 @@ use ash::{version::DeviceV1_0, vk};
 
 use crate::assets::shader;
 
+/// Loads a vertex and fragment shader from the filesystem and creates a [`vk::ShaderModule`] for each.
+pub fn create_shader_modules(
+    shader: &str,
+    device: &ash::Device,
+    out_spv_vert: &mut Vec<u32>,
+    out_spv_frag: &mut Vec<u32>,
+) -> Result<(vk::ShaderModule, vk::ShaderModule), vk::Result> {
+    let vertexshader_createinfo = shader::load(shader, shader::ShaderKind::Vertex, out_spv_vert);
+    let vertexshader_module =
+        unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
+
+    let fragmentshader_createinfo =
+        shader::load(shader, shader::ShaderKind::Fragment, out_spv_frag);
+    let fragmentshader_module =
+        unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
+
+    Ok((vertexshader_module, fragmentshader_module))
+}
+
+/// Creates a [`vk::Pipeline`] with the given options.
+/// 
+/// Used to reduce code duplication.
+/// 
+/// # Parameters
+/// - `uses_vertex_attribs`: set to true if the Pipeline expects vertex data to be passed into the vertex shader, false is useful for PP Effects.
+/// - `attachment_count`: the number of color attachments the pipeline expects.
+/// - `blend_func`: a single [`vk::PipelineColorBlendAttachmentState`] to be used for every color attachment.
+/// - `depth_test`: true if the Pipeline should have depth testing and writing enabled, false otherwise.
+/// - `stencil_func`: an optional [`vk::StencilOpState`] to be used for stencil testing.
 #[allow(clippy::too_many_arguments)]
 pub fn create_pipeline(
-    shader: &str,
     layout: vk::PipelineLayout,
     renderpass: vk::RenderPass,
     subpass: u32,
@@ -14,20 +42,10 @@ pub fn create_pipeline(
     depth_test: bool,
     stencil_func: Option<vk::StencilOpState>,
     device: &ash::Device,
+    vertexshader_module: vk::ShaderModule,
+    fragmentshader_module: vk::ShaderModule,
+    wireframe: bool,
 ) -> Result<vk::Pipeline, vk::Result> {
-    let (mut vertexshader_code, mut fragmentshader_code) = (Vec::new(), Vec::new());
-    let vertexshader_createinfo =
-        shader::load(shader, shader::ShaderKind::Vertex, &mut vertexshader_code);
-    let vertexshader_module =
-        unsafe { device.create_shader_module(&vertexshader_createinfo, None)? };
-    let fragmentshader_createinfo = shader::load(
-        shader,
-        shader::ShaderKind::Fragment,
-        &mut fragmentshader_code,
-    );
-    let fragmentshader_module =
-        unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
-
     let mainfunctionname = std::ffi::CString::new("main").unwrap();
 
     let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
@@ -107,8 +125,8 @@ pub fn create_pipeline(
     let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
         .line_width(1.0)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-        .cull_mode(vk::CullModeFlags::BACK)
-        .polygon_mode(vk::PolygonMode::FILL);
+        .cull_mode(if wireframe { vk::CullModeFlags::NONE } else { vk::CullModeFlags::BACK })
+        .polygon_mode(if wireframe { vk::PolygonMode::LINE } else { vk::PolygonMode::FILL });
     let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
         .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 
@@ -123,6 +141,9 @@ pub fn create_pipeline(
         .stencil_test_enable(stencil_func.is_some());
     if let Some(stencil_func) = stencil_func {
         depth_stencil_info = depth_stencil_info.front(stencil_func);
+        if wireframe {
+            depth_stencil_info = depth_stencil_info.back(stencil_func);
+        }
     }
     let depth_stencil_info = depth_stencil_info.build();
 
@@ -149,9 +170,5 @@ pub fn create_pipeline(
             .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
             .expect("A problem with the pipeline creation")
     }[0];
-    unsafe {
-        device.destroy_shader_module(fragmentshader_module, None);
-        device.destroy_shader_module(vertexshader_module, None);
-    }
     Ok(graphicspipeline)
 }

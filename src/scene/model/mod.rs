@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use self::mesh::Mesh;
 
-use super::{material::MaterialInterface, transform::Transform};
+use super::{material::Material, transform::Transform};
 
 pub mod mesh;
 
 pub struct Model {
-    pub material: Rc<dyn MaterialInterface>,
+    pub material: Rc<Material>,
     pub mesh: Rc<Mesh>,
     pub transform: Transform,
 }

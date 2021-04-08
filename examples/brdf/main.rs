@@ -17,22 +17,9 @@ use vulkan_engine::{
     },
 };
 use vulkan_engine::{
-    scene::{material::*, model::mesh::Mesh},
+    scene::model::mesh::Mesh,
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
-
-#[repr(C)]
-#[derive(MaterialBindingFragment)]
-struct BrdfColorData {
-    albedo: Vec4<f32>,
-    metallic: f32,
-    roughness: f32,
-}
-
-#[derive(MaterialData)]
-struct BrdfMaterialData {
-    color_data: BrdfColorData,
-}
 
 fn main() {
     // setting up logger
@@ -103,7 +90,7 @@ fn setup(engine: &mut Engine) {
         .vulkan_manager
         .register_lighting_pipeline(brdf_lighting.clone());
 
-    let brdf_pipeline = MaterialPipeline::<BrdfMaterialData>::new(
+    let brdf_pipeline = MaterialPipeline::new(
         engine.vulkan_manager.device.clone(),
         (*engine.vulkan_manager.allocator).clone(),
         "material_solid_color",
@@ -119,21 +106,20 @@ fn setup(engine: &mut Engine) {
     let mesh_sphere_smooth = Mesh::bake(
         mesh_data_sphere_smooth,
         (*engine.vulkan_manager.allocator).clone(),
+        &mut engine.vulkan_manager.uploader,
     )
     .unwrap();
 
     // setup models
     for x in 0..11 {
         for y in 0..11 {
-            let material = brdf_pipeline
-                .create_material(BrdfMaterialData {
-                    color_data: BrdfColorData {
-                        albedo: Vec4::new(0.5, 0.5, 0.5, 0.0),
-                        metallic: (x as f32) * 0.1,
-                        roughness: (y as f32) * 0.1,
-                    },
-                })
+            let material = brdf_pipeline.create_material().unwrap();
+
+            material
+                .set_vec4("albedo", Vec4::new(0.5, 0.5, 0.5, 0.0))
                 .unwrap();
+            material.set_float("metallic", (x as f32) * 0.1).unwrap();
+            material.set_float("roughness", (y as f32) * 0.1).unwrap();
 
             let model = Model {
                 material,

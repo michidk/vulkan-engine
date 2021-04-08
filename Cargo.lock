@@ -1207,7 +1207,7 @@ dependencies = [
 [[package]]
 name = "spirv_cross"
 version = "0.23.1"
-source = "git+https://github.com/Rob2309/spirv_cross?branch=expose-image-type#62b6fe80fddc961abba6d9a410c0133710e0bacb"
+source = "git+https://github.com/grovesNL/spirv_cross?rev=98d39abb762d50adb11ba9253569a74fff0ae3c6#98d39abb762d50adb11ba9253569a74fff0ae3c6"
 dependencies = [
  "cc",
  "js-sys",

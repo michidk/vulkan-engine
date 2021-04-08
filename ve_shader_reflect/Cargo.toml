@@ -7,4 +7,4 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-spirv_cross = { git="https://github.com/Rob2309/spirv_cross", branch="expose-image-type", features=["glsl"] }
+spirv_cross = { git="https://github.com/grovesNL/spirv_cross", rev="98d39abb762d50adb11ba9253569a74fff0ae3c6", features=["glsl"] }

@@ -24,6 +24,7 @@ pub fn test_gpass_simple() {
                     data: SetBindingData::UniformBuffer {
                         layout: BlockLayout {
                             block_name: String::from("FrameData"),
+                            total_size: 256,
                             members: vec![
                                 BlockMember {
                                     kind: BlockMemberType::FloatMatrix(4),
@@ -76,6 +77,7 @@ pub fn test_gpass_simple() {
                         data: SetBindingData::UniformBuffer {
                             layout: BlockLayout {
                                 block_name: String::from("MaterialData"),
+                                total_size: 28,
                                 members: vec![
                                     BlockMember {
                                         kind: BlockMemberType::Float,

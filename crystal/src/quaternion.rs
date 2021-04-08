@@ -264,15 +264,6 @@ where
         res.into()
     }
 }
-//
-//impl Mul<&Vec3<f32>> for Quaternion {
-//    type Output = Vec3<f32>;
-//
-//    fn mul(self, rhs: &Vec3<f32>) -> Vec3<f32> {
-//        let res = self * Quaternion::new(*rhs.x(), *rhs.y(), *rhs.z(), 0.0) * self.conjugated();
-//        Vec3::new(res.x, res.y, res.z)
-//    }
-//}
 
 impl<T> Normed for Quaternion<T>
 where

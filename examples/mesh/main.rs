@@ -4,10 +4,12 @@ use std::{path::Path, process::exit};
 use crystal::prelude::*;
 use log::error;
 use vulkan_engine::{
-    core::window::{self, Dimensions},
-    engine::{self, Engine, EngineInit},
-    scene::{
+    core::{
         camera::Camera,
+        engine::{self, Engine, EngineInit},
+        window::{self, Dimensions},
+    },
+    scene::{
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -24,8 +26,8 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // initialize engine
-    let engine_info = engine::Info {
-        window_info: window::Info {
+    let engine_info = engine::EngineInfo {
+        window_info: window::InitialWindowInfo {
             initial_dimensions: Dimensions {
                 width: 1920,
                 height: 1080,
@@ -35,8 +37,18 @@ fn main() {
         app_name: "Vulkan Mesh Example",
     };
 
+    // setup camera
+    let camera = Camera::builder()
+        //.fovy(30.0.deg())
+        .position(Vec3::new(0.0, 0.0, -5.0))
+        .aspect(
+            engine_info.window_info.initial_dimensions.width as f32
+                / engine_info.window_info.initial_dimensions.height as f32,
+        )
+        .build();
+
     // setup engine
-    let engine_init = EngineInit::new(engine_info);
+    let engine_init = EngineInit::new(engine_info, camera);
 
     // start engine
     match engine_init {
@@ -94,7 +106,7 @@ fn setup(engine: &mut Engine) {
     brdf_material0.set_float("metallic", 0.0).unwrap();
     brdf_material0.set_float("roughness", 0.1).unwrap();
 
-    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/sphere.vem"))
+    let mesh_data = ve_format::mesh::MeshData::from_file(Path::new("./assets/models/cube.vem"))
         .expect("Model cube.vem not found!");
 
     let mesh = Mesh::bake(
@@ -111,7 +123,7 @@ fn setup(engine: &mut Engine) {
             position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::from_axis_angle(
                 Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-                Angle::from_deg(180.0),
+                Angle::from_deg(0.0),
             ),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
@@ -149,20 +161,4 @@ fn setup(engine: &mut Engine) {
         position: Vec4::new(0.0, 0.0, -3.0, 0.0),
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
     });
-
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine.info.window_info.initial_dimensions.width as f32
-                / engine.info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
-    camera.update_buffer(
-        &engine.vulkan_manager.allocator,
-        &mut engine.vulkan_manager.uniform_buffer,
-        0,
-    );
 }

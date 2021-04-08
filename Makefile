@@ -1,4 +1,4 @@
-.PHONY: run build build-release shaders build-release-windows build-release-linux check test clippy clippy-hack fmt lint cic cicl prepare-release-windows prepare-release-linux clean
+.PHONY: run build build-release shaders build-release-windows build-release-linux check test clippy clippy-hack fmt lint cic cicl prepare-release-windows prepare-release-linux clean install
 
 # run and compile
 run:
@@ -61,3 +61,7 @@ prepare-release-linux:
 
 clean:
 	cargo clean
+
+# installs binaries
+install:
+	cargo install --path ./ve_asset

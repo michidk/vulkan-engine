@@ -14,7 +14,7 @@ Then build with `cargo build`.
 
 Get an overview of the parameters with `ve_asset -h`.
 
-For example, `ve_asset "./import/*" -o ./output` compiles all assets in the `/import` folder and outputs the artifacts to the `/output` folder.
+For example, `ve_asset "./import/" -o ./output` compiles all assets in the `/import` folder and outputs the artifacts to the `/output` folder.
 
 ## Files
 

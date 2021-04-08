@@ -54,7 +54,13 @@ impl PPEffect {
             &device,
             vertex_shader,
             fragment_shader,
+            false
         )?;
+
+        unsafe {
+            device.destroy_shader_module(vertex_shader, None);
+            device.destroy_shader_module(fragment_shader, None);
+        }
 
         Ok(Rc::new(Self { pipeline, device }))
     }

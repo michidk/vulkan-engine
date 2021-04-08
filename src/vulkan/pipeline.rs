@@ -44,6 +44,7 @@ pub fn create_pipeline(
     device: &ash::Device,
     vertexshader_module: vk::ShaderModule,
     fragmentshader_module: vk::ShaderModule,
+    wireframe: bool,
 ) -> Result<vk::Pipeline, vk::Result> {
     let mainfunctionname = std::ffi::CString::new("main").unwrap();
 
@@ -124,8 +125,8 @@ pub fn create_pipeline(
     let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
         .line_width(1.0)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-        .cull_mode(vk::CullModeFlags::BACK)
-        .polygon_mode(vk::PolygonMode::FILL);
+        .cull_mode(if wireframe { vk::CullModeFlags::NONE } else { vk::CullModeFlags::BACK })
+        .polygon_mode(if wireframe { vk::PolygonMode::LINE } else { vk::PolygonMode::FILL });
     let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
         .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 
@@ -140,6 +141,9 @@ pub fn create_pipeline(
         .stencil_test_enable(stencil_func.is_some());
     if let Some(stencil_func) = stencil_func {
         depth_stencil_info = depth_stencil_info.front(stencil_func);
+        if wireframe {
+            depth_stencil_info = depth_stencil_info.back(stencil_func);
+        }
     }
     let depth_stencil_info = depth_stencil_info.build();
 
@@ -166,9 +170,5 @@ pub fn create_pipeline(
             .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
             .expect("A problem with the pipeline creation")
     }[0];
-    unsafe {
-        device.destroy_shader_module(fragmentshader_module, None);
-        device.destroy_shader_module(vertexshader_module, None);
-    }
     Ok(graphicspipeline)
 }

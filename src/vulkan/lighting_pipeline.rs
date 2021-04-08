@@ -73,7 +73,7 @@ impl LightingPipeline {
                 &mut fragmentshader_code,
             )?;
 
-            Some(pipeline::create_pipeline(
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -85,7 +85,15 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-            )?)
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };
@@ -100,7 +108,7 @@ impl LightingPipeline {
                 &mut fragmentshader_code,
             )?;
 
-            Some(pipeline::create_pipeline(
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -112,7 +120,15 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-            )?)
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };
@@ -127,7 +143,7 @@ impl LightingPipeline {
                 &mut fragmentshader_code,
             )?;
 
-            Some(pipeline::create_pipeline(
+            let pipeline = pipeline::create_pipeline(
                 pipe_layout_resolve,
                 renderpass,
                 1,
@@ -139,7 +155,15 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-            )?)
+                false
+            )?;
+
+            unsafe {
+                device.destroy_shader_module(vertex_shader, None);
+                device.destroy_shader_module(fragment_shader, None);
+            }
+
+            Some(pipeline)
         } else {
             None
         };

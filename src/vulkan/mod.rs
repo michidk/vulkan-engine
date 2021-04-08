@@ -79,6 +79,7 @@ pub struct VulkanManager {
     pub renderpass_pp: vk::RenderPass,
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
+    pub enable_wireframe: bool,
 }
 
 impl VulkanManager {
@@ -325,6 +326,7 @@ impl VulkanManager {
             renderpass_pp,
             pp_effects: Vec::new(),
             uploader: std::mem::ManuallyDrop::new(uploader),
+            enable_wireframe: false,
         })
     }
 
@@ -567,11 +569,17 @@ impl VulkanManager {
         let mut last_mesh: *const Mesh = null();
         for obj in models {
             unsafe {
-                if last_pipeline != obj.material.get_pipeline() {
+                let pipeline = if self.enable_wireframe {
+                    obj.material.get_wireframe_pipeline()
+                } else {
+                    obj.material.get_pipeline()
+                };
+
+                if last_pipeline != pipeline {
                     self.device.cmd_bind_pipeline(
                         commandbuffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        obj.material.get_pipeline(),
+                        pipeline
                     );
                     self.set_viewport(
                         commandbuffer,

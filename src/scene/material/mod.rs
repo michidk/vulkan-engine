@@ -58,6 +58,7 @@ pub struct MaterialPipeline {
     device: Rc<ash::Device>,
     allocator: Rc<vk_mem::Allocator>,
     pipeline: vk::Pipeline,
+    pipeline_wireframe: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     properties: HashMap<String, MaterialProperty>,
@@ -209,12 +210,33 @@ impl MaterialPipeline {
             &device,
             vertex_shader,
             fragment_shader,
+            false
         )?;
+        let pipeline_wireframe = pipeline::create_pipeline(
+            pipeline_layout,
+            renderpass,
+            0,
+            true,
+            2,
+            blend_func,
+            true,
+            Some(stencil_func),
+            &device,
+            vertex_shader,
+            fragment_shader,
+            true
+        )?;
+
+        unsafe {
+            device.destroy_shader_module(vertex_shader, None);
+            device.destroy_shader_module(fragment_shader, None);
+        }
 
         Ok(Rc::new(MaterialPipeline {
             device,
             allocator,
             pipeline,
+            pipeline_wireframe,
             pipeline_layout,
             descriptor_set_layout,
             properties,
@@ -240,6 +262,7 @@ impl Drop for MaterialPipeline {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline(self.pipeline_wireframe, None);
             self.device
                 .destroy_pipeline_layout(self.pipeline_layout, None);
             self.device
@@ -416,6 +439,10 @@ impl Material {
     /// Returns the vk::Pipeline that has to be used with this Material
     pub fn get_pipeline(&self) -> vk::Pipeline {
         self.pipeline.pipeline
+    }
+
+    pub fn get_wireframe_pipeline(&self) -> vk::Pipeline {
+        self.pipeline.pipeline_wireframe
     }
 
     /// Returns the vk::DescriptorSetLayout of set #1 of this Material's Pipeline.

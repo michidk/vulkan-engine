@@ -7,12 +7,11 @@ use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::{
         camera::Camera,
-        material::MaterialPipeline,
         engine::{self, Engine, EngineInit},
         window::{self, Dimensions},
     },
     scene::{
-        material::{MaterialData, MaterialPipeline},
+        material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
     },

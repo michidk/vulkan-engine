@@ -34,6 +34,7 @@ impl Texture2D {
     /// # Parameters
     /// - `pixels`: A `width` * `height` * 4 slice of u8. A group of 4 bytes is a single pixel.
     ///   The slice must be in row major memory order and tightly packed.
+    ///   The row with UV (xx, 0.0) is the first one in the buffer.
     pub fn new(
         width: u32,
         height: u32,

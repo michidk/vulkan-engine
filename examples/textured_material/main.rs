@@ -87,7 +87,10 @@ fn setup(engine: &mut Engine) {
     .unwrap();
 
     let pixels = [
-        255u8, 0, 255, 255, 255u8, 255, 255, 255, 255u8, 255, 255, 255, 255u8, 0, 255, 255,
+        255u8, 0, 0, 255, 
+        0, 255, 0, 255, 
+        0, 0, 255, 255, 
+        255, 0, 255, 255,
     ];
     let albedo_tex = Texture2D::new(
         2,
@@ -112,19 +115,19 @@ fn setup(engine: &mut Engine) {
                 position: Vec3::new(-1.0, -1.0, 0.0),
                 color: Vec3::new(1.0, 0.0, 0.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.0, 0.0),
+                uv: Vec2::new(0.0, 1.0),
             },
             Vertex {
                 position: Vec3::new(1.0, -1.0, 0.0),
                 color: Vec3::new(0.0, 1.0, 0.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(1.0, 0.0),
+                uv: Vec2::new(1.0, 1.0),
             },
             Vertex {
                 position: Vec3::new(0.0, 1.0, 0.0),
                 color: Vec3::new(0.0, 0.0, 1.0),
                 normal: Vec3::new(0.0, 0.0, -1.0),
-                uv: Vec2::new(0.5, 1.0),
+                uv: Vec2::new(0.5, 0.0),
             },
         ],
         submeshes: vec![Submesh {

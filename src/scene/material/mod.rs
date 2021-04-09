@@ -286,9 +286,9 @@ impl Material {
     /// For naming scheme, see [`MaterialPipeline`]
     /// 
     /// # Errors
-    /// - [`MaterialError::InvalidProperty`] when no property with name `name` exists
-    /// - [`MaterialError::IncompatiblePropertyType`] when property `name` does not have type `float`
-    /// - [`MaterialError::VkMemError`]
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `float`
+    /// - [`GraphicsError::VkMem`]
     pub fn set_float(&self, name: &str, val: f32) -> GraphicsResult<()> {
         let prop = self
             .pipeline
@@ -315,9 +315,9 @@ impl Material {
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
-    /// - [`MaterialError::InvalidProperty`] when no property with name `name` exists
-    /// - [`MaterialError::IncompatiblePropertyType`] when property `name` does not have type `vec2`
-    /// - [`MaterialError::VkMemError`]
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec2`
+    /// - [`GraphicsError::VkMem`]
     pub fn set_vec2(&self, name: &str, val: Vec2<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
@@ -344,9 +344,9 @@ impl Material {
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
-    /// - [`MaterialError::InvalidProperty`] when no property with name `name` exists
-    /// - [`MaterialError::IncompatiblePropertyType`] when property `name` does not have type `vec3`
-    /// - [`MaterialError::VkMemError`]
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec3`
+    /// - [`GraphicsError::VkMem`]
     pub fn set_vec3(&self, name: &str, val: Vec3<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
@@ -373,9 +373,9 @@ impl Material {
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
-    /// - [`MaterialError::InvalidProperty`] when no property with name `name` exists
-    /// - [`MaterialError::IncompatiblePropertyType`] when property `name` does not have type `vec4`
-    /// - [`MaterialError::VkMemError`]
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec4`
+    /// - [`GraphicsError::VkMem`]
     pub fn set_vec4(&self, name: &str, val: Vec4<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
@@ -402,8 +402,8 @@ impl Material {
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
-    /// - [`MaterialError::InvalidProperty`] when no property with name `name` exists
-    /// - [`MaterialError::IncompatiblePropertyType`] when property `name` does not have type `sampler2D`
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `sampler2D`
     pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> GraphicsResult<()> {
         let prop = self
             .pipeline

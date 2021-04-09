@@ -32,17 +32,7 @@ use crate::{
     },
 };
 
-use self::{
-    buffer::{PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
-    descriptor_manager::{DescriptorData, DescriptorManager},
-    lighting_pipeline::LightingPipeline,
-    pp_effect::PPEffect,
-    queue::{PoolsWrapper, QueueFamilies, Queues},
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-    uploader::Uploader,
-};
+use self::{buffer::{PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, error::GraphicsResult, lighting_pipeline::LightingPipeline, pp_effect::PPEffect, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper, uploader::Uploader};
 
 pub struct VulkanManager {
     #[allow(dead_code)]
@@ -87,7 +77,7 @@ impl VulkanManager {
         engine_info: EngineInfo,
         window: &winit::window::Window,
         max_frames_in_flight: u8,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> GraphicsResult<Self> {
         let entry = ash::Entry::new()?;
 
         let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;

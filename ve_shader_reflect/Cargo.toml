@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 spirv_cross = { git="https://github.com/grovesNL/spirv_cross", rev="98d39abb762d50adb11ba9253569a74fff0ae3c6", features=["glsl"] }
+thiserror = "1.0.23"

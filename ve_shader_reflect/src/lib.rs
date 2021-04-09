@@ -2,8 +2,17 @@ use spirv_cross::{
     glsl,
     spirv::{Ast, Decoration, Module, Resource, Type},
 };
+use thiserror::Error;
 
-pub type Error = spirv_cross::ErrorCode;
+#[derive(Error, Debug, Clone)]
+pub enum Error {
+    #[error("Reflection error: {0}")]
+    ReflectError(#[from] spirv_cross::ErrorCode),
+    #[error("Incompatible shader property names: {0} and {1}")]
+    IncompatiblePropertyNames(String, String),
+    #[error("Incompatible shader properties: {0} and {1}")]
+    IncompatibleProperties(String, String),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockMemberType {
@@ -245,7 +254,7 @@ pub fn merge(
     a: ShaderInfo,
     b: &ShaderInfo,
     names_must_match: bool,
-) -> std::result::Result<ShaderInfo, String> {
+) -> Result<ShaderInfo> {
     let mut res = a;
 
     for binding in &b.set_bindings {
@@ -257,10 +266,10 @@ pub fn merge(
 
             if names_must_match {
                 if a_binding != binding {
-                    return Err(String::from("Incompatible shaders"));
+                    return Err(Error::IncompatiblePropertyNames(binding.var_name.clone(), a_binding.var_name.clone()));
                 }
             } else if !a_binding.equal_ignore_names(binding) {
-                return Err(String::from("Incompatible shaders"));
+                return Err(Error::IncompatibleProperties(binding.var_name.clone(), a_binding.var_name.clone()));
             }
 
             found = true;

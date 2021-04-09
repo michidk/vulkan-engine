@@ -1357,6 +1357,7 @@ name = "ve-shader-reflect"
 version = "0.1.0"
 dependencies = [
  "spirv_cross",
+ "thiserror",
 ]
 
 [[package]]

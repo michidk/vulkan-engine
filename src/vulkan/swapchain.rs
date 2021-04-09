@@ -1,6 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
 
-use super::{error::VulkanError, queue, surface};
+use super::{GraphicsResult, queue, surface};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -39,7 +39,7 @@ impl SwapchainWrapper {
         surface: &surface::SurfaceWrapper,
         #[allow(unused_variables)] queue_families: &queue::QueueFamilies,
         allocator: &vk_mem::Allocator,
-    ) -> Result<SwapchainWrapper, VulkanError> {
+    ) -> GraphicsResult<SwapchainWrapper> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent; // TODO: handle 0xFFFF x 0xFFFF extent
         let surface_format = surface.choose_format(physical_device)?;

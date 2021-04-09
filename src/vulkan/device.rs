@@ -2,20 +2,18 @@ use std::collections::BTreeMap;
 
 use ash::{version::InstanceV1_0, vk};
 
-use super::error::VulkanError;
+use super::error::{GraphicsError, GraphicsResult};
 
 const VULKAN_VERSION: (u32, u32) = (1, 2);
 
 pub fn select_physical_device(
     instance: &ash::Instance,
-) -> Result<
-    (
+) -> GraphicsResult<(
         vk::PhysicalDevice,
         vk::PhysicalDeviceProperties,
         vk::PhysicalDeviceFeatures,
-    ),
-    VulkanError,
-> {
+    )>
+{
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
     let mut candidates: BTreeMap<
         u32,
@@ -67,7 +65,7 @@ pub fn select_physical_device(
     }
 
     if candidates.is_empty() {
-        return Err(VulkanError::NoSuitableGpu);
+        return Err(GraphicsError::NoSuitableGpu);
     }
 
     Ok(candidates.pop_last().unwrap().1) // use physical device with the highest score

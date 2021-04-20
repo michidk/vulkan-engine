@@ -17,16 +17,16 @@ enum MaterialProperty {
 }
 
 /// A MaterialPipeline represents a GPass shader and its corresponding material properties.
-/// 
+///
 /// Each MaterialPipeline can be used to create multiple [`Materials`](Material).
-/// 
+///
 /// # MaterialProperties
-/// Material properties are directly reflected from the shaders SPIRV code, 
+/// Material properties are directly reflected from the shaders SPIRV code,
 /// meaning Debug information has to be enabled when compiling the GLSL files.
-/// 
+///
 /// Standalone properties are named after their variable name, e.g.
 /// `uniform sampler2D u_AlbedoTex` will be named "u_AlbedoTex".
-/// 
+///
 /// Properties inside uniform blocks are named after their inner names (i.e. the name of the surrounding block is ignored).
 /// ```glsl
 /// uniform MaterialData {
@@ -48,9 +48,9 @@ pub struct MaterialPipeline {
 
 impl MaterialPipeline {
     /// Create a new MaterialPipeline from a given shader and [`LightingPipeline`].
-    /// 
+    ///
     /// This function creates a new MaterialPipeline by loading the shader with the given name and reflecting its properties.
-    /// 
+    ///
     /// # Parameters
     /// - `device`: Handle to the Vulkan Device
     /// - `allocator`: Handle to the Vulkan Allocator
@@ -191,7 +191,7 @@ impl MaterialPipeline {
             &device,
             vertex_shader,
             fragment_shader,
-            false
+            false,
         )?;
         let pipeline_wireframe = pipeline::create_pipeline(
             pipeline_layout,
@@ -205,7 +205,7 @@ impl MaterialPipeline {
             &device,
             vertex_shader,
             fragment_shader,
-            true
+            true,
         )?;
 
         unsafe {
@@ -253,8 +253,8 @@ impl Drop for MaterialPipeline {
 }
 
 /// A Material is an instance of a [`MaterialPipeline`].
-/// 
-/// While a [`MaterialPipeline`] stores information about which properties a Material exposes, a Material stores the values of each exposed Property. 
+///
+/// While a [`MaterialPipeline`] stores information about which properties a Material exposes, a Material stores the values of each exposed Property.
 /// Thus a [`MaterialPipeline`] can be viewed as a Material Template, while a Material is an instantiation of such a template.
 pub struct Material {
     pipeline: Rc<MaterialPipeline>,
@@ -282,7 +282,7 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type float
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
     /// 
     /// # Errors
@@ -311,7 +311,7 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type vec2
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
@@ -340,7 +340,7 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type vec3
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
@@ -369,7 +369,7 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type vec4
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
@@ -398,7 +398,7 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type sampler2D
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
     ///
     /// # Errors
@@ -451,13 +451,13 @@ impl Material {
     }
 
     /// Returns the vk::DescriptorSetLayout of set #1 of this Material's Pipeline.
-    /// 
+    ///
     /// Set #1 should contain all MaterialProperties
     pub fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.pipeline.descriptor_set_layout
     }
 
-    /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet 
+    /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet
     /// from the [DescriptorManager](crate::vulkan::descriptor_manager::DescriptorManager).
     pub fn get_descriptor_data(&self) -> Vec<DescriptorData> {
         self.resources.borrow().clone()

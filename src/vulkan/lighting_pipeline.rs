@@ -5,7 +5,7 @@ use ash::{version::DeviceV1_0, vk};
 use super::pipeline;
 
 /// This struct describes a Deferred Resolve shader and its associated state.
-/// 
+///
 /// A LightingPipeline can be thought of as a specific lighting equation to be applied to a specific set of [`Materials`](crate::scene::material::Material).
 pub struct LightingPipeline {
     /// The [`vk::Pipeline`] to be used for rendering point lights
@@ -22,7 +22,7 @@ pub struct LightingPipeline {
 
 impl LightingPipeline {
     /// Creates a new [`LightingPipeline`].
-    /// 
+    ///
     /// # Parameters
     /// - `point_shader`, `directional_shader`, `ambient_shader`: names of the shaders to be used for rendering
     ///   point lights, directional lights and ambient light respectively. All three are optional.
@@ -85,7 +85,7 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-                false
+                false,
             )?;
 
             unsafe {
@@ -120,7 +120,7 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-                false
+                false,
             )?;
 
             unsafe {
@@ -155,7 +155,7 @@ impl LightingPipeline {
                 &device,
                 vertex_shader,
                 fragment_shader,
-                false
+                false,
             )?;
 
             unsafe {

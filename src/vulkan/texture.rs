@@ -13,7 +13,7 @@ pub enum TextureFilterMode {
 }
 
 /// Manages a 2D Texture.
-/// 
+///
 /// A Texture2D will always be in R8G8B8A8 format.
 pub struct Texture2D {
     allocator: Rc<vk_mem::Allocator>,
@@ -30,7 +30,7 @@ pub struct Texture2D {
 
 impl Texture2D {
     /// Creates a new [`Texture2D`].
-    /// 
+    ///
     /// # Parameters
     /// - `pixels`: A `width` * `height` * 4 slice of u8. A group of 4 bytes is a single pixel.
     ///   The slice must be in row major memory order and tightly packed.

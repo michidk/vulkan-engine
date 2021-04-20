@@ -39,7 +39,7 @@ fn print_bindings(bindings: &[SetBinding]) {
                 ImageDimension::SubpassInput => print!("samplerSubpassInput "),
             },
             SetBindingData::UniformBuffer { layout } => {
-                print!("{} {{\n", layout.block_name);
+                println!("{} {{", layout.block_name);
                 print_block_layout(layout);
                 print!("}} ");
             }

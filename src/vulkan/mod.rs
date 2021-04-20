@@ -89,9 +89,14 @@ impl VulkanManager {
         window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> GraphicsResult<Self> {
-        let entry = ash::Entry::new()?;
+        // box ash::Entry to anyhow::error
+        fn init_entrypoint() -> anyhow::Result<ash::Entry> {
+            Ok(ash::Entry::new()?)
+        }
 
+        let entry = init_entrypoint()?;
         let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;
+
         let debug = DebugMessenger::init(&entry, &instance)?;
         let surface = SurfaceWrapper::init(&window, &entry, &instance);
 
@@ -347,7 +352,7 @@ impl VulkanManager {
         engine_info: EngineInfo,
         entry: &ash::Entry,
         window: &winit::window::Window,
-    ) -> Result<ash::Instance, ash::InstanceError> {
+    ) -> anyhow::Result<ash::Instance> {
         let app_name = CString::new(engine_info.app_name).unwrap();
 
         let app_info = vk::ApplicationInfo::builder()
@@ -381,7 +386,7 @@ impl VulkanManager {
                 .enabled_layer_names(&layer_names);
         }
 
-        unsafe { entry.create_instance(&instance_create_info, None) }
+        Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
 
     pub fn next_frame(&mut self) -> u32 {

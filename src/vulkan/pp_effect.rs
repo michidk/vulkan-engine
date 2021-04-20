@@ -13,7 +13,7 @@ pub struct PPEffect {
 
 impl PPEffect {
     /// Creates a new [`PPEffect`].
-    /// 
+    ///
     /// # Parameters
     /// - `pipe_layout`: The [`vk::PipelineLayout`] that describes the post processing pipeline layout.
     /// - `renderpass`: The [`vk::RenderPass`] in which this [`PPEffect`] will be used. SubPass 0 will be used.
@@ -54,7 +54,7 @@ impl PPEffect {
             &device,
             vertex_shader,
             fragment_shader,
-            false
+            false,
         )?;
 
         unsafe {

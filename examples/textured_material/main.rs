@@ -4,12 +4,22 @@ use std::process::exit;
 use crystal::prelude::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
-use vulkan_engine::{core::{camera::Camera, engine::{self, Engine, EngineInit}, window::{self, Dimensions}}, scene::{
+use vulkan_engine::{
+    core::{
+        camera::Camera,
+        engine::{self, Engine, EngineInit},
+        window::{self, Dimensions},
+    },
+    scene::{
         light::*,
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
-    }, vulkan::lighting_pipeline::LightingPipeline, vulkan::pp_effect::PPEffect, vulkan::texture::{Texture2D, TextureFilterMode}};
+    },
+    vulkan::lighting_pipeline::LightingPipeline,
+    vulkan::pp_effect::PPEffect,
+    vulkan::texture::{Texture2D, TextureFilterMode},
+};
 
 fn main() {
     // setting up logger
@@ -30,8 +40,8 @@ fn main() {
     let camera = Camera::builder()
         .position(Vec3::new(0.0, 0.0, -5.0))
         .aspect(
-            engine_info.window_info.initial_dimensions.width as f32 /
-            engine_info.window_info.initial_dimensions.height as f32,
+            engine_info.window_info.initial_dimensions.width as f32
+                / engine_info.window_info.initial_dimensions.height as f32,
         )
         .build();
 
@@ -88,10 +98,7 @@ fn setup(engine: &mut Engine) {
     .unwrap();
 
     let pixels = [
-        255u8, 0, 0, 255, 
-        0, 255, 0, 255, 
-        0, 0, 255, 255, 
-        255, 0, 255, 255,
+        255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 0, 255, 255,
     ];
     let albedo_tex = Texture2D::new(
         2,

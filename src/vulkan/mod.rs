@@ -579,7 +579,7 @@ impl VulkanManager {
                     self.device.cmd_bind_pipeline(
                         commandbuffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline
+                        pipeline,
                     );
                     self.set_viewport(
                         commandbuffer,

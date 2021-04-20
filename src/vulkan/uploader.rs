@@ -14,7 +14,7 @@ struct StagingBuffer {
 }
 
 /// This struct automatically manages a pool of staging buffers that can be used to upload data to GPU-only buffers and images.
-/// 
+///
 /// # Notes
 /// This struct has to be cleaned up manually by calling [`destroy()`](Uploader::destroy()).
 pub struct Uploader {
@@ -85,7 +85,7 @@ impl Uploader {
     }
 
     /// Destroys a [`Uploader`].
-    /// 
+    ///
     /// The object *must not* be used after calling this method.
     pub fn destroy(&mut self) {
         for fence in &self.fences {
@@ -147,7 +147,7 @@ impl Uploader {
     }
 
     /// Enqueues a buffer upload command.
-    /// 
+    ///
     /// The data upload will happend before any other vulkan commands are executed this frame.
     pub fn enqueue_buffer_upload<T>(
         &mut self,
@@ -186,10 +186,10 @@ impl Uploader {
     }
 
     /// Enqueues an image upload command.
-    /// 
+    ///
     /// The image upload will happend before any other vulkan commands are executed this frame.
-    /// 
-    /// Any previous contents of the image will be discarded. After upload, 
+    ///
+    /// Any previous contents of the image will be discarded. After upload,
     /// the image will be transitioned to the given `layout`.
     pub fn enqueue_image_upload(
         &mut self,
@@ -295,7 +295,7 @@ impl Uploader {
     }
 
     /// Submits all upload commands for the current frame.
-    /// 
+    ///
     /// This method should be called once per frame before any rendering takes place.
     pub fn submit_uploads(&mut self, queue: vk::Queue) {
         let command_buffer =

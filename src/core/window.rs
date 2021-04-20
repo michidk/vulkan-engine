@@ -33,8 +33,8 @@ impl InitialWindowInfo {
         let window_size = winit_window.outer_size();
 
         winit_window.set_outer_position(winit::dpi::PhysicalPosition {
-            x: monitor_pos.x + ((monitor_size.width - window_size.width) / 2) as i32,
-            y: monitor_pos.y + ((monitor_size.height - window_size.height) / 2) as i32,
+            x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
+            y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
         });
 
         Ok(Window::new(winit_window))

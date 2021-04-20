@@ -9,11 +9,10 @@ const VULKAN_VERSION: (u32, u32) = (1, 2);
 pub fn select_physical_device(
     instance: &ash::Instance,
 ) -> GraphicsResult<(
-        vk::PhysicalDevice,
-        vk::PhysicalDeviceProperties,
-        vk::PhysicalDeviceFeatures,
-    )>
-{
+    vk::PhysicalDevice,
+    vk::PhysicalDeviceProperties,
+    vk::PhysicalDeviceFeatures,
+)> {
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
     let mut candidates: BTreeMap<
         u32,

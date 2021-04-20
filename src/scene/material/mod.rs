@@ -2,7 +2,13 @@ use ash::{version::DeviceV1_0, vk};
 use crystal::prelude::{Vec2, Vec3, Vec4};
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
-use crate::vulkan::{descriptor_manager::DescriptorData, error::{GraphicsError, GraphicsResult}, lighting_pipeline::LightingPipeline, pipeline, texture::Texture2D};
+use crate::vulkan::{
+    descriptor_manager::DescriptorData,
+    error::{GraphicsError, GraphicsResult},
+    lighting_pipeline::LightingPipeline,
+    pipeline,
+    texture::Texture2D,
+};
 
 mod material_compiler;
 
@@ -284,7 +290,7 @@ impl Material {
     /// Sets a MaterialProperty of type float
     ///
     /// For naming scheme, see [`MaterialPipeline`]
-    /// 
+    ///
     /// # Errors
     /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
     /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `float`

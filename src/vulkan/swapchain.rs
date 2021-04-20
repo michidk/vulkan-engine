@@ -1,6 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
 
-use super::{GraphicsResult, queue, surface};
+use super::{queue, surface, GraphicsResult};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 

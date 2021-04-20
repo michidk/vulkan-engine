@@ -8,7 +8,7 @@ pub enum GraphicsError {
     #[error("Vulkan API error: {0}")]
     Vk(#[from] vk::Result),
     /// Vulkan memory allocator errors
-    /// 
+    ///
     /// [`vk_mem::ErrorKind::Vulkan`] will be converted to [`GraphicsError::Vk`].
     #[error("vk_mem error: {0}")]
     VkMem(vk_mem::Error),

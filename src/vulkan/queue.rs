@@ -4,7 +4,10 @@ use ash::{
     vk,
 };
 
-use super::{error::{GraphicsError, GraphicsResult}, surface};
+use super::{
+    error::{GraphicsError, GraphicsResult},
+    surface,
+};
 
 pub struct PoolsWrapper {
     pub commandpool_graphics: vk::CommandPool,

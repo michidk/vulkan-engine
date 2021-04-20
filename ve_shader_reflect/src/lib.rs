@@ -250,11 +250,7 @@ fn reflect_ubos(
     Ok(())
 }
 
-pub fn merge(
-    a: ShaderInfo,
-    b: &ShaderInfo,
-    names_must_match: bool,
-) -> Result<ShaderInfo> {
+pub fn merge(a: ShaderInfo, b: &ShaderInfo, names_must_match: bool) -> Result<ShaderInfo> {
     let mut res = a;
 
     for binding in &b.set_bindings {
@@ -266,10 +262,16 @@ pub fn merge(
 
             if names_must_match {
                 if a_binding != binding {
-                    return Err(Error::IncompatiblePropertyNames(binding.var_name.clone(), a_binding.var_name.clone()));
+                    return Err(Error::IncompatiblePropertyNames(
+                        binding.var_name.clone(),
+                        a_binding.var_name.clone(),
+                    ));
                 }
             } else if !a_binding.equal_ignore_names(binding) {
-                return Err(Error::IncompatibleProperties(binding.var_name.clone(), a_binding.var_name.clone()));
+                return Err(Error::IncompatibleProperties(
+                    binding.var_name.clone(),
+                    a_binding.var_name.clone(),
+                ));
             }
 
             found = true;

@@ -32,7 +32,18 @@ use crate::{
     },
 };
 
-use self::{buffer::{PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, error::GraphicsResult, lighting_pipeline::LightingPipeline, pp_effect::PPEffect, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper, uploader::Uploader};
+use self::{
+    buffer::{PerFrameUniformBuffer, VulkanBuffer},
+    debug::DebugMessenger,
+    descriptor_manager::{DescriptorData, DescriptorManager},
+    error::GraphicsResult,
+    lighting_pipeline::LightingPipeline,
+    pp_effect::PPEffect,
+    queue::{PoolsWrapper, QueueFamilies, Queues},
+    surface::SurfaceWrapper,
+    swapchain::SwapchainWrapper,
+    uploader::Uploader,
+};
 
 pub struct VulkanManager {
     #[allow(dead_code)]

@@ -182,11 +182,11 @@ where
 {
     type Norm = T;
 
-    fn norm(&self) -> Self::Norm {
-        self.norm_squared().sqrt()
+    fn magnitude(&self) -> Self::Norm {
+        self.magnitude_squared().sqrt()
     }
 
-    fn norm_squared(&self) -> Self::Norm {
+    fn magnitude_squared(&self) -> Self::Norm {
         let mut value = T::zero();
         for row_idx in 0..R {
             value += unsafe {

@@ -276,11 +276,11 @@ where
 {
     type Norm = T;
 
-    fn norm(&self) -> Self::Norm {
-        self.norm_squared().sqrt()
+    fn magnitude(&self) -> Self::Norm {
+        self.magnitude_squared().sqrt()
     }
 
-    fn norm_squared(&self) -> Self::Norm {
+    fn magnitude_squared(&self) -> Self::Norm {
         self.x().clone() * self.x().clone()
             + self.y().clone() * self.y().clone()
             + self.z().clone() * self.z().clone()

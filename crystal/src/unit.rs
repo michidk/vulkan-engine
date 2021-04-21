@@ -1,6 +1,7 @@
 use std::{fmt, ops::Deref};
 
 use crate::norm::Normed;
+use crate::scalar::Zero;
 
 #[repr(transparent)]
 pub struct Unit<T> {
@@ -10,16 +11,12 @@ pub struct Unit<T> {
 impl<T> Unit<T>
 where
     T: Normed,
-    T::Norm: Clone,
+    T::Norm: Clone + Zero + PartialEq,
 {
-    pub fn new_normalize(value: T) -> Self {
-        Self::new_and_get(value).0
-    }
+    pub fn new_normalize(mut value: T) -> Self {
+        value.normalize();
 
-    pub fn new_and_get(mut value: T) -> (Self, T::Norm) {
-        let n = value.norm();
-        value.unscale_mut(n.clone());
-        (Unit { value }, n)
+        Self { value }
     }
 }
 

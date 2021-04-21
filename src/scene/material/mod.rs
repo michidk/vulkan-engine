@@ -3,27 +3,14 @@ use crystal::prelude::{Vec2, Vec3, Vec4};
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
 use crate::vulkan::{
-    descriptor_manager::DescriptorData, lighting_pipeline::LightingPipeline, pipeline,
+    descriptor_manager::DescriptorData,
+    error::{GraphicsError, GraphicsResult},
+    lighting_pipeline::LightingPipeline,
+    pipeline,
     texture::Texture2D,
 };
 
 mod material_compiler;
-
-#[derive(thiserror::Error, Debug)]
-pub enum MaterialError {
-    #[error("Vulkan error {0}")]
-    VulkanError(#[from] vk::Result),
-    #[error("VkMem error {0}")]
-    VkMemError(#[from] vk_mem::Error),
-    #[error("Shader reflection Error: {0}")]
-    ShaderReflectError(#[from] ve_shader_reflect::Error),
-    #[error("Material Error: {0}")]
-    MaterialError(String),
-    #[error("Invalid Property: {0}")]
-    InvalidProperty(String),
-    #[error("Incompatible Property Type")]
-    IncompatiblePropertyType,
-}
 
 /// Description of a single named property in a shader
 enum MaterialProperty {
@@ -36,16 +23,16 @@ enum MaterialProperty {
 }
 
 /// A MaterialPipeline represents a GPass shader and its corresponding material properties.
-/// 
+///
 /// Each MaterialPipeline can be used to create multiple [`Materials`](Material).
-/// 
+///
 /// # MaterialProperties
-/// Material properties are directly reflected from the shaders SPIRV code, 
+/// Material properties are directly reflected from the shaders SPIRV code,
 /// meaning Debug information has to be enabled when compiling the GLSL files.
-/// 
+///
 /// Standalone properties are named after their variable name, e.g.
 /// `uniform sampler2D u_AlbedoTex` will be named "u_AlbedoTex".
-/// 
+///
 /// Properties inside uniform blocks are named after their inner names (i.e. the name of the surrounding block is ignored).
 /// ```glsl
 /// uniform MaterialData {
@@ -67,9 +54,9 @@ pub struct MaterialPipeline {
 
 impl MaterialPipeline {
     /// Create a new MaterialPipeline from a given shader and [`LightingPipeline`].
-    /// 
+    ///
     /// This function creates a new MaterialPipeline by loading the shader with the given name and reflecting its properties.
-    /// 
+    ///
     /// # Parameters
     /// - `device`: Handle to the Vulkan Device
     /// - `allocator`: Handle to the Vulkan Allocator
@@ -84,7 +71,7 @@ impl MaterialPipeline {
         frame_data_layout: vk::DescriptorSetLayout,
         renderpass: vk::RenderPass,
         lighting_pipeline: &LightingPipeline,
-    ) -> Result<Rc<MaterialPipeline>, MaterialError> {
+    ) -> GraphicsResult<Rc<MaterialPipeline>> {
         let mut vertexshader_code = Vec::new();
         let mut fragmentshader_code = Vec::new();
         let (vertex_shader, fragment_shader) = pipeline::create_shader_modules(
@@ -96,7 +83,7 @@ impl MaterialPipeline {
 
         let refl_vertex = ve_shader_reflect::reflect_shader(&vertexshader_code)?;
         let refl_fragment = ve_shader_reflect::reflect_shader(&fragmentshader_code)?;
-        let refl = ve_shader_reflect::merge(refl_vertex, &refl_fragment, false).unwrap();
+        let refl = ve_shader_reflect::merge(refl_vertex, &refl_fragment, false)?;
 
         let mut properties = HashMap::new();
         let mut resource_infos = Vec::new();
@@ -210,7 +197,7 @@ impl MaterialPipeline {
             &device,
             vertex_shader,
             fragment_shader,
-            false
+            false,
         )?;
         let pipeline_wireframe = pipeline::create_pipeline(
             pipeline_layout,
@@ -224,7 +211,7 @@ impl MaterialPipeline {
             &device,
             vertex_shader,
             fragment_shader,
-            true
+            true,
         )?;
 
         unsafe {
@@ -245,7 +232,7 @@ impl MaterialPipeline {
     }
 
     /// Creates a new [`Material`] from the given MaterialPipeline.
-    pub fn create_material(self: &Rc<Self>) -> Result<Rc<Material>, MaterialError> {
+    pub fn create_material(self: &Rc<Self>) -> GraphicsResult<Rc<Material>> {
         let (resources, allocations) =
             material_compiler::compile_resources(&self.resource_infos, self.allocator.as_ref())?;
 
@@ -272,8 +259,8 @@ impl Drop for MaterialPipeline {
 }
 
 /// A Material is an instance of a [`MaterialPipeline`].
-/// 
-/// While a [`MaterialPipeline`] stores information about which properties a Material exposes, a Material stores the values of each exposed Property. 
+///
+/// While a [`MaterialPipeline`] stores information about which properties a Material exposes, a Material stores the values of each exposed Property.
 /// Thus a [`MaterialPipeline`] can be viewed as a Material Template, while a Material is an instantiation of such a template.
 pub struct Material {
     pipeline: Rc<MaterialPipeline>,
@@ -301,14 +288,19 @@ impl Material {
     }
 
     /// Sets a MaterialProperty of type float
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
-    pub fn set_float(&self, name: &str, val: f32) -> Result<(), MaterialError> {
+    ///
+    /// # Errors
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `float`
+    /// - [`GraphicsError::VkMem`]
+    pub fn set_float(&self, name: &str, val: f32) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
             .get(name)
-            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+            .ok_or_else(|| GraphicsError::InvalidMaterialProperty(name.to_owned()))?;
         match prop {
             MaterialProperty::Float { binding, offset } => {
                 self.set_uniform_property(
@@ -318,21 +310,26 @@ impl Material {
                     &val as *const f32 as *const u8,
                 )?;
             }
-            _ => return Err(MaterialError::IncompatiblePropertyType),
+            _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
 
         Ok(())
     }
 
     /// Sets a MaterialProperty of type vec2
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
-    pub fn set_vec2(&self, name: &str, val: Vec2<f32>) -> Result<(), MaterialError> {
+    ///
+    /// # Errors
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec2`
+    /// - [`GraphicsError::VkMem`]
+    pub fn set_vec2(&self, name: &str, val: Vec2<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
             .get(name)
-            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+            .ok_or_else(|| GraphicsError::InvalidMaterialProperty(name.to_owned()))?;
         match prop {
             MaterialProperty::Vec2 { binding, offset } => {
                 self.set_uniform_property(
@@ -342,21 +339,26 @@ impl Material {
                     &val as *const Vec2<f32> as *const u8,
                 )?;
             }
-            _ => return Err(MaterialError::IncompatiblePropertyType),
+            _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
 
         Ok(())
     }
 
     /// Sets a MaterialProperty of type vec3
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
-    pub fn set_vec3(&self, name: &str, val: Vec3<f32>) -> Result<(), MaterialError> {
+    ///
+    /// # Errors
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec3`
+    /// - [`GraphicsError::VkMem`]
+    pub fn set_vec3(&self, name: &str, val: Vec3<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
             .get(name)
-            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+            .ok_or_else(|| GraphicsError::InvalidMaterialProperty(name.to_owned()))?;
         match prop {
             MaterialProperty::Vec3 { binding, offset } => {
                 self.set_uniform_property(
@@ -366,21 +368,26 @@ impl Material {
                     &val as *const Vec3<f32> as *const u8,
                 )?;
             }
-            _ => return Err(MaterialError::IncompatiblePropertyType),
+            _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
 
         Ok(())
     }
 
     /// Sets a MaterialProperty of type vec4
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
-    pub fn set_vec4(&self, name: &str, val: Vec4<f32>) -> Result<(), MaterialError> {
+    ///
+    /// # Errors
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec4`
+    /// - [`GraphicsError::VkMem`]
+    pub fn set_vec4(&self, name: &str, val: Vec4<f32>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
             .get(name)
-            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+            .ok_or_else(|| GraphicsError::InvalidMaterialProperty(name.to_owned()))?;
         match prop {
             MaterialProperty::Vec4 { binding, offset } => {
                 self.set_uniform_property(
@@ -390,26 +397,30 @@ impl Material {
                     &val as *const Vec4<f32> as *const u8,
                 )?;
             }
-            _ => return Err(MaterialError::IncompatiblePropertyType),
+            _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
 
         Ok(())
     }
 
     /// Sets a MaterialProperty of type sampler2D
-    /// 
+    ///
     /// For naming scheme, see [`MaterialPipeline`]
-    pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> Result<(), MaterialError> {
+    ///
+    /// # Errors
+    /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
+    /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `sampler2D`
+    pub fn set_texture(&self, name: &str, val: Rc<Texture2D>) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
             .get(name)
-            .ok_or_else(|| MaterialError::InvalidProperty(String::from(name)))?;
+            .ok_or_else(|| GraphicsError::InvalidMaterialProperty(name.to_owned()))?;
         match prop {
             MaterialProperty::Sampler2D { binding } => {
                 self.textures
                     .borrow_mut()
-                    .insert(String::from(name), val.clone());
+                    .insert(name.to_owned(), val.clone());
 
                 let res = &mut self.resources.borrow_mut()[*binding as usize];
                 match res {
@@ -422,10 +433,10 @@ impl Material {
                         *layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
                         *sampler = val.sampler;
                     }
-                    _ => return Err(MaterialError::IncompatiblePropertyType),
+                    _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
                 }
             }
-            _ => return Err(MaterialError::IncompatiblePropertyType),
+            _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
 
         Ok(())
@@ -446,13 +457,13 @@ impl Material {
     }
 
     /// Returns the vk::DescriptorSetLayout of set #1 of this Material's Pipeline.
-    /// 
+    ///
     /// Set #1 should contain all MaterialProperties
     pub fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.pipeline.descriptor_set_layout
     }
 
-    /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet 
+    /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet
     /// from the [DescriptorManager](crate::vulkan::descriptor_manager::DescriptorManager).
     pub fn get_descriptor_data(&self) -> Vec<DescriptorData> {
         self.resources.borrow().clone()

@@ -36,6 +36,7 @@ use self::{
     buffer::{PerFrameUniformBuffer, VulkanBuffer},
     debug::DebugMessenger,
     descriptor_manager::{DescriptorData, DescriptorManager},
+    error::GraphicsResult,
     lighting_pipeline::LightingPipeline,
     pp_effect::PPEffect,
     queue::{PoolsWrapper, QueueFamilies, Queues},
@@ -87,10 +88,10 @@ impl VulkanManager {
         engine_info: EngineInfo,
         window: &winit::window::Window,
         max_frames_in_flight: u8,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let entry = ash::Entry::new()?;
-
+    ) -> GraphicsResult<Self> {
+        let entry = ash::Entry::new().map_err(anyhow::Error::from)?;
         let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;
+
         let debug = DebugMessenger::init(&entry, &instance)?;
         let surface = SurfaceWrapper::init(&window, &entry, &instance);
 
@@ -346,7 +347,7 @@ impl VulkanManager {
         engine_info: EngineInfo,
         entry: &ash::Entry,
         window: &winit::window::Window,
-    ) -> Result<ash::Instance, ash::InstanceError> {
+    ) -> anyhow::Result<ash::Instance> {
         let app_name = CString::new(engine_info.app_name).unwrap();
 
         let app_info = vk::ApplicationInfo::builder()
@@ -380,7 +381,7 @@ impl VulkanManager {
                 .enabled_layer_names(&layer_names);
         }
 
-        unsafe { entry.create_instance(&instance_create_info, None) }
+        Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
 
     pub fn next_frame(&mut self) -> u32 {
@@ -579,7 +580,7 @@ impl VulkanManager {
                     self.device.cmd_bind_pipeline(
                         commandbuffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline
+                        pipeline,
                     );
                     self.set_viewport(
                         commandbuffer,

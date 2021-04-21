@@ -146,49 +146,49 @@ impl Camera {
         }
     }
 
-    // TODO: refine
+    // TODO: implement seperate movement struct as soon as gameloop is
     pub(crate) fn movement(&mut self, input: &Input) {
-        let delta = self.last_render.elapsed().as_nanos() as f32 / 1_000_000_000.0f32;
+        let delta = self.last_render.elapsed().as_secs_f32();
         self.last_render = Instant::now();
 
-        let sens = 0.123f32;
+        let mouse_sensitivity = 0.123f32;
 
         self.rotate(
-            Angle::from_deg(input.get_mouse_delta().1 as f32 * sens),
-            Angle::from_deg(input.get_mouse_delta().0 as f32 * sens),
+            Angle::from_deg(input.get_mouse_delta().1 as f32 * mouse_sensitivity),
+            Angle::from_deg(input.get_mouse_delta().0 as f32 * mouse_sensitivity),
         );
 
-        let mut vec: Vec3<f32> = Vec3::new(0f32, 0f32, 0f32);
+        let mut movement: Vec3<f32> = Vec3::zero();
 
+        // WASD movement
         if input.get_button_down(VirtualKeyCode::W) {
-            vec += Vec3::new(0.0, 0.0, 1.0);
+            movement += Vec3::new(0.0, 0.0, 1.0);
         }
         if input.get_button_down(VirtualKeyCode::A) {
-            vec += Vec3::new(-1.0, 0.0, 0.0);
+            movement += Vec3::new(-1.0, 0.0, 0.0);
         }
         if input.get_button_down(VirtualKeyCode::S) {
-            vec += Vec3::new(0.0, 0.0, -1.0);
+            movement += Vec3::new(0.0, 0.0, -1.0);
         }
         if input.get_button_down(VirtualKeyCode::D) {
-            vec += Vec3::new(1.0, 0.0, 0.0);
+            movement += Vec3::new(1.0, 0.0, 0.0);
         }
+        // UP, DOWN
         if input.get_button_down(VirtualKeyCode::Space) {
-            vec += Vec3::new(0.0, 1.0, 0.0);
+            movement += Vec3::new(0.0, 1.0, 0.0);
         }
         if input.get_button_down(VirtualKeyCode::LControl) {
-            vec += Vec3::new(0.0, -1.0, 0.0);
+            movement += Vec3::new(0.0, -1.0, 0.0);
         }
 
-        // TODO: normalize vec
+        Unit::new_normalize(movement); // normalize the movement vector, so that diagonal movement is not faster
 
-        let speed: f32 = 5.0;
-
-        let f = speed * delta;
-        self.move_in_view_direction(&Vec3::new(vec.x() * f, vec.y() * f, vec.z() * f));
+        let move_speed: f32 = 5.0;
+        let move_step = movement * (move_speed * delta);
+        self.move_in_view_direction(&move_step);
     }
 }
 
-#[allow(dead_code)]
 pub struct CameraBuilder {
     position: Vec3<f32>,
     rotation: (f32, f32),

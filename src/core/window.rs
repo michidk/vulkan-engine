@@ -26,6 +26,17 @@ impl InitialWindowInfo {
             ))
             .with_min_inner_size(winit::dpi::LogicalSize::new(64, 64))
             .build(window_target)?;
+
+        let monitor = winit_window.primary_monitor().unwrap();
+        let monitor_pos = monitor.position();
+        let monitor_size = monitor.size();
+        let window_size = winit_window.outer_size();
+
+        winit_window.set_outer_position(winit::dpi::PhysicalPosition {
+            x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
+            y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
+        });
+
         Ok(Window::new(winit_window))
     }
 }
@@ -71,12 +82,9 @@ impl Window {
     pub fn set_mode(&mut self, mode: WindowMode) {
         match mode {
             WindowMode::Windowed => self.winit_window.set_fullscreen(None),
-            WindowMode::Borderless => {
-                self.winit_window
-                    .set_fullscreen(Some(winit::window::Fullscreen::Borderless(
-                        self.winit_window.current_monitor(),
-                    )))
-            }
+            WindowMode::Borderless => self
+                .winit_window
+                .set_fullscreen(Some(winit::window::Fullscreen::Borderless(None))),
             WindowMode::Exclusive => {
                 // select best video mode by ord
                 let vm = self

@@ -49,7 +49,7 @@ struct DescriptorSetData {
 /// This class automatically creates, caches and updates descriptor sets
 /// The descriptor caching mechanism is losely inspired by the system the Granite Engine uses
 /// (<http://themaister.net/blog/2019/04/20/a-tour-of-granites-vulkan-backend-part-3/>).
-/// 
+///
 /// # Generic Parameters
 /// - `HISTORY_SIZE`: The number of frames a DescriptorSet has to be unused for
 /// before it is destroyed. This value has to be greater or equal to the maximum number
@@ -103,7 +103,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
     }
 
     /// Advances the [`DescriptorManager`] to the next frame.
-    /// 
+    ///
     /// This frees unused DescriptorSets and should be called every frame.
     pub fn next_frame(&mut self) {
         self.frame_index = (self.frame_index + 1) % HISTORY_SIZE as u16;
@@ -135,7 +135,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
     }
 
     /// Creates or recycles a DescriptorSet with the given layout and contents.
-    /// 
+    ///
     /// The data in `bindings` is interpreted as a packed array of DescriptorSet bindings,
     /// meaning entry `n` is expected to be DescriptorSet binding `n`.
     pub fn get_descriptor_set(
@@ -290,7 +290,7 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
     }
 
     /// Deinitializes a [`DescriptorManager`].
-    /// 
+    ///
     /// Simply dropping the [`DescriptorManager`] will also call this method automatically.
     pub fn destroy(&mut self) {
         if self.pool != vk::DescriptorPool::null() {

@@ -4,7 +4,10 @@ use ash::{
     vk,
 };
 
-use super::{error::VulkanError, surface};
+use super::{
+    error::{GraphicsError, GraphicsResult},
+    surface,
+};
 
 pub struct PoolsWrapper {
     pub commandpool_graphics: vk::CommandPool,
@@ -14,7 +17,7 @@ impl PoolsWrapper {
     pub fn init(
         logical_device: &ash::Device,
         queue_families: &QueueFamilies,
-    ) -> Result<Self, vk::Result> {
+    ) -> GraphicsResult<Self> {
         let graphics_commandpool_info = vk::CommandPoolCreateInfo::builder()
             .queue_family_index(queue_families.graphics_q_index)
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
@@ -36,11 +39,11 @@ pub fn create_commandbuffers(
     logical_device: &ash::Device,
     pools: &PoolsWrapper,
     amount: usize,
-) -> Result<Vec<vk::CommandBuffer>, vk::Result> {
+) -> GraphicsResult<Vec<vk::CommandBuffer>> {
     let commandbuf_allocate_info = vk::CommandBufferAllocateInfo::builder()
         .command_pool(pools.commandpool_graphics)
         .command_buffer_count(amount as u32);
-    unsafe { logical_device.allocate_command_buffers(&commandbuf_allocate_info) }
+    unsafe { Ok(logical_device.allocate_command_buffers(&commandbuf_allocate_info)?) }
 }
 
 pub struct QueueFamilies {
@@ -52,7 +55,7 @@ impl QueueFamilies {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         surface: &surface::SurfaceWrapper,
-    ) -> Result<QueueFamilies, VulkanError> {
+    ) -> GraphicsResult<QueueFamilies> {
         let queues = QueueFamilies::find_suitable_queue_family(instance, physical_device, surface)?;
         Ok(QueueFamilies {
             graphics_q_index: queues,
@@ -63,7 +66,7 @@ impl QueueFamilies {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         surface: &surface::SurfaceWrapper,
-    ) -> Result<u32, VulkanError> {
+    ) -> GraphicsResult<u32> {
         let queuefamilyproperties =
             unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
@@ -81,7 +84,7 @@ impl QueueFamilies {
         if let Some(index) = found_graphics_q_index {
             Ok(index)
         } else {
-            Err(VulkanError::NoSuitableQueueFamily)
+            Err(GraphicsError::NoSuitableQueueFamily)
         }
     }
 }
@@ -94,7 +97,7 @@ pub fn init_device_and_queues(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
-) -> Result<(ash::Device, Queues), vk::Result> {
+) -> GraphicsResult<(ash::Device, Queues)> {
     let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode

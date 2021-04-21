@@ -22,9 +22,9 @@ pub fn create_shader_modules(
 }
 
 /// Creates a [`vk::Pipeline`] with the given options.
-/// 
+///
 /// Used to reduce code duplication.
-/// 
+///
 /// # Parameters
 /// - `uses_vertex_attribs`: set to true if the Pipeline expects vertex data to be passed into the vertex shader, false is useful for PP Effects.
 /// - `attachment_count`: the number of color attachments the pipeline expects.
@@ -125,8 +125,16 @@ pub fn create_pipeline(
     let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
         .line_width(1.0)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-        .cull_mode(if wireframe { vk::CullModeFlags::NONE } else { vk::CullModeFlags::BACK })
-        .polygon_mode(if wireframe { vk::PolygonMode::LINE } else { vk::PolygonMode::FILL });
+        .cull_mode(if wireframe {
+            vk::CullModeFlags::NONE
+        } else {
+            vk::CullModeFlags::BACK
+        })
+        .polygon_mode(if wireframe {
+            vk::PolygonMode::LINE
+        } else {
+            vk::PolygonMode::FILL
+        });
     let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
         .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 

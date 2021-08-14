@@ -1,0 +1,38 @@
+#include "common.hlslh"
+
+#define DEFAULT_VERTEX_SHADER \
+    static const float3 g_Vertices[] = {        \
+        float3(-1.0, -1.0, 0.0),                \
+        float3(1.0, 1.0, 0.0),                  \
+        float3(-1.0, 1.0, 0.0),                 \
+                                                \
+        float3(-1.0, -1.0, 0.0),                \
+        float3(1.0, -1.0, 0.0),                 \
+        float3(1.0, 1.0, 0.0),                  \
+    };                                          \
+                                                \
+    static const float2 g_UVs[] = {             \
+        float2(0.0, 1.0),                       \
+        float2(1.0, 0.0),                       \
+        float2(0.0, 0.0),                       \
+                                                \
+        float2(0.0, 1.0),                       \
+        float2(1.0, 1.0),                       \
+        float2(1.0, 0.0),                       \
+    };                                          \
+                                                \
+    struct V2F {                                \
+        float4 position : SV_POSITION;          \
+        float2 uv;                              \
+    };                                          \
+                                                \
+    V2F vert(int index : SV_VERTEXID) {         \
+        V2F res;                                \
+                                                \
+        res.position = float4(g_Vertices[index], 1.0);  \
+        res.uv = g_UVs[index];                          \
+                                                        \
+        return res;                                     \
+    }
+
+#define SRC_IMAGE_BINDING [[vk::binding(0, 0)]]

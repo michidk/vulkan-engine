@@ -1,0 +1,61 @@
+#include "common.hlslh"
+
+#define DEFAULT_VERTEX_SHADER \
+    static const float3 g_Vertices[] = {        \
+        float3(-1.0, -1.0, 0.0),                \
+        float3(1.0, 1.0, 0.0),                  \
+        float3(-1.0, 1.0, 0.0),                 \
+                                                \
+        float3(-1.0, -1.0, 0.0),                \
+        float3(1.0, -1.0, 0.0),                 \
+        float3(1.0, 1.0, 0.0),                  \
+    };                                          \
+                                                \
+    static const float2 g_UVs[] = {             \
+        float2(-1.0, -1.0),                       \
+        float2(1.0, 1.0),                       \
+        float2(-1.0, 1.0),                       \
+                                                \
+        float2(-1.0, -1.0),                       \
+        float2(1.0, -1.0),                       \
+        float2(1.0, 1.0),                       \
+    };                                          \
+                                                \
+    struct V2F {                                \
+        float4 position : SV_POSITION;          \
+        float2 uv;                              \
+    };                                          \
+                                                \
+    V2F vert(int index : SV_VERTEXID) {         \
+        V2F res;                                \
+                                                \
+        res.position = float4(g_Vertices[index], 1.0);  \
+        res.uv = g_UVs[index];                          \
+                                                        \
+        return res;                                     \
+    }
+
+#define GBUF0_BINDING [[vk::binding(1, 0)]] [[vk::input_attachment_index(0)]] 
+#define GBUF1_BINDING [[vk::binding(2, 0)]] [[vk::input_attachment_index(1)]] 
+#define GBUF_DEPTH_BINDING [[vk::binding(3, 0)]] [[vk::input_attachment_index(2)]] 
+
+#define CALC_WORLD_POS(uv, depth, invProj, invView) \
+    float3 worldPos; \
+    { \
+        float4 clipPos = float4((uv).xy, (depth), 1.0); \
+        float4 viewPos = clipPos * invProj; \
+        viewPos /= viewPos.w; \
+        worldPos = (viewPos * invView).xyz; \
+    }
+
+struct PointLight {
+    float4 position;
+    float4 luminousFlux;
+};
+
+struct DirLight {
+    float4 directionToLight;
+    float4 irradiance;
+};
+
+#define LIGHT_BINDING [[vk::push_constant]]

@@ -17,6 +17,7 @@ pub mod allocator;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::{extensions::{ext, khr}, vk::{self, Handle}};
+use gpu_allocator::SubAllocation;
 
 use crate::{
     core::camera::{self, CamData},
@@ -68,7 +69,31 @@ pub struct VulkanManager {
     pub uploader: std::mem::ManuallyDrop<Uploader>,
     pub enable_wireframe: bool,
 
-    pub acc_ext: Option<Rc<khr::AccelerationStructure>>,
+    pub rtx_data: Option<RtxData>,
+}
+
+pub struct RtxData {
+    pub acc_ext: Rc<khr::AccelerationStructure>,
+    pub rtx_ext: Rc<khr::RayTracingPipeline>,
+    pub scene_acc_buffer: vk::Buffer,
+    pub scene_acc_buffer_alloc: SubAllocation,
+    pub scene_acc: vk::AccelerationStructureKHR,
+
+    pub rtx_set_layout: vk::DescriptorSetLayout,
+    pub rtx_pipe_layout: vk::PipelineLayout,
+    pub rtx_pipe: vk::Pipeline,
+    pub rtx_pool: vk::DescriptorPool,
+    pub rtx_set: vk::DescriptorSet,
+
+    pub rtx_sbt_gen_alloc: SubAllocation,
+    pub rtx_sbt_gen: vk::Buffer,
+    pub rtx_sbt_gen_addr: vk::DeviceAddress,
+    pub rtx_sbt_chit_alloc: SubAllocation,
+    pub rtx_sbt_chit: vk::Buffer,
+    pub rtx_sbt_chit_addr: vk::DeviceAddress,
+    pub rtx_sbt_miss_alloc: SubAllocation,
+    pub rtx_sbt_miss: vk::Buffer,
+    pub rtx_sbt_miss_addr: vk::DeviceAddress,
 }
 
 impl VulkanManager {
@@ -90,12 +115,6 @@ impl VulkanManager {
 
         let (logical_device, queues, raytracing_supported) =
             queue::init_device_and_queues(&instance, physical_device, &queue_families)?;
-
-        let acc_ext = if raytracing_supported {
-            Some(Rc::new(khr::AccelerationStructure::new(&instance, &logical_device)))
-        } else {
-            None
-        };
 
         let logical_device = Rc::new(logical_device);
 
@@ -276,12 +295,112 @@ impl VulkanManager {
         let pipe_layout_pp =
             unsafe { logical_device.create_pipeline_layout(&pipe_layout_pp_info, None)? };
 
-        let uploader = Uploader::new(
+        let mut uploader = Uploader::new(
             logical_device.clone(),
             allocator.clone(),
             max_frames_in_flight as u64,
             queue_families.graphics_q_index,
         );
+
+        let rtx_data = if raytracing_supported {
+            let rtx_set_bindings = [
+                vk::DescriptorSetLayoutBinding::builder()
+                    .binding(0)
+                    .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR)
+                    .descriptor_count(1)
+                    .stage_flags(vk::ShaderStageFlags::RAYGEN_KHR)
+                    .build(),
+                vk::DescriptorSetLayoutBinding::builder()
+                    .binding(1)
+                    .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
+                    .descriptor_count(1)
+                    .stage_flags(vk::ShaderStageFlags::RAYGEN_KHR)
+                    .build(),
+                vk::DescriptorSetLayoutBinding::builder()
+                    .binding(2)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+                    .descriptor_count(1)
+                    .stage_flags(vk::ShaderStageFlags::RAYGEN_KHR)
+                    .build(),
+            ];
+            let rtx_set_layout = unsafe{logical_device.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::builder()
+                    .bindings(&rtx_set_bindings)
+                    .build(),
+                None
+            )}.unwrap();
+            
+            let rtx_pipe_layout_sets = [ rtx_set_layout ];
+            let rtx_pipe_layout = unsafe{logical_device.create_pipeline_layout(
+                &vk::PipelineLayoutCreateInfo::builder()
+                    .set_layouts(&rtx_pipe_layout_sets)
+                    .build(),
+                None
+            )}.unwrap();
+
+            let rtx_ext = Rc::new(khr::RayTracingPipeline::new(&instance, &logical_device));
+
+            let rtx_pipe = pipeline::create_rtx_pipeline(rtx_pipe_layout, "rtx_test.rgen.spv", "rtx_test.rchit.spv", &logical_device, rtx_ext.clone());
+            
+            let rtx_pool_sizes = [
+                vk::DescriptorPoolSize::builder().ty(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR).descriptor_count(1).build(),
+                vk::DescriptorPoolSize::builder().ty(vk::DescriptorType::STORAGE_IMAGE).descriptor_count(1).build(),
+                vk::DescriptorPoolSize::builder().ty(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC).descriptor_count(1).build(),
+            ];
+            let rtx_pool = unsafe{logical_device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::builder()
+                    .max_sets(1)
+                    .pool_sizes(&rtx_pool_sizes)
+                    .build(),
+                None
+            )}.unwrap();
+
+            let rtx_set = unsafe{logical_device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .descriptor_pool(rtx_pool)
+                    .set_layouts(&[rtx_set_layout])
+                    .build()
+            )}.unwrap()[0];
+
+            let (rtx_sbt_gen, rtx_sbt_gen_alloc) = allocator.create_buffer(32, vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::TRANSFER_DST, gpu_allocator::MemoryLocation::GpuOnly);
+            let (rtx_sbt_chit, rtx_sbt_chit_alloc) = allocator.create_buffer(32, vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::TRANSFER_DST, gpu_allocator::MemoryLocation::GpuOnly);
+            let (rtx_sbt_miss, rtx_sbt_miss_alloc) = allocator.create_buffer(32, vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::TRANSFER_DST, gpu_allocator::MemoryLocation::GpuOnly);
+            let rtx_sbt_gen_addr = unsafe{logical_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(rtx_sbt_gen).build())};
+            let rtx_sbt_chit_addr = unsafe{logical_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(rtx_sbt_chit).build())};
+            let rtx_sbt_miss_addr = unsafe{logical_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(rtx_sbt_miss).build())};
+
+            let handles = unsafe{rtx_ext.get_ray_tracing_shader_group_handles(rtx_pipe, 0, 2, 64).unwrap()};
+            let zero_handle = [0u8; 32];
+
+            uploader.enqueue_buffer_upload(rtx_sbt_gen, 0, &handles[0..32]);
+            uploader.enqueue_buffer_upload(rtx_sbt_chit, 0, &handles[32..64]);
+            uploader.enqueue_buffer_upload(rtx_sbt_miss, 0, &zero_handle);
+
+            Some(RtxData {
+                acc_ext: Rc::new(khr::AccelerationStructure::new(&instance, &logical_device)),
+                rtx_ext,
+                scene_acc_buffer: vk::Buffer::null(),
+                scene_acc_buffer_alloc: SubAllocation::default(),
+                scene_acc: vk::AccelerationStructureKHR::null(),
+                rtx_set_layout,
+                rtx_pipe_layout,
+                rtx_pipe,
+                rtx_pool,
+                rtx_set,
+
+                rtx_sbt_gen_alloc,
+                rtx_sbt_gen,
+                rtx_sbt_gen_addr,
+                rtx_sbt_chit_alloc,
+                rtx_sbt_chit,
+                rtx_sbt_chit_addr,
+                rtx_sbt_miss_alloc,
+                rtx_sbt_miss,
+                rtx_sbt_miss_addr,
+            })
+        } else {
+            None
+        };
 
         Ok(Self {
             entry,
@@ -317,7 +436,7 @@ impl VulkanManager {
             uploader: std::mem::ManuallyDrop::new(uploader),
             enable_wireframe: false,
 
-            acc_ext,
+            rtx_data,
         })
     }
 
@@ -465,7 +584,7 @@ impl VulkanManager {
     }
 
     fn transition_images<const N: usize>(
-        &self,
+        device: &ash::Device,
         commandbuffer: vk::CommandBuffer,
         src_stages: vk::PipelineStageFlags,
         dst_stages: vk::PipelineStageFlags,
@@ -490,7 +609,7 @@ impl VulkanManager {
         }
 
         unsafe {
-            self.device.cmd_pipeline_barrier(
+            device.cmd_pipeline_barrier(
                 commandbuffer,
                 src_stages,
                 dst_stages,
@@ -784,7 +903,8 @@ impl VulkanManager {
         }
 
         // transition swapchain image to TRANSFER_DST_OPTIMAL and final pp image to TRANSFER_SRC_OPTIMAL
-        self.transition_images(
+        Self::transition_images(
+            &self.device,
             commandbuffer,
             vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
             vk::PipelineStageFlags::TRANSFER,
@@ -824,7 +944,8 @@ impl VulkanManager {
         );
 
         // transition swapchain image to PRESENT_SRC_KHR
-        self.transition_images(
+        Self::transition_images(
+            &self.device,
             commandbuffer,
             vk::PipelineStageFlags::TRANSFER,
             vk::PipelineStageFlags::BOTTOM_OF_PIPE, // can be BOTTOM_OF_PIPE because vkQueuePresentKHR waits for a semaphore
@@ -852,83 +973,226 @@ impl VulkanManager {
                 .begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?;
         }
 
-        self.begin_renderpass(
-            commandbuffer,
-            self.renderpass,
-            self.swapchain.framebuffer_deferred,
-            &[
-                vk::ClearValue {
-                    color: vk::ClearColorValue {
-                        float32: [0.2, 0.2, 0.2, 0.0],
-                    },
-                },
-                vk::ClearValue {
-                    depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 1.0,
-                        stencil: 0,
-                    },
-                },
-            ],
-        );
+        if let Some(rtx_data) = &mut self.rtx_data {
+            if rtx_data.scene_acc == vk::AccelerationStructureKHR::null() {
+                let mut objects = Vec::new();
+                for obj in &scene.models {
+                    objects.push((
+                        obj.mesh.rtx_data.as_ref().unwrap().acc_struct,
+                        obj.transform.get_transform_data().model_matrix
+                    ));
+                }
 
-        let desc_values_frame_data = [
-            DescriptorData::DynamicUniformBuffer {
-                buffer: self.uniform_buffer.get_buffer(),
-                offset: 0,
-                size: self.uniform_buffer.get_size(),
-            },
-            DescriptorData::InputAttachment {
-                image: self.swapchain.g0_imageview,
-                layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            },
-            DescriptorData::InputAttachment {
-                image: self.swapchain.g1_imageview,
-                layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            },
-            DescriptorData::InputAttachment {
-                image: self.swapchain.depth_imageview_depth_only,
-                layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-            },
-        ];
-        let desc_set_camera = self
-            .descriptor_manager
-            .get_descriptor_set(self.desc_layout_frame_data, &desc_values_frame_data)?;
+                let (acc, acc_buffer, acc_alloc) = self.uploader.enqueue_scene_acc_struct_build(rtx_data.acc_ext.clone(), &objects);
+                rtx_data.scene_acc = acc;
+                rtx_data.scene_acc_buffer = acc_buffer;
+                rtx_data.scene_acc_buffer_alloc = acc_alloc;
 
-        unsafe {
-            self.device.cmd_bind_descriptor_sets(
+                unsafe {
+                    let mut acc_write = vk::WriteDescriptorSet::builder()
+                        .dst_set(rtx_data.rtx_set)
+                        .dst_binding(0)
+                        .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR)
+                        .build();
+                    acc_write.descriptor_count = 1;
+                    let accs = [rtx_data.scene_acc];
+                    let acc_write_next = vk::WriteDescriptorSetAccelerationStructureKHR::builder()
+                        .acceleration_structures(&accs)
+                        .build();
+                    acc_write.p_next = &acc_write_next as *const _ as *const _;
+                    
+                    let image_info = [
+                        vk::DescriptorImageInfo::builder()
+                            .image_view(self.swapchain.g0_imageview)
+                            .image_layout(vk::ImageLayout::GENERAL)
+                            .build()
+                    ];
+                    let buffer_info = [
+                        vk::DescriptorBufferInfo::builder()
+                            .buffer(self.uniform_buffer.get_buffer())
+                            .range(self.uniform_buffer.get_size())
+                            .build()
+                    ];
+
+                    self.device.update_descriptor_sets(&[
+                        acc_write,
+                        vk::WriteDescriptorSet::builder()
+                            .dst_set(rtx_data.rtx_set)
+                            .dst_binding(1)
+                            .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
+                            .image_info(&image_info)
+                            .build(),
+                        vk::WriteDescriptorSet::builder()
+                            .dst_set(rtx_data.rtx_set)
+                            .dst_binding(2)
+                            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+                            .buffer_info(&buffer_info)
+                            .build()
+                    ],
+                &[]);
+                }
+            }
+
+            Self::transition_images(
+                &self.device,
+                commandbuffer, vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR, vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR, &[
+                ImageTransition {
+                    image: self.swapchain.g0_image,
+                    from: vk::ImageLayout::UNDEFINED,
+                    to: vk::ImageLayout::GENERAL,
+                    wait_access: vk::AccessFlags::empty(),
+                    dst_access: vk::AccessFlags::SHADER_WRITE,
+                },
+            ]);
+            
+            unsafe {
+                self.device.cmd_bind_descriptor_sets(commandbuffer, vk::PipelineBindPoint::RAY_TRACING_KHR, rtx_data.rtx_pipe_layout, 0, &[rtx_data.rtx_set], &[self.uniform_buffer.get_offset(self.current_frame_index) as u32]);
+                self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::RAY_TRACING_KHR, rtx_data.rtx_pipe);
+                rtx_data.rtx_ext.cmd_trace_rays(
+                    commandbuffer,
+                    &vk::StridedDeviceAddressRegionKHR::builder()
+                        .device_address(rtx_data.rtx_sbt_gen_addr)
+                        .stride(32)
+                        .size(32)
+                        .build(),
+                    &vk::StridedDeviceAddressRegionKHR::builder()
+                        .device_address(rtx_data.rtx_sbt_miss_addr)
+                        .stride(32)
+                        .size(32)
+                        .build(),
+                    &vk::StridedDeviceAddressRegionKHR::builder()
+                        .device_address(rtx_data.rtx_sbt_chit_addr)
+                        .stride(32)
+                        .size(32)
+                        .build(),
+                    &vk::StridedDeviceAddressRegionKHR::builder()
+                        .stride(0)
+                        .size(0)
+                        .build(),
+                    self.swapchain.extent.width,
+                    self.swapchain.extent.height,
+                    1
+                );
+            }
+
+            Self::transition_images(
+                &self.device,
+                commandbuffer, vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR, vk::PipelineStageFlags::TRANSFER, &[
+                ImageTransition {
+                    image: self.swapchain.g0_image,
+                    from: vk::ImageLayout::GENERAL,
+                    to: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    wait_access: vk::AccessFlags::SHADER_WRITE,
+                    dst_access: vk::AccessFlags::TRANSFER_READ,
+                },
+                ImageTransition {
+                    image: self.swapchain.images[swapchain_image_index],
+                    from: vk::ImageLayout::UNDEFINED,
+                    to: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    wait_access: vk::AccessFlags::empty(),
+                    dst_access: vk::AccessFlags::TRANSFER_WRITE,
+                },
+            ]);
+
+            self.blit_image(
                 commandbuffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout_gpass,
-                0,
-                &[desc_set_camera],
-                &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
+                self.swapchain.g0_image,
+                self.swapchain.images[swapchain_image_index],
+                self.swapchain.extent.width as i32,
+                self.swapchain.extent.height as i32
             );
+
+            Self::transition_images(
+                &self.device,
+                commandbuffer, vk::PipelineStageFlags::TRANSFER, vk::PipelineStageFlags::BOTTOM_OF_PIPE, &[
+                ImageTransition {
+                    image: self.swapchain.images[swapchain_image_index],
+                    from: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    to: vk::ImageLayout::PRESENT_SRC_KHR,
+                    wait_access: vk::AccessFlags::TRANSFER_WRITE,
+                    dst_access: vk::AccessFlags::empty(),
+                },
+            ]);
+        } else {
+            self.begin_renderpass(
+                commandbuffer,
+                self.renderpass,
+                self.swapchain.framebuffer_deferred,
+                &[
+                    vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.2, 0.2, 0.2, 0.0],
+                        },
+                    },
+                    vk::ClearValue {
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    },
+                ],
+            );
+    
+            let desc_values_frame_data = [
+                DescriptorData::DynamicUniformBuffer {
+                    buffer: self.uniform_buffer.get_buffer(),
+                    offset: 0,
+                    size: self.uniform_buffer.get_size(),
+                },
+                DescriptorData::InputAttachment {
+                    image: self.swapchain.g0_imageview,
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                },
+                DescriptorData::InputAttachment {
+                    image: self.swapchain.g1_imageview,
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                },
+                DescriptorData::InputAttachment {
+                    image: self.swapchain.depth_imageview_depth_only,
+                    layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                },
+            ];
+            let desc_set_camera = self
+                .descriptor_manager
+                .get_descriptor_set(self.desc_layout_frame_data, &desc_values_frame_data)?;
+    
+            unsafe {
+                self.device.cmd_bind_descriptor_sets(
+                    commandbuffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout_gpass,
+                    0,
+                    &[desc_set_camera],
+                    &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
+                );
+            }
+    
+            let render_map = Self::build_render_order(&scene.models);
+            self.render_gpass(commandbuffer, &render_map)?;
+    
+            unsafe {
+                self.device
+                    .cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
+    
+                self.device.cmd_bind_descriptor_sets(
+                    commandbuffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout_resolve_pass,
+                    0,
+                    &[desc_set_camera],
+                    &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
+                );
+            }
+    
+            self.render_resolve_pass(commandbuffer, &scene.light_manager);
+    
+            unsafe {
+                self.device.cmd_end_render_pass(commandbuffer);
+                self.render_pp(commandbuffer, swapchain_image_index)?;
+            }
         }
 
-        let render_map = Self::build_render_order(&scene.models);
-        self.render_gpass(commandbuffer, &render_map)?;
-
         unsafe {
-            self.device
-                .cmd_next_subpass(commandbuffer, vk::SubpassContents::INLINE);
-
-            self.device.cmd_bind_descriptor_sets(
-                commandbuffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout_resolve_pass,
-                0,
-                &[desc_set_camera],
-                &[self.uniform_buffer.get_offset(self.current_frame_index) as u32],
-            );
-        }
-
-        self.render_resolve_pass(commandbuffer, &scene.light_manager);
-
-        unsafe {
-            self.device.cmd_end_render_pass(commandbuffer);
-
-            self.render_pp(commandbuffer, swapchain_image_index)?;
-
             self.device.end_command_buffer(commandbuffer)?;
         }
 

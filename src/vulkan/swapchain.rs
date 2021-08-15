@@ -141,7 +141,7 @@ impl SwapchainWrapper {
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
         let (g0_image, g0_image_alloc) =
-            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED, vk::Format::R16G16B16A16_SFLOAT);
+            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE, vk::Format::R16G16B16A16_SFLOAT);
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)

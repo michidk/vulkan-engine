@@ -1,6 +1,7 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
+use gpu_allocator::SubAllocation;
 
-use super::{queue, surface, GraphicsResult};
+use super::{GraphicsResult, allocator::Allocator, queue, surface};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -11,7 +12,7 @@ pub struct SwapchainWrapper {
     pub images: Vec<vk::Image>,
     pub imageviews: Vec<vk::ImageView>,
     pub depth_image: vk::Image, // used in gpass and resolve pass
-    pub depth_image_alloc: vk_mem::Allocation,
+    pub depth_image_alloc: SubAllocation,
     pub depth_imageview: vk::ImageView,
     pub depth_imageview_depth_only: vk::ImageView,
     pub surface_format: vk::SurfaceFormatKHR,
@@ -19,13 +20,13 @@ pub struct SwapchainWrapper {
     pub amount_of_images: u32,
     pub resolve_image: vk::Image, // will contain the finished deferred scene rendering
     pub resolve_imageview: vk::ImageView,
-    pub resolve_image_alloc: vk_mem::Allocation,
+    pub resolve_image_alloc: SubAllocation,
     pub g0_image: vk::Image,
     pub g0_imageview: vk::ImageView,
-    pub g0_image_alloc: vk_mem::Allocation,
+    pub g0_image_alloc: SubAllocation,
     pub g1_image: vk::Image,
     pub g1_imageview: vk::ImageView,
-    pub g1_image_alloc: vk_mem::Allocation,
+    pub g1_image_alloc: SubAllocation,
     pub framebuffer_deferred: vk::Framebuffer, // used for gpass and resolve pass, renders to resolve_image
     pub framebuffer_pp_a: vk::Framebuffer,     // used for pp, renders to g0_image
     pub framebuffer_pp_b: vk::Framebuffer,     // used for pp, renders to resolve_image
@@ -38,7 +39,7 @@ impl SwapchainWrapper {
         logical_device: &ash::Device,
         surface: &surface::SurfaceWrapper,
         #[allow(unused_variables)] queue_families: &queue::QueueFamilies,
-        allocator: &vk_mem::Allocator,
+        allocator: &Allocator,
     ) -> GraphicsResult<SwapchainWrapper> {
         let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent; // TODO: handle 0xFFFF x 0xFFFF extent
@@ -93,25 +94,8 @@ impl SwapchainWrapper {
             depth: 1,
         };
 
-        let depth_image_info = vk::ImageCreateInfo::builder()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::D24_UNORM_S8_UINT)
-            .extent(extend_3d)
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(
-                vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                    | vk::ImageUsageFlags::INPUT_ATTACHMENT,
-            )
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let allocation_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::GpuOnly,
-            ..Default::default()
-        };
-        let (depth_image, depth_image_alloc, _) =
-            allocator.create_image(&depth_image_info, &allocation_info)?;
+        let (depth_image, depth_image_alloc) =
+            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, vk::Format::D24_UNORM_S8_UINT);
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL)
             .base_mip_level(0)
@@ -140,26 +124,8 @@ impl SwapchainWrapper {
         let depth_imageview_depth_only =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let resolve_image_info = vk::ImageCreateInfo::builder()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R16G16B16A16_SFLOAT)
-            .extent(extend_3d)
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(
-                vk::ImageUsageFlags::COLOR_ATTACHMENT
-                    | vk::ImageUsageFlags::TRANSFER_SRC
-                    | vk::ImageUsageFlags::SAMPLED,
-            )
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let allocation_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::GpuOnly,
-            ..Default::default()
-        };
-        let (resolve_image, resolve_image_alloc, _) =
-            allocator.create_image(&resolve_image_info, &allocation_info)?;
+        let (resolve_image, resolve_image_alloc) =
+            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED, vk::Format::R16G16B16A16_SFLOAT);
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -174,27 +140,8 @@ impl SwapchainWrapper {
         let resolve_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let g0_image_info = vk::ImageCreateInfo::builder()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R16G16B16A16_SFLOAT)
-            .extent(extend_3d)
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(
-                vk::ImageUsageFlags::COLOR_ATTACHMENT
-                    | vk::ImageUsageFlags::INPUT_ATTACHMENT
-                    | vk::ImageUsageFlags::TRANSFER_SRC
-                    | vk::ImageUsageFlags::SAMPLED,
-            )
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let allocation_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::GpuOnly,
-            ..Default::default()
-        };
-        let (g0_image, g0_image_alloc, _) =
-            allocator.create_image(&g0_image_info, &allocation_info)?;
+        let (g0_image, g0_image_alloc) =
+            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED, vk::Format::R16G16B16A16_SFLOAT);
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -209,22 +156,8 @@ impl SwapchainWrapper {
         let g0_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let g1_image_info = vk::ImageCreateInfo::builder()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R16G16B16A16_SFLOAT)
-            .extent(extend_3d)
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let allocation_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::GpuOnly,
-            ..Default::default()
-        };
-        let (g1_image, g1_image_alloc, _) =
-            allocator.create_image(&g1_image_info, &allocation_info)?;
+        let (g1_image, g1_image_alloc) =
+            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, vk::Format::R16G16B16A16_SFLOAT);
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -328,7 +261,7 @@ impl SwapchainWrapper {
         Ok(())
     }
 
-    pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &vk_mem::Allocator) {
+    pub unsafe fn cleanup(&mut self, logical_device: &ash::Device, allocator: &Allocator) {
         logical_device.destroy_framebuffer(self.framebuffer_deferred, None);
         logical_device.destroy_framebuffer(self.framebuffer_pp_a, None);
         logical_device.destroy_framebuffer(self.framebuffer_pp_b, None);

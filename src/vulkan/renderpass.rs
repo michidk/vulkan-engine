@@ -1,4 +1,4 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 pub fn create_deferred_pass(
     color_format: vk::Format,

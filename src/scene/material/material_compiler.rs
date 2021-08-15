@@ -1,6 +1,7 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
+use gpu_allocator::SubAllocation;
 
-use crate::vulkan::descriptor_manager::DescriptorData;
+use crate::vulkan::{allocator::Allocator, descriptor_manager::DescriptorData};
 
 pub fn compile_descriptor_set_layout(
     device: &ash::Device,
@@ -56,8 +57,8 @@ pub fn compile_pipeline_layout(
 
 pub fn compile_resources(
     data: &[DescriptorData],
-    allocator: &vk_mem::Allocator,
-) -> Result<(Vec<DescriptorData>, Vec<vk_mem::Allocation>), vk_mem::Error> {
+    allocator: &Allocator,
+) -> (Vec<DescriptorData>, Vec<SubAllocation>) {
     let mut resources = Vec::with_capacity(data.len());
     let mut allocations = Vec::with_capacity(data.len());
 
@@ -68,16 +69,7 @@ pub fn compile_resources(
                 offset: _,
                 size,
             } => {
-                let buffer_info = vk::BufferCreateInfo::builder()
-                    .usage(vk::BufferUsageFlags::UNIFORM_BUFFER)
-                    .size(*size)
-                    .sharing_mode(vk::SharingMode::EXCLUSIVE)
-                    .build();
-                let alloc_info = vk_mem::AllocationCreateInfo {
-                    usage: vk_mem::MemoryUsage::CpuToGpu,
-                    ..Default::default()
-                };
-                let (buffer, alloc, _) = allocator.create_buffer(&buffer_info, &alloc_info)?;
+                let (buffer, alloc) = allocator.create_buffer(*size, vk::BufferUsageFlags::UNIFORM_BUFFER, gpu_allocator::MemoryLocation::CpuToGpu);
 
                 allocations.push(alloc);
                 resources.push(DescriptorData::UniformBuffer {
@@ -97,5 +89,5 @@ pub fn compile_resources(
         }
     }
 
-    Ok((resources, allocations))
+    (resources, allocations)
 }

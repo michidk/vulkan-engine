@@ -4,7 +4,7 @@ use std::{
     slice,
 };
 
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 /// This enum holds the necessary state for a single DescriptorSet binding.
 /// For usage, see [`DescriptorManager`]

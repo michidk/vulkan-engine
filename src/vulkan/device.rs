@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ash::{version::InstanceV1_0, vk};
+use ash::vk;
 
 use super::error::{GraphicsError, GraphicsResult};
 

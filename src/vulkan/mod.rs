@@ -12,14 +12,11 @@ mod surface;
 mod swapchain;
 pub mod texture;
 pub mod uploader;
+pub mod allocator;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{
-    extensions::ext,
-    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
-    vk::{self, Handle},
-};
+use ash::{extensions::{ext, khr}, vk::{self, Handle}};
 
 use crate::{
     core::camera::{self, CamData},
@@ -32,24 +29,13 @@ use crate::{
     },
 };
 
-use self::{
-    buffer::{PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
-    descriptor_manager::{DescriptorData, DescriptorManager},
-    error::GraphicsResult,
-    lighting_pipeline::LightingPipeline,
-    pp_effect::PPEffect,
-    queue::{PoolsWrapper, QueueFamilies, Queues},
-    surface::SurfaceWrapper,
-    swapchain::SwapchainWrapper,
-    uploader::Uploader,
-};
+use self::{allocator::Allocator, buffer::{PerFrameUniformBuffer, VulkanBuffer}, debug::DebugMessenger, descriptor_manager::{DescriptorData, DescriptorManager}, error::GraphicsResult, lighting_pipeline::LightingPipeline, pp_effect::PPEffect, queue::{PoolsWrapper, QueueFamilies, Queues}, surface::SurfaceWrapper, swapchain::SwapchainWrapper, uploader::Uploader};
 
 pub struct VulkanManager {
     #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
-    pub allocator: std::mem::ManuallyDrop<Rc<vk_mem::Allocator>>,
+    pub allocator: std::mem::ManuallyDrop<Rc<Allocator>>,
     pub device: Rc<ash::Device>,
 
     debug: std::mem::ManuallyDrop<DebugMessenger>,
@@ -81,6 +67,8 @@ pub struct VulkanManager {
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
     pub enable_wireframe: bool,
+
+    pub acc_ext: Option<Rc<khr::AccelerationStructure>>,
 }
 
 impl VulkanManager {
@@ -89,7 +77,7 @@ impl VulkanManager {
         window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> GraphicsResult<Self> {
-        let entry = ash::Entry::new().map_err(anyhow::Error::from)?;
+        let entry = unsafe{ash::Entry::new().map_err(anyhow::Error::from)?};
         let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;
 
         let debug = DebugMessenger::init(&entry, &instance)?;
@@ -100,18 +88,18 @@ impl VulkanManager {
 
         let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
-        let (logical_device, queues) =
+        let (logical_device, queues, raytracing_supported) =
             queue::init_device_and_queues(&instance, physical_device, &queue_families)?;
+
+        let acc_ext = if raytracing_supported {
+            Some(Rc::new(khr::AccelerationStructure::new(&instance, &logical_device)))
+        } else {
+            None
+        };
 
         let logical_device = Rc::new(logical_device);
 
-        let allocator_create_info = vk_mem::AllocatorCreateInfo {
-            physical_device,
-            device: (*logical_device).clone(),
-            instance: instance.clone(),
-            ..Default::default()
-        };
-        let allocator = Rc::new(vk_mem::Allocator::new(&allocator_create_info)?);
+        let allocator = Rc::new(Allocator::new(instance.clone(), logical_device.clone(), physical_device, raytracing_supported));
 
         let mut swapchain = SwapchainWrapper::init(
             &instance,
@@ -170,7 +158,7 @@ impl VulkanManager {
             &allocator,
             max_frames_in_flight as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
+        );
 
         let desc_layout_frame_data_bindings = [
             // CamData
@@ -328,6 +316,8 @@ impl VulkanManager {
             pp_effects: Vec::new(),
             uploader: std::mem::ManuallyDrop::new(uploader),
             enable_wireframe: false,
+
+            acc_ext,
         })
     }
 

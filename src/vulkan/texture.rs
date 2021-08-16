@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
+use gpu_allocator::SubAllocation;
 
-use super::uploader::Uploader;
+use super::{allocator::Allocator, uploader::Uploader};
 
 /// The filtering mode with which a [`Texture2D`] should be sampled.
 pub enum TextureFilterMode {
@@ -16,10 +17,10 @@ pub enum TextureFilterMode {
 ///
 /// A Texture2D will always be in R8G8B8A8 format.
 pub struct Texture2D {
-    allocator: Rc<vk_mem::Allocator>,
+    allocator: Rc<Allocator>,
     device: Rc<ash::Device>,
     image: vk::Image,
-    alloc: vk_mem::Allocation,
+    alloc: SubAllocation,
     /// The [`vk::ImageView`] that can be used to refer to this [`Texture2D`].
     pub view: vk::ImageView,
     pub width: u32,
@@ -40,32 +41,16 @@ impl Texture2D {
         height: u32,
         pixels: &[u8],
         filter: TextureFilterMode,
-        allocator: Rc<vk_mem::Allocator>,
+        allocator: Rc<Allocator>,
         uploader: &mut Uploader,
         device: Rc<ash::Device>,
-    ) -> Result<Rc<Texture2D>, vk_mem::Error> {
-        let image_info = vk::ImageCreateInfo::builder()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(vk::Format::R8G8B8A8_SRGB)
-            .extent(vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            })
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .initial_layout(vk::ImageLayout::UNDEFINED)
-            .build();
-        let alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::GpuOnly,
-            ..Default::default()
-        };
-
-        let (image, alloc, _) = allocator.create_image(&image_info, &alloc_info)?;
+    ) -> Rc<Texture2D> {
+        let (image, alloc) = allocator.create_image(
+            width,
+            height,
+            vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+            vk::Format::R8G8B8A8_SRGB,
+        );
 
         uploader.enqueue_image_upload(
             image,
@@ -116,7 +101,7 @@ impl Texture2D {
             .build();
         let sampler = unsafe { device.create_sampler(&sampler_info, None) }.unwrap();
 
-        Ok(Rc::new(Texture2D {
+        Rc::new(Texture2D {
             allocator,
             device,
             image,
@@ -125,7 +110,7 @@ impl Texture2D {
             width,
             height,
             sampler,
-        }))
+        })
     }
 }
 

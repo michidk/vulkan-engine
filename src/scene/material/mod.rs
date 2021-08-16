@@ -1,8 +1,10 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 use crystal::prelude::{Vec2, Vec3, Vec4};
+use gpu_allocator::SubAllocation;
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
 use crate::vulkan::{
+    allocator::Allocator,
     descriptor_manager::DescriptorData,
     error::{GraphicsError, GraphicsResult},
     lighting_pipeline::LightingPipeline,
@@ -43,7 +45,7 @@ enum MaterialProperty {
 /// This means, multiple variables with the same name in different uniform blocks will clash in the material properties.
 pub struct MaterialPipeline {
     device: Rc<ash::Device>,
-    allocator: Rc<vk_mem::Allocator>,
+    allocator: Rc<Allocator>,
     pipeline: vk::Pipeline,
     pipeline_wireframe: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
@@ -66,7 +68,7 @@ impl MaterialPipeline {
     /// - `lighing_pipeline`: The [LightingPipeline] which will be used in the Deferred Resolve Pass for Materials created with this MaterialPipeline
     pub fn new(
         device: Rc<ash::Device>,
-        allocator: Rc<vk_mem::Allocator>,
+        allocator: Rc<Allocator>,
         shader: &str,
         frame_data_layout: vk::DescriptorSetLayout,
         renderpass: vk::RenderPass,
@@ -234,7 +236,7 @@ impl MaterialPipeline {
     /// Creates a new [`Material`] from the given MaterialPipeline.
     pub fn create_material(self: &Rc<Self>) -> GraphicsResult<Rc<Material>> {
         let (resources, allocations) =
-            material_compiler::compile_resources(&self.resource_infos, self.allocator.as_ref())?;
+            material_compiler::compile_resources(&self.resource_infos, self.allocator.as_ref());
 
         Ok(Rc::new(Material {
             pipeline: self.clone(),
@@ -265,26 +267,17 @@ impl Drop for MaterialPipeline {
 pub struct Material {
     pipeline: Rc<MaterialPipeline>,
     resources: RefCell<Vec<DescriptorData>>,
-    allocations: Vec<vk_mem::Allocation>,
+    allocations: Vec<SubAllocation>,
     textures: RefCell<HashMap<String, Rc<Texture2D>>>,
 }
 
 impl Material {
-    fn set_uniform_property(
-        &self,
-        alloc: &vk_mem::Allocation,
-        offset: u64,
-        size: u64,
-        data: *const u8,
-    ) -> Result<(), vk_mem::Error> {
-        let map = self.pipeline.allocator.map_memory(alloc)?;
+    fn set_uniform_property(&self, alloc: &SubAllocation, offset: u64, size: u64, data: *const u8) {
+        let map = Allocator::get_ptr(alloc) as *mut u8;
         unsafe {
             map.offset(offset as isize)
                 .copy_from_nonoverlapping(data, size as usize);
         }
-        self.pipeline.allocator.unmap_memory(alloc);
-
-        Ok(())
     }
 
     /// Sets a MaterialProperty of type float
@@ -308,7 +301,7 @@ impl Material {
                     *offset as u64,
                     size_of::<f32>() as u64,
                     &val as *const f32 as *const u8,
-                )?;
+                );
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
@@ -337,7 +330,7 @@ impl Material {
                     *offset as u64,
                     size_of::<Vec2<f32>>() as u64,
                     &val as *const Vec2<f32> as *const u8,
-                )?;
+                );
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
@@ -366,7 +359,7 @@ impl Material {
                     *offset as u64,
                     size_of::<Vec3<f32>>() as u64,
                     &val as *const Vec3<f32> as *const u8,
-                )?;
+                );
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
@@ -395,7 +388,7 @@ impl Material {
                     *offset as u64,
                     size_of::<Vec4<f32>>() as u64,
                     &val as *const Vec4<f32> as *const u8,
-                )?;
+                );
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
         }
@@ -479,7 +472,7 @@ impl Drop for Material {
                 }
             }
             for a in &self.allocations {
-                self.pipeline.allocator.free_memory(a);
+                self.pipeline.allocator.free(a);
             }
         }
     }

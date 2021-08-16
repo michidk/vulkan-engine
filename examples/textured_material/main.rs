@@ -108,8 +108,7 @@ fn setup(engine: &mut Engine) {
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
         engine.vulkan_manager.device.clone(),
-    )
-    .unwrap();
+    );
 
     let material0 = pipeline.create_material().unwrap();
     material0.set_float("metallic", 0.0).unwrap();
@@ -147,6 +146,11 @@ fn setup(engine: &mut Engine) {
         mesh_data,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
+        engine
+            .vulkan_manager
+            .rtx_data
+            .as_ref()
+            .map(|rtx_data| rtx_data.acc_ext.clone()),
     )
     .unwrap();
 

@@ -1,4 +1,6 @@
-use ash::{version::DeviceV1_0, vk};
+use std::rc::Rc;
+
+use ash::{extensions::khr::RayTracingPipeline, vk};
 
 use crate::assets::shader;
 
@@ -19,6 +21,86 @@ pub fn create_shader_modules(
         unsafe { device.create_shader_module(&fragmentshader_createinfo, None)? };
 
     Ok((vertexshader_module, fragmentshader_module))
+}
+
+pub fn create_rtx_pipeline(
+    layout: vk::PipelineLayout,
+    ray_gen_shader: &str,
+    ray_chit_shader: &str,
+    device: &ash::Device,
+    rtx_ext: Rc<RayTracingPipeline>,
+) -> vk::Pipeline {
+    let func_name = std::ffi::CString::new("main").unwrap();
+
+    let mut rgen_code = Vec::new();
+    let rgen_shader_module = unsafe {
+        device
+            .create_shader_module(
+                &shader::load_single(ray_gen_shader.to_owned(), &mut rgen_code),
+                None,
+            )
+            .unwrap()
+    };
+
+    let mut rchit_code = Vec::new();
+    let rchit_shader_module = unsafe {
+        device
+            .create_shader_module(
+                &shader::load_single(ray_chit_shader.to_owned(), &mut rchit_code),
+                None,
+            )
+            .unwrap()
+    };
+
+    let stages = [
+        vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::RAYGEN_KHR)
+            .module(rgen_shader_module)
+            .name(&func_name)
+            .build(),
+        vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::CLOSEST_HIT_KHR)
+            .module(rchit_shader_module)
+            .name(&func_name)
+            .build(),
+    ];
+    let groups = [
+        vk::RayTracingShaderGroupCreateInfoKHR::builder()
+            .ty(vk::RayTracingShaderGroupTypeKHR::GENERAL)
+            .general_shader(0)
+            .closest_hit_shader(vk::SHADER_UNUSED_KHR)
+            .any_hit_shader(vk::SHADER_UNUSED_KHR)
+            .intersection_shader(vk::SHADER_UNUSED_KHR)
+            .build(),
+        vk::RayTracingShaderGroupCreateInfoKHR::builder()
+            .ty(vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP)
+            .general_shader(vk::SHADER_UNUSED_KHR)
+            .closest_hit_shader(1)
+            .any_hit_shader(vk::SHADER_UNUSED_KHR)
+            .intersection_shader(vk::SHADER_UNUSED_KHR)
+            .build(),
+    ];
+    let pipe = unsafe {
+        rtx_ext.create_ray_tracing_pipelines(
+            vk::DeferredOperationKHR::null(),
+            vk::PipelineCache::null(),
+            &[vk::RayTracingPipelineCreateInfoKHR::builder()
+                .stages(&stages)
+                .groups(&groups)
+                .max_pipeline_ray_recursion_depth(1)
+                .layout(layout)
+                .build()],
+            None,
+        )
+    }
+    .unwrap()[0];
+
+    unsafe {
+        device.destroy_shader_module(rgen_shader_module, None);
+        device.destroy_shader_module(rchit_shader_module, None);
+    }
+
+    pipe
 }
 
 /// Creates a [`vk::Pipeline`] with the given options.
@@ -46,16 +128,17 @@ pub fn create_pipeline(
     fragmentshader_module: vk::ShaderModule,
     wireframe: bool,
 ) -> Result<vk::Pipeline, vk::Result> {
-    let mainfunctionname = std::ffi::CString::new("main").unwrap();
+    let vert_func_name = std::ffi::CString::new("vert").unwrap();
+    let frag_func_name = std::ffi::CString::new("frag").unwrap();
 
     let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::VERTEX)
         .module(vertexshader_module)
-        .name(&mainfunctionname);
+        .name(&vert_func_name);
     let fragmentshader_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::FRAGMENT)
         .module(fragmentshader_module)
-        .name(&mainfunctionname);
+        .name(&frag_func_name);
     let shader_stages = [vertexshader_stage.build(), fragmentshader_stage.build()];
 
     let vertex_attrib_descs = [

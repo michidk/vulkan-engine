@@ -1,8 +1,6 @@
-use ash::{
-    extensions::khr,
-    version::{DeviceV1_0, InstanceV1_0},
-    vk,
-};
+use std::ffi::CStr;
+
+use ash::{extensions::khr, vk};
 
 use super::{
     error::{GraphicsError, GraphicsResult},
@@ -97,8 +95,26 @@ pub fn init_device_and_queues(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
-) -> GraphicsResult<(ash::Device, Queues)> {
-    let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
+) -> GraphicsResult<(ash::Device, Queues, bool)> {
+    let dev_extensions =
+        unsafe { instance.enumerate_device_extension_properties(physical_device)? };
+
+    let mut raytracing_supported = false;
+    for ext in &dev_extensions {
+        let ext_name = unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) };
+        if ext_name == khr::RayTracingPipeline::name() {
+            log::info!("Enabling raytracing support");
+            raytracing_supported = true;
+        }
+    }
+
+    let mut device_extension_names_raw = vec![khr::Swapchain::name().as_ptr()];
+    if raytracing_supported {
+        device_extension_names_raw.push(khr::RayTracingPipeline::name().as_ptr());
+        device_extension_names_raw.push(khr::AccelerationStructure::name().as_ptr());
+        device_extension_names_raw.push(khr::DeferredHostOperations::name().as_ptr());
+    }
+
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode
     let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true); // TODO: check if feature is supported before force-enabling it
@@ -109,10 +125,29 @@ pub fn init_device_and_queues(
         .queue_priorities(&priorities)
         .build()];
 
-    let device_create_info = vk::DeviceCreateInfo::builder()
+    let mut device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_info)
         .enabled_extension_names(&device_extension_names_raw)
         .enabled_features(&features);
+
+    let mut vk12features = vk::PhysicalDeviceVulkan12Features::builder()
+        .buffer_device_address(raytracing_supported)
+        .build();
+    device_create_info = device_create_info.push_next(&mut vk12features);
+
+    let mut acc_features = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
+        .acceleration_structure(raytracing_supported)
+        .build();
+    if raytracing_supported {
+        device_create_info = device_create_info.push_next(&mut acc_features);
+    }
+
+    let mut ray_pipe_features = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
+        .ray_tracing_pipeline(raytracing_supported)
+        .build();
+    if raytracing_supported {
+        device_create_info = device_create_info.push_next(&mut ray_pipe_features);
+    }
 
     let logical_device: ash::Device =
         unsafe { instance.create_device(physical_device, &device_create_info, None) }?;
@@ -120,5 +155,9 @@ pub fn init_device_and_queues(
     let graphics_queue =
         unsafe { logical_device.get_device_queue(queue_families.graphics_q_index as u32, 0) };
 
-    Ok((logical_device, Queues { graphics_queue }))
+    Ok((
+        logical_device,
+        Queues { graphics_queue },
+        raytracing_supported,
+    ))
 }

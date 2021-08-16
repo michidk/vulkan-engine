@@ -39,8 +39,8 @@ pub fn select_physical_device(
             log::info!("GPU detected: {}", name);
         }
 
-        if vk::version_major(properties.api_version) != VULKAN_VERSION.0
-            || vk::version_minor(properties.api_version) < VULKAN_VERSION.1
+        if vk::api_version_major(properties.api_version) != VULKAN_VERSION.0
+            || vk::api_version_minor(properties.api_version) < VULKAN_VERSION.1
         {
             continue;
         }

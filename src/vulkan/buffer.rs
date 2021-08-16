@@ -12,12 +12,7 @@ pub trait VulkanBuffer {
 }
 
 pub trait MutableBuffer<T: Sized>: VulkanBuffer {
-    fn set_data(
-        &mut self,
-        allocator: &Allocator,
-        data: &T,
-        current_frame_index: u8,
-    );
+    fn set_data(&mut self, allocator: &Allocator, data: &T, current_frame_index: u8);
 }
 
 pub trait ResizableBuffer<T>: MutableBuffer<T> {
@@ -43,7 +38,11 @@ impl<T: Sized> PerFrameUniformBuffer<T> {
         let data_size = mem::size_of::<T>() as u64;
         let aligned_data_size = (data_size + alignment - 1) / alignment * alignment;
 
-        let (buffer, allocation) = allocator.create_buffer(aligned_data_size * num_frames, buffer_usage, gpu_allocator::MemoryLocation::CpuToGpu);
+        let (buffer, allocation) = allocator.create_buffer(
+            aligned_data_size * num_frames,
+            buffer_usage,
+            gpu_allocator::MemoryLocation::CpuToGpu,
+        );
 
         let mapping = Allocator::get_ptr(&allocation) as *mut T;
 
@@ -57,7 +56,6 @@ impl<T: Sized> PerFrameUniformBuffer<T> {
     }
 
     pub fn destroy(&self, allocator: &Allocator) {
-        allocator.free(&self.allocation);
         allocator.destroy_buffer(self.buffer, &self.allocation);
     }
 }
@@ -77,12 +75,7 @@ impl<T: Sized> VulkanBuffer for PerFrameUniformBuffer<T> {
 }
 
 impl<T: Sized> MutableBuffer<T> for PerFrameUniformBuffer<T> {
-    fn set_data(
-        &mut self,
-        _: &Allocator,
-        data: &T,
-        current_frame_index: u8,
-    ) {
+    fn set_data(&mut self, _: &Allocator, data: &T, current_frame_index: u8) {
         let offset = current_frame_index as u64 * self.aligned_data_size;
 
         unsafe {
@@ -122,11 +115,7 @@ impl BufferWrapper {
         }
     }
 
-    pub fn fill<T: Sized>(
-        &mut self,
-        allocator: &Allocator,
-        data: &[T],
-    ) {
+    pub fn fill<T: Sized>(&mut self, allocator: &Allocator, data: &[T]) {
         let bytes_to_write = (data.len() * std::mem::size_of::<T>()) as u64;
         if bytes_to_write > self.capacity {
             log::warn!("Not enough memory allocated in buffer; Resizing");
@@ -144,11 +133,7 @@ impl BufferWrapper {
         self.size
     }
 
-    fn resize(
-        &mut self,
-        allocator: &Allocator,
-        new_capacity: u64,
-    ) {
+    fn resize(&mut self, allocator: &Allocator, new_capacity: u64) {
         allocator.destroy_buffer(self.buffer, &self.allocation);
         let new_buffer = BufferWrapper::new(
             allocator,

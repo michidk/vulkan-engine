@@ -45,7 +45,12 @@ impl Texture2D {
         uploader: &mut Uploader,
         device: Rc<ash::Device>,
     ) -> Rc<Texture2D> {
-        let (image, alloc) = allocator.create_image(width, height, vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB);
+        let (image, alloc) = allocator.create_image(
+            width,
+            height,
+            vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+            vk::Format::R8G8B8A8_SRGB,
+        );
 
         uploader.enqueue_image_upload(
             image,

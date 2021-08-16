@@ -3,7 +3,14 @@ use crystal::prelude::{Vec2, Vec3, Vec4};
 use gpu_allocator::SubAllocation;
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
-use crate::vulkan::{allocator::Allocator, descriptor_manager::DescriptorData, error::{GraphicsError, GraphicsResult}, lighting_pipeline::LightingPipeline, pipeline, texture::Texture2D};
+use crate::vulkan::{
+    allocator::Allocator,
+    descriptor_manager::DescriptorData,
+    error::{GraphicsError, GraphicsResult},
+    lighting_pipeline::LightingPipeline,
+    pipeline,
+    texture::Texture2D,
+};
 
 mod material_compiler;
 
@@ -265,13 +272,7 @@ pub struct Material {
 }
 
 impl Material {
-    fn set_uniform_property(
-        &self,
-        alloc: &SubAllocation,
-        offset: u64,
-        size: u64,
-        data: *const u8,
-    ) {
+    fn set_uniform_property(&self, alloc: &SubAllocation, offset: u64, size: u64, data: *const u8) {
         let map = Allocator::get_ptr(alloc) as *mut u8;
         unsafe {
             map.offset(offset as isize)

@@ -3,7 +3,10 @@ use std::time::Instant;
 use crystal::prelude::*;
 use winit::event::VirtualKeyCode;
 
-use crate::vulkan::{allocator::Allocator, buffer::{self, MutableBuffer}};
+use crate::vulkan::{
+    allocator::Allocator,
+    buffer::{self, MutableBuffer},
+};
 
 use super::input::Input;
 
@@ -46,8 +49,7 @@ impl Camera {
             inv_projection_matrix: self.inv_projection_matrix.into(),
             pos: self.position.into(),
         };
-        buffer
-            .set_data(allocator, &cam_data, current_frame_index);
+        buffer.set_data(allocator, &cam_data, current_frame_index);
     }
 
     fn update_projection_matrix(&mut self) {

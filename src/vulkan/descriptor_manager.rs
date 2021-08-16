@@ -112,7 +112,11 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
         for s in &self.frame_sets[self.frame_index as usize] {
             let removed = self.set_cache.remove(s);
             if let Some(removed) = removed {
-                unsafe { self.device.free_descriptor_sets(self.pool, &[removed.set]) };
+                unsafe {
+                    self.device
+                        .free_descriptor_sets(self.pool, &[removed.set])
+                        .unwrap()
+                };
             }
         }
         self.frame_sets[self.frame_index as usize].clear();

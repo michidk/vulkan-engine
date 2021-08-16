@@ -1,9 +1,6 @@
 use std::ffi::CStr;
 
-use ash::{
-    extensions::khr,
-    vk,
-};
+use ash::{extensions::khr, vk};
 
 use super::{
     error::{GraphicsError, GraphicsResult},
@@ -99,11 +96,12 @@ pub fn init_device_and_queues(
     physical_device: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
 ) -> GraphicsResult<(ash::Device, Queues, bool)> {
-    let dev_extensions = unsafe { instance.enumerate_device_extension_properties(physical_device)? };
+    let dev_extensions =
+        unsafe { instance.enumerate_device_extension_properties(physical_device)? };
 
     let mut raytracing_supported = false;
     for ext in &dev_extensions {
-        let ext_name = unsafe {CStr::from_ptr(ext.extension_name.as_ptr()) };
+        let ext_name = unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) };
         if ext_name == khr::RayTracingPipeline::name() {
             log::info!("Enabling raytracing support");
             raytracing_supported = true;
@@ -157,5 +155,9 @@ pub fn init_device_and_queues(
     let graphics_queue =
         unsafe { logical_device.get_device_queue(queue_families.graphics_q_index as u32, 0) };
 
-    Ok((logical_device, Queues { graphics_queue }, raytracing_supported))
+    Ok((
+        logical_device,
+        Queues { graphics_queue },
+        raytracing_supported,
+    ))
 }

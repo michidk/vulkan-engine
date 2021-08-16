@@ -69,7 +69,11 @@ pub fn compile_resources(
                 offset: _,
                 size,
             } => {
-                let (buffer, alloc) = allocator.create_buffer(*size, vk::BufferUsageFlags::UNIFORM_BUFFER, gpu_allocator::MemoryLocation::CpuToGpu);
+                let (buffer, alloc) = allocator.create_buffer(
+                    *size,
+                    vk::BufferUsageFlags::UNIFORM_BUFFER,
+                    gpu_allocator::MemoryLocation::CpuToGpu,
+                );
 
                 allocations.push(alloc);
                 resources.push(DescriptorData::UniformBuffer {

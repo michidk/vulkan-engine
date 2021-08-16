@@ -23,26 +23,46 @@ pub fn create_shader_modules(
     Ok((vertexshader_module, fragmentshader_module))
 }
 
-pub fn create_rtx_pipeline(layout: vk::PipelineLayout, ray_gen_shader: &str, ray_chit_shader: &str, device: &ash::Device, rtx_ext: Rc<RayTracingPipeline>) -> vk::Pipeline {
+pub fn create_rtx_pipeline(
+    layout: vk::PipelineLayout,
+    ray_gen_shader: &str,
+    ray_chit_shader: &str,
+    device: &ash::Device,
+    rtx_ext: Rc<RayTracingPipeline>,
+) -> vk::Pipeline {
     let func_name = std::ffi::CString::new("main").unwrap();
 
     let mut rgen_code = Vec::new();
-    let rgen_shader_module = unsafe{device.create_shader_module(&shader::load_single(ray_gen_shader.to_owned(), &mut rgen_code), None).unwrap()};
+    let rgen_shader_module = unsafe {
+        device
+            .create_shader_module(
+                &shader::load_single(ray_gen_shader.to_owned(), &mut rgen_code),
+                None,
+            )
+            .unwrap()
+    };
 
     let mut rchit_code = Vec::new();
-    let rchit_shader_module = unsafe{device.create_shader_module(&shader::load_single(ray_chit_shader.to_owned(), &mut rchit_code), None).unwrap()};
+    let rchit_shader_module = unsafe {
+        device
+            .create_shader_module(
+                &shader::load_single(ray_chit_shader.to_owned(), &mut rchit_code),
+                None,
+            )
+            .unwrap()
+    };
 
     let stages = [
         vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::RAYGEN_KHR)
             .module(rgen_shader_module)
             .name(&func_name)
-        .build(),
+            .build(),
         vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::CLOSEST_HIT_KHR)
             .module(rchit_shader_module)
             .name(&func_name)
-        .build(),
+            .build(),
     ];
     let groups = [
         vk::RayTracingShaderGroupCreateInfoKHR::builder()
@@ -51,23 +71,29 @@ pub fn create_rtx_pipeline(layout: vk::PipelineLayout, ray_gen_shader: &str, ray
             .closest_hit_shader(vk::SHADER_UNUSED_KHR)
             .any_hit_shader(vk::SHADER_UNUSED_KHR)
             .intersection_shader(vk::SHADER_UNUSED_KHR)
-        .build(),
+            .build(),
         vk::RayTracingShaderGroupCreateInfoKHR::builder()
             .ty(vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP)
             .general_shader(vk::SHADER_UNUSED_KHR)
             .closest_hit_shader(1)
             .any_hit_shader(vk::SHADER_UNUSED_KHR)
             .intersection_shader(vk::SHADER_UNUSED_KHR)
-        .build(),
+            .build(),
     ];
-    let pipe = unsafe{rtx_ext.create_ray_tracing_pipelines(vk::DeferredOperationKHR::null(), vk::PipelineCache::null(), 
-        &[vk::RayTracingPipelineCreateInfoKHR::builder()
-            .stages(&stages)
-            .groups(&groups)
-            .max_pipeline_ray_recursion_depth(1)
-            .layout(layout)
-        .build()]
-    , None)}.unwrap()[0];
+    let pipe = unsafe {
+        rtx_ext.create_ray_tracing_pipelines(
+            vk::DeferredOperationKHR::null(),
+            vk::PipelineCache::null(),
+            &[vk::RayTracingPipelineCreateInfoKHR::builder()
+                .stages(&stages)
+                .groups(&groups)
+                .max_pipeline_ray_recursion_depth(1)
+                .layout(layout)
+                .build()],
+            None,
+        )
+    }
+    .unwrap()[0];
 
     unsafe {
         device.destroy_shader_module(rgen_shader_module, None);

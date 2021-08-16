@@ -31,7 +31,7 @@ pub fn load(name: &str, kind: ShaderKind, code_ref: &mut Vec<u32>) -> vk::Shader
 
     get_file_as_bytes(file, code_ref);
 
-    *vk::ShaderModuleCreateInfo::builder().code(&code_ref)
+    *vk::ShaderModuleCreateInfo::builder().code(code_ref)
 }
 
 pub fn load_single(name: String, code_ref: &mut Vec<u32>) -> vk::ShaderModuleCreateInfo {
@@ -40,7 +40,7 @@ pub fn load_single(name: String, code_ref: &mut Vec<u32>) -> vk::ShaderModuleCre
 
     get_file_as_bytes(file, code_ref);
 
-    *vk::ShaderModuleCreateInfo::builder().code(&code_ref)
+    *vk::ShaderModuleCreateInfo::builder().code(code_ref)
 }
 
 fn get_file_as_bytes(file: PathBuf, dst: &mut Vec<u32>) {

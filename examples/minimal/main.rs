@@ -119,6 +119,11 @@ fn setup(engine: &mut Engine) {
         mesh_data,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
+        engine
+            .vulkan_manager
+            .rtx_data
+            .as_ref()
+            .map(|rtx_data| rtx_data.acc_ext.clone()),
     )
     .unwrap();
 

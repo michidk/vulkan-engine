@@ -1,7 +1,7 @@
 use ash::vk;
 use gpu_allocator::SubAllocation;
 
-use super::{GraphicsResult, allocator::Allocator, queue, surface};
+use super::{allocator::Allocator, queue, surface, GraphicsResult};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -88,14 +88,13 @@ impl SwapchainWrapper {
                 unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
             swapchain_imageviews.push(imageview);
         }
-        let extend_3d = vk::Extent3D {
-            width: extent.width,
-            height: extent.height,
-            depth: 1,
-        };
 
-        let (depth_image, depth_image_alloc) =
-            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, vk::Format::D24_UNORM_S8_UINT);
+        let (depth_image, depth_image_alloc) = allocator.create_image(
+            extent.width,
+            extent.height,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT,
+            vk::Format::D24_UNORM_S8_UINT,
+        );
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL)
             .base_mip_level(0)
@@ -124,8 +123,14 @@ impl SwapchainWrapper {
         let depth_imageview_depth_only =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let (resolve_image, resolve_image_alloc) =
-            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED, vk::Format::R16G16B16A16_SFLOAT);
+        let (resolve_image, resolve_image_alloc) = allocator.create_image(
+            extent.width,
+            extent.height,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::SAMPLED,
+            vk::Format::R16G16B16A16_SFLOAT,
+        );
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -140,8 +145,16 @@ impl SwapchainWrapper {
         let resolve_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let (g0_image, g0_image_alloc) =
-            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE, vk::Format::R16G16B16A16_SFLOAT);
+        let (g0_image, g0_image_alloc) = allocator.create_image(
+            extent.width,
+            extent.height,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | vk::ImageUsageFlags::INPUT_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::STORAGE,
+            vk::Format::R16G16B16A16_SFLOAT,
+        );
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
@@ -156,8 +169,12 @@ impl SwapchainWrapper {
         let g0_imageview =
             unsafe { logical_device.create_image_view(&imageview_create_info, None) }?;
 
-        let (g1_image, g1_image_alloc) =
-            allocator.create_image(extent.width, extent.height, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, vk::Format::R16G16B16A16_SFLOAT);
+        let (g1_image, g1_image_alloc) = allocator.create_image(
+            extent.width,
+            extent.height,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT,
+            vk::Format::R16G16B16A16_SFLOAT,
+        );
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)

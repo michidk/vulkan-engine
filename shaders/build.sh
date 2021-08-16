@@ -1,3 +1,4 @@
+#!/bin/bash
 
 for src in *.hlsl; do
     echo Compiling Vulkan HLSL shader $src

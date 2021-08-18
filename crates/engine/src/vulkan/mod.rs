@@ -88,11 +88,11 @@ impl VulkanManager {
         window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> GraphicsResult<Self> {
-        let entry = unsafe{ash::Entry::new()}.map_err(anyhow::Error::from)?;
-        let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;
+        let entry = unsafe { ash::Entry::new() }.map_err(anyhow::Error::from)?;
+        let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
         let debug = DebugMessenger::init(&entry, &instance)?;
-        let surface = SurfaceWrapper::init(&window, &entry, &instance);
+        let surface = SurfaceWrapper::init(window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
             device::select_physical_device(&instance)?;
@@ -374,7 +374,7 @@ impl VulkanManager {
             &mut debug::get_debug_create_info(startup_debug_severity, startup_debug_type);
 
         let layer_names = debug::get_layer_names();
-        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(&entry) {
+        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(entry) {
             instance_create_info = instance_create_info
                 .push_next(debug_create_info)
                 .enabled_layer_names(&layer_names);
@@ -525,7 +525,7 @@ impl VulkanManager {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: self.swapchain.extent,
             })
-            .clear_values(&clear_values);
+            .clear_values(clear_values);
         unsafe {
             self.device
                 .cmd_begin_render_pass(commandbuffer, &info, vk::SubpassContents::INLINE);

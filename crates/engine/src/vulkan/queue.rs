@@ -1,7 +1,4 @@
-use ash::{
-    extensions::khr,
-    vk,
-};
+use ash::{extensions::khr, vk};
 
 use super::{
     error::{GraphicsError, GraphicsResult},

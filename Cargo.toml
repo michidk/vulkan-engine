@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "engine",
-    "ve_asset",
-    "ve_format",
-    "ve_shader_reflect",
+    "crates/engine",
+    "crates/ve_asset",
+    "crates/ve_format",
+    "crates/ve_shader_reflect",
 ]
 
 [profile.release]

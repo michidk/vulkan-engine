@@ -7,7 +7,7 @@ use std::{
 
 use ash::vk;
 
-const FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/shaders");
+const FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/shaders");
 
 pub enum ShaderKind {
     Vertex,

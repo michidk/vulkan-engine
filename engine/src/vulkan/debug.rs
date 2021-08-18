@@ -1,4 +1,4 @@
-use ash::{extensions::ext, version::EntryV1_0, vk};
+use ash::{extensions::ext, vk};
 use std::{ffi::c_void, os::raw::c_char};
 use std::{
     ffi::{CStr, CString},

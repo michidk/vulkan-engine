@@ -1,0 +1,22 @@
+[package]
+name = "vulkan_engine"
+version = "0.1.0"
+authors = ["Michael Lohr <michael@lohr.dev>", "Shemnei", "Robin Quint <rob2309@hotmail.de>"]
+edition = "2018"
+
+[lib]
+name = "vulkan_engine"
+
+[dependencies]
+env_logger = "0.8.2"
+log = "0.4.14"
+thiserror = "1.0.23"
+anyhow = "1.0.40"
+ash = "0.33.0"
+ash-window = "0.7.0"
+vk-mem = { git = "https://github.com/aclysma/vk-mem-rs", branch="ash-0.33-build-fix" }
+winit = "0.24.0"
+image = "0.23.13"
+crystal = { path = "../crystal" }
+ve-shader-reflect = { path = "../ve_shader_reflect" }
+ve_format = { path = "../ve_format"}

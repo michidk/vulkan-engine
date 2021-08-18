@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 use super::uploader::Uploader;
 

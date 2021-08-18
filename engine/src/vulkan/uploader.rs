@@ -1,6 +1,6 @@
 use std::{mem::size_of, rc::Rc};
 
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 const DEFAULT_STAGING_BUFFER_SIZE: u64 = 16 * 1024 * 1024;
 

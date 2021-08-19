@@ -13,7 +13,7 @@ build-release:
 	cargo +nightly build --release --example brdf
 
 shaders:
-	ve_shader "./shaders/*" --debug true -o ./assets/shaders/
+	./build-shaders.sh
 
 # build on windows for windows with make for windows
 build-release-windows: prepare-release-windows shaders build-release

@@ -1,12 +1,15 @@
 use std::{mem::size_of, rc::Rc};
 
 use ash::vk;
+use gpu_allocator::{vulkan::Allocation, MemoryLocation};
+
+use super::allocator::Allocator;
 
 const DEFAULT_STAGING_BUFFER_SIZE: u64 = 16 * 1024 * 1024;
 
 struct StagingBuffer {
     buffer: vk::Buffer,
-    alloc: vk_mem::Allocation,
+    alloc: Allocation,
     mapping: *mut u8,
     pos: u64,
     size: u64,
@@ -19,7 +22,7 @@ struct StagingBuffer {
 /// This struct has to be cleaned up manually by calling [`destroy()`](Uploader::destroy()).
 pub struct Uploader {
     device: Rc<ash::Device>,
-    allocator: Rc<vk_mem::Allocator>,
+    allocator: Rc<Allocator>,
     staging_buffers: Vec<StagingBuffer>,
     frame_counter: u64,
     max_frames_ahead: u64,
@@ -32,7 +35,7 @@ impl Uploader {
     /// Creates a new [`Uploader`].
     pub fn new(
         device: Rc<ash::Device>,
-        allocator: Rc<vk_mem::Allocator>,
+        allocator: Rc<Allocator>,
         max_frames_ahead: u64,
         queue_family: u32,
     ) -> Uploader {
@@ -95,8 +98,7 @@ impl Uploader {
         }
 
         for buf in &self.staging_buffers {
-            self.allocator.unmap_memory(&buf.alloc);
-            self.allocator.destroy_buffer(buf.buffer, &buf.alloc);
+            self.allocator.destroy_buffer(buf.buffer, buf.alloc.clone());
         }
 
         unsafe {
@@ -118,21 +120,15 @@ impl Uploader {
 
         // no staging buffer with enough capacity found, create a new one
         let new_size = size.max(DEFAULT_STAGING_BUFFER_SIZE);
-        let buffer_info = vk::BufferCreateInfo::builder()
-            .size(new_size)
-            .usage(vk::BufferUsageFlags::TRANSFER_SRC)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .build();
-        let alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::CpuOnly,
-            ..Default::default()
-        };
-
-        let (buffer, alloc, _) = self
+        let (buffer, alloc) = self
             .allocator
-            .create_buffer(&buffer_info, &alloc_info)
+            .create_buffer(
+                new_size,
+                vk::BufferUsageFlags::TRANSFER_SRC,
+                MemoryLocation::CpuToGpu,
+            )
             .unwrap();
-        let mapping = self.allocator.map_memory(&alloc).unwrap();
+        let mapping = alloc.mapped_ptr().unwrap().as_ptr() as *mut u8;
 
         self.staging_buffers.push(StagingBuffer {
             buffer,

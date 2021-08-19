@@ -7,11 +7,9 @@ pub enum GraphicsError {
     /// General Vulkan API errors
     #[error("Vulkan API error: {0}")]
     Vk(#[from] vk::Result),
-    /// Vulkan memory allocator errors
-    ///
-    /// [`vk_mem::ErrorKind::Vulkan`] will be converted to [`GraphicsError::Vk`].
-    #[error("vk_mem error: {0}")]
-    VkMem(vk_mem::Error),
+    /// Vulkan allocation errors
+    #[error("Allocation error: {0}")]
+    VkMem(#[from] gpu_allocator::AllocationError),
     /// Error during shader property discovery
     #[error("Shader reflection error: {0}")]
     ShaderReflect(#[from] ve_shader_reflect::Error),
@@ -30,15 +28,6 @@ pub enum GraphicsError {
     /// All errors for which no specific variant is available
     #[error(transparent)]
     Other(#[from] anyhow::Error),
-}
-
-impl From<vk_mem::Error> for GraphicsError {
-    fn from(err: vk_mem::Error) -> Self {
-        match err.kind() {
-            vk_mem::ErrorKind::Vulkan(code) => GraphicsError::Vk(*code),
-            _ => GraphicsError::VkMem(err),
-        }
-    }
 }
 
 pub type GraphicsResult<T> = Result<T, GraphicsError>;

@@ -1,8 +1,4 @@
-use ash::{
-    extensions::khr,
-    version::{DeviceV1_0, InstanceV1_0},
-    vk,
-};
+use ash::{extensions::khr, vk};
 
 use super::{
     error::{GraphicsError, GraphicsResult},

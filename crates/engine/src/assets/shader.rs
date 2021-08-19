@@ -7,7 +7,7 @@ use std::{
 
 use ash::vk;
 
-const FOLDER: &str = "./assets/shaders";
+const FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/shaders");
 
 pub enum ShaderKind {
     Vertex,
@@ -31,7 +31,7 @@ pub fn load(name: &str, kind: ShaderKind, code_ref: &mut Vec<u32>) -> vk::Shader
 
     get_file_as_bytes(file, code_ref);
 
-    *vk::ShaderModuleCreateInfo::builder().code(&code_ref)
+    *vk::ShaderModuleCreateInfo::builder().code(code_ref)
 }
 
 fn get_file_as_bytes(file: PathBuf, dst: &mut Vec<u32>) {

@@ -17,7 +17,6 @@ use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::{
     extensions::ext,
-    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
 };
 
@@ -89,11 +88,11 @@ impl VulkanManager {
         window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> GraphicsResult<Self> {
-        let entry = ash::Entry::new().map_err(anyhow::Error::from)?;
-        let instance = VulkanManager::init_instance(engine_info, &entry, &window)?;
+        let entry = unsafe { ash::Entry::new() }.map_err(anyhow::Error::from)?;
+        let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
         let debug = DebugMessenger::init(&entry, &instance)?;
-        let surface = SurfaceWrapper::init(&window, &entry, &instance);
+        let surface = SurfaceWrapper::init(window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
             device::select_physical_device(&instance)?;
@@ -352,10 +351,10 @@ impl VulkanManager {
 
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name)
-            .application_version(vk::make_version(0, 0, 1))
+            .application_version(vk::make_api_version(0, 0, 1, 0))
             .engine_name(&app_name)
-            .engine_version(vk::make_version(0, 0, 1))
-            .api_version(vk::make_version(1, 2, 0));
+            .engine_version(vk::make_api_version(0, 0, 1, 0))
+            .api_version(vk::make_api_version(1, 2, 0, 0));
 
         let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
         let mut extension_names_raw = surface_extensions
@@ -375,7 +374,7 @@ impl VulkanManager {
             &mut debug::get_debug_create_info(startup_debug_severity, startup_debug_type);
 
         let layer_names = debug::get_layer_names();
-        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(&entry) {
+        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(entry) {
             instance_create_info = instance_create_info
                 .push_next(debug_create_info)
                 .enabled_layer_names(&layer_names);
@@ -526,7 +525,7 @@ impl VulkanManager {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: self.swapchain.extent,
             })
-            .clear_values(&clear_values);
+            .clear_values(clear_values);
         unsafe {
             self.device
                 .cmd_begin_render_pass(commandbuffer, &info, vk::SubpassContents::INLINE);

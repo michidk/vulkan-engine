@@ -1,4 +1,4 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 use crystal::prelude::{Vec2, Vec3, Vec4};
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 

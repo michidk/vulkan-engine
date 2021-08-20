@@ -121,10 +121,7 @@ fn setup(engine: &mut Engine) {
         mesh,
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::axis_angle(
-                Vec3::new(1.0, 0.0, 0.0),
-                0.0f32.to_radians(),
-            ),
+            rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.0f32.to_radians()),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     };

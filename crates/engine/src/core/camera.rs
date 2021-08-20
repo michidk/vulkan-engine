@@ -43,11 +43,11 @@ impl Camera {
         current_frame_index: u8,
     ) {
         let cam_data = CamData {
-            view_matrix: self.view_matrix.into(),
-            projection_matrix: self.projection_matrix.into(),
-            inv_view_matrix: self.inv_view_matrix.into(),
-            inv_projection_matrix: self.inv_projection_matrix.into(),
-            pos: self.position.into(),
+            view_matrix: self.view_matrix,
+            projection_matrix: self.projection_matrix,
+            inv_view_matrix: self.inv_view_matrix,
+            inv_projection_matrix: self.inv_projection_matrix,
+            pos: self.position,
         };
         buffer
             .set_data(allocator, &cam_data, current_frame_index)
@@ -55,18 +55,15 @@ impl Camera {
     }
 
     fn update_projection_matrix(&mut self) {
-        self.projection_matrix = Mat4::perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
-        self.inv_projection_matrix = Mat4::inverse_perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
+        self.projection_matrix =
+            Mat4::perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
+        self.inv_projection_matrix =
+            Mat4::inverse_perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
     }
 
     fn get_rotation(&self) -> Quaternion {
-        Quaternion::axis_angle(
-            Vec3::new(0.0, 1.0, 0.0),
-            self.rotation_y,
-        ) * Quaternion::axis_angle(
-            Vec3::new(1.0, 0.0, 0.0),
-            self.rotation_x,
-        )
+        Quaternion::axis_angle(Vec3::new(0.0, 1.0, 0.0), self.rotation_y)
+            * Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), self.rotation_x)
     }
 
     fn update_view_matrix(&mut self) {
@@ -81,7 +78,7 @@ impl Camera {
 
     pub fn move_in_view_direction(&mut self, movement: &Vec3) {
         let rotation = self.get_rotation();
-        self.position += &rotation * movement;
+        self.position += rotation * movement;
         self.update_view_matrix();
     }
 

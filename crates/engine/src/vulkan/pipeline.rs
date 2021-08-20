@@ -46,16 +46,17 @@ pub fn create_pipeline(
     fragmentshader_module: vk::ShaderModule,
     wireframe: bool,
 ) -> Result<vk::Pipeline, vk::Result> {
-    let mainfunctionname = std::ffi::CString::new("main").unwrap();
+    let vert_func_name = std::ffi::CString::new("vert").unwrap();
+    let frag_func_name = std::ffi::CString::new("frag").unwrap();
 
     let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::VERTEX)
         .module(vertexshader_module)
-        .name(&mainfunctionname);
+        .name(&vert_func_name);
     let fragmentshader_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::FRAGMENT)
         .module(fragmentshader_module)
-        .name(&mainfunctionname);
+        .name(&frag_func_name);
     let shader_stages = [vertexshader_stage.build(), fragmentshader_stage.build()];
 
     let vertex_attrib_descs = [

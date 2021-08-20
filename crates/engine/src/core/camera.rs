@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crystal::prelude::*;
+use gfx_maths::*;
 use winit::event::VirtualKeyCode;
 
 use crate::vulkan::{
@@ -11,27 +11,27 @@ use crate::vulkan::{
 use super::input::Input;
 
 pub struct CamData {
-    pub view_matrix: [[f32; 4]; 4],
-    pub projection_matrix: [[f32; 4]; 4],
-    pub inv_view_matrix: [[f32; 4]; 4],
-    pub inv_projection_matrix: [[f32; 4]; 4],
-    pub pos: [[f32; 3]; 1],
+    pub view_matrix: Mat4,
+    pub projection_matrix: Mat4,
+    pub inv_view_matrix: Mat4,
+    pub inv_projection_matrix: Mat4,
+    pub pos: Vec3,
 }
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Camera {
-    view_matrix: Mat4<f32>,
-    position: Vec3<f32>,
+    view_matrix: Mat4,
+    position: Vec3,
     rotation_x: f32,
     rotation_y: f32,
     fovy: f32,
     aspect: f32,
     near: f32,
     far: f32,
-    projection_matrix: Mat4<f32>,
-    inv_view_matrix: Mat4<f32>,
-    inv_projection_matrix: Mat4<f32>,
+    projection_matrix: Mat4,
+    inv_view_matrix: Mat4,
+    inv_projection_matrix: Mat4,
     last_render: Instant,
 }
 
@@ -55,81 +55,53 @@ impl Camera {
     }
 
     fn update_projection_matrix(&mut self) {
-        let a = 1.0 / ((0.5 * self.fovy).tan() * self.aspect);
-        let b = 1.0 / (0.5 * self.fovy).tan();
-        let c = self.far / (self.far - self.near);
-        let d = -self.near * self.far / (self.far - self.near);
-
-        self.projection_matrix = Mat4::new(
-            a, 0.0, 0.0, 0.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, c, d, 0.0, 0.0, 1.0, 0.0,
-        );
-        self.inv_projection_matrix = Mat4::new(
-            1.0 / a,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0 / b,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-            1.0 / d,
-            -c / d,
-        );
+        self.projection_matrix = Mat4::perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
+        self.inv_projection_matrix = Mat4::inverse_perspective_vulkan(self.fovy, self.near, self.far, self.aspect);
     }
 
-    fn get_rotation(&self) -> Quaternion<f32> {
-        Quaternion::from_axis_angle(
-            Unit::new_normalize(Vec3::new(0.0, 1.0, 0.0)),
-            Angle::from_rad(self.rotation_y),
-        ) * Quaternion::from_axis_angle(
-            Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-            Angle::from_rad(self.rotation_x),
+    fn get_rotation(&self) -> Quaternion {
+        Quaternion::axis_angle(
+            Vec3::new(0.0, 1.0, 0.0),
+            self.rotation_y,
+        ) * Quaternion::axis_angle(
+            Vec3::new(1.0, 0.0, 0.0),
+            self.rotation_x,
         )
     }
 
     fn update_view_matrix(&mut self) {
         let rotation = self.get_rotation();
 
-        let m = Mat4::from(rotation.conjugated()) * Mat4::translate(&-self.position);
-        let im = Mat4::translate(&self.position) * Mat4::from(rotation);
+        let m = Mat4::rotate(-rotation) * Mat4::translate(-self.position);
+        let im = Mat4::translate(self.position) * Mat4::rotate(rotation);
 
         self.view_matrix = m;
         self.inv_view_matrix = im;
     }
 
-    pub fn move_in_view_direction(&mut self, movement: &Vec3<f32>) {
+    pub fn move_in_view_direction(&mut self, movement: &Vec3) {
         let rotation = self.get_rotation();
         self.position += &rotation * movement;
         self.update_view_matrix();
     }
 
-    pub fn rotate(&mut self, angle_x: Angle<f32>, angle_y: Angle<f32>) {
-        self.rotation_y += angle_y.to_rad();
-        self.rotation_x = (self.rotation_x + angle_x.to_rad())
-            .min(Angle::from_deg(85.0).to_rad())
-            .max(Angle::from_deg(-85.0).to_rad());
+    pub fn rotate(&mut self, angle_x: f32, angle_y: f32) {
+        self.rotation_y += angle_y;
+        self.rotation_x = (self.rotation_x + angle_x)
+            .min(85.0f32.to_radians())
+            .max(-85.0f32.to_radians());
         self.update_view_matrix();
     }
 
-    pub fn turn_up(&mut self, angle: Angle<f32>) {
-        self.rotation_x += angle.to_rad();
-        if self.rotation_x < Angle::from_deg(-85.0).to_rad() {
-            self.rotation_x = Angle::from_deg(-85.0).to_rad();
-        }
-        if self.rotation_x > Angle::from_deg(85.0).to_rad() {
-            self.rotation_x = Angle::from_deg(85.0).to_rad();
-        }
+    pub fn turn_up(&mut self, angle: f32) {
+        self.rotation_x = (self.rotation_x + angle)
+            .min(85.0f32.to_radians())
+            .max(-85.0f32.to_radians());
 
         self.update_view_matrix();
     }
 
-    pub fn turn_down(&mut self, angle: Angle<f32>) {
+    pub fn turn_down(&mut self, angle: f32) {
         self.turn_up(-angle);
     }
 
@@ -157,11 +129,11 @@ impl Camera {
         let mouse_sensitivity = 0.123f32;
 
         self.rotate(
-            Angle::from_deg(input.get_mouse_delta().1 as f32 * mouse_sensitivity),
-            Angle::from_deg(input.get_mouse_delta().0 as f32 * mouse_sensitivity),
+            (input.get_mouse_delta().1 as f32 * mouse_sensitivity).to_radians(),
+            (input.get_mouse_delta().0 as f32 * mouse_sensitivity).to_radians(),
         );
 
-        let mut movement: Vec3<f32> = Vec3::zero();
+        let mut movement: Vec3 = Vec3::zero();
 
         // WASD movement
         if input.get_button_down(VirtualKeyCode::W) {
@@ -184,7 +156,9 @@ impl Camera {
             movement += Vec3::new(0.0, -1.0, 0.0);
         }
 
-        Unit::new_normalize(movement); // normalize the movement vector, so that diagonal movement is not faster
+        if movement.sqr_magnitude() > 0.0 {
+            movement.normalize();
+        }
 
         let move_speed: f32 = 5.0;
         let move_step = movement * (move_speed * delta);
@@ -193,7 +167,7 @@ impl Camera {
 }
 
 pub struct CameraBuilder {
-    position: Vec3<f32>,
+    position: Vec3,
     rotation: (f32, f32),
     fovy: f32,
     aspect: f32,
@@ -202,7 +176,7 @@ pub struct CameraBuilder {
 }
 
 impl CameraBuilder {
-    pub fn position(&mut self, pos: Vec3<f32>) -> &mut Self {
+    pub fn position(&mut self, pos: Vec3) -> &mut Self {
         self.position = pos;
         self
     }
@@ -212,8 +186,8 @@ impl CameraBuilder {
         self
     }
 
-    pub fn fovy(&mut self, fovy: Angle<f32>) -> &mut Self {
-        let fovy = fovy.to_rad();
+    pub fn fovy(&mut self, fovy: f32) -> &mut Self {
+        let fovy = fovy.to_radians();
         const MIN: f32 = 0.01;
         const MAX: f32 = std::f32::consts::PI - 0.01;
 

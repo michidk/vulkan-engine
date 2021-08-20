@@ -98,6 +98,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto_ops"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7460f7dd8e100147b82a63afca1a20eb6c231ee36b90ba7272e14951cb58af59"
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -376,14 +382,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crystal"
-version = "0.1.1"
-dependencies = [
- "bincode",
- "serde",
-]
-
-[[package]]
 name = "darling"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -524,6 +522,16 @@ name = "fuchsia-zircon-sys"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
+
+[[package]]
+name = "gfx-maths"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2607a2abd1c1c595eff8dd692d8e431b910cea6de2e24a573708d97f51acbb7e"
+dependencies = [
+ "auto_ops",
+ "serde",
+]
 
 [[package]]
 name = "gif"
@@ -1430,8 +1438,8 @@ name = "ve_asset"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "crystal",
  "env_logger",
+ "gfx-maths",
  "log",
  "serde",
  "structopt",
@@ -1446,7 +1454,7 @@ name = "ve_format"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "crystal",
+ "gfx-maths",
  "serde",
  "thiserror",
 ]
@@ -1470,8 +1478,8 @@ dependencies = [
  "anyhow",
  "ash",
  "ash-window",
- "crystal",
  "env_logger",
+ "gfx-maths",
  "gpu-allocator",
  "image",
  "log",

@@ -1,7 +1,7 @@
 use std::{path::Path, process::exit};
 
 /// Renders a brdf example
-use crystal::prelude::*;
+use gfx_maths::*;
 use log::error;
 use vulkan_engine::{
     core::{
@@ -121,9 +121,9 @@ fn setup(engine: &mut Engine) {
         mesh,
         transform: Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::from_axis_angle(
-                Unit::new_normalize(Vec3::new(1.0, 0.0, 0.0)),
-                Angle::from_deg(0.0),
+            rotation: Quaternion::axis_angle(
+                Vec3::new(1.0, 0.0, 0.0),
+                0.0f32.to_radians(),
             ),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },

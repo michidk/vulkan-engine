@@ -1,5 +1,5 @@
 use ash::vk;
-use crystal::prelude::{Vec2, Vec3, Vec4};
+use gfx_maths::*;
 use gpu_allocator::vulkan::Allocation;
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
@@ -325,7 +325,7 @@ impl Material {
     /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
     /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec2`
     /// - [`GraphicsError::VkMem`]
-    pub fn set_vec2(&self, name: &str, val: Vec2<f32>) -> GraphicsResult<()> {
+    pub fn set_vec2(&self, name: &str, val: Vec2) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
@@ -336,8 +336,8 @@ impl Material {
                 self.set_uniform_property(
                     &self.allocations[*binding as usize],
                     *offset as u64,
-                    size_of::<Vec2<f32>>() as u64,
-                    &val as *const Vec2<f32> as *const u8,
+                    size_of::<Vec2>() as u64,
+                    &val as *const Vec2 as *const u8,
                 )?;
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
@@ -354,7 +354,7 @@ impl Material {
     /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
     /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec3`
     /// - [`GraphicsError::VkMem`]
-    pub fn set_vec3(&self, name: &str, val: Vec3<f32>) -> GraphicsResult<()> {
+    pub fn set_vec3(&self, name: &str, val: Vec3) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
@@ -365,8 +365,8 @@ impl Material {
                 self.set_uniform_property(
                     &self.allocations[*binding as usize],
                     *offset as u64,
-                    size_of::<Vec3<f32>>() as u64,
-                    &val as *const Vec3<f32> as *const u8,
+                    size_of::<Vec3>() as u64,
+                    &val as *const Vec3 as *const u8,
                 )?;
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),
@@ -383,7 +383,7 @@ impl Material {
     /// - [`GraphicsError::InvalidMaterialProperty`] when no property with name `name` exists
     /// - [`GraphicsError::InvalidMaterialPropertyType`] when property `name` does not have type `vec4`
     /// - [`GraphicsError::VkMem`]
-    pub fn set_vec4(&self, name: &str, val: Vec4<f32>) -> GraphicsResult<()> {
+    pub fn set_vec4(&self, name: &str, val: Vec4) -> GraphicsResult<()> {
         let prop = self
             .pipeline
             .properties
@@ -394,8 +394,8 @@ impl Material {
                 self.set_uniform_property(
                     &self.allocations[*binding as usize],
                     *offset as u64,
-                    size_of::<Vec4<f32>>() as u64,
-                    &val as *const Vec4<f32> as *const u8,
+                    size_of::<Vec4>() as u64,
+                    &val as *const Vec4 as *const u8,
                 )?;
             }
             _ => return Err(GraphicsError::InvalidMaterialPropertyType(name.to_owned())),

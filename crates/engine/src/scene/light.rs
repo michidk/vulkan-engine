@@ -1,15 +1,15 @@
-use crystal::prelude::Vec4;
+use gfx_maths::*;
 
 #[repr(C)]
 pub struct DirectionalLight {
-    pub direction: Vec4<f32>,
-    pub illuminance: Vec4<f32>, // in lx = lm / m^2
+    pub direction: Vec4,
+    pub illuminance: Vec4, // in lx = lm / m^2
 }
 
 #[repr(C)]
 pub struct PointLight {
-    pub position: Vec4<f32>,
-    pub luminous_flux: Vec4<f32>, // in lm
+    pub position: Vec4,
+    pub luminous_flux: Vec4, // in lm
 }
 
 pub enum Light {

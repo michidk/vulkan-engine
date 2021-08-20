@@ -1,15 +1,15 @@
 use crate::error::Result;
-use crystal::prelude::*;
+use gfx_maths::*;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Vertex {
-    pub position: Vec3<f32>,
-    pub color: Vec3<f32>,
-    pub normal: Vec3<f32>,
-    pub uv: Vec2<f32>,
+    pub position: Vec3,
+    pub color: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
 }
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Submesh {

@@ -14,5 +14,5 @@ pub mod prelude {
     pub use crate::scene;
     pub use crate::utils;
     pub use crate::vulkan;
-    pub use crystal::prelude::*;
+    pub use gfx_maths::*;
 }

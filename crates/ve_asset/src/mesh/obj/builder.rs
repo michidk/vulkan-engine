@@ -1,6 +1,6 @@
 use std::iter;
 
-use crystal::prelude::*;
+use gfx_maths::*;
 
 use log::debug;
 use ve_format::mesh;
@@ -166,20 +166,20 @@ impl ObjMeshBuilder {
         vertices: &mut Vec<mesh::Vertex>,
     ) -> usize {
         // convert position to vec
-        let position: Vec3<f32> = obj_vert.position.into();
+        let position: Vec3 = obj_vert.position.into();
 
         // get color values or default as vec
-        let color: Vec3<f32> = obj_vert.color.unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
+        let color: Vec3 = obj_vert.color.unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
 
         // get uv values from current face index or default as vec
-        let uv: Vec2<f32> = face.face_i[i]
+        let uv: Vec2 = face.face_i[i]
             .uv_i
             .map(|x| uvs[x - 1])
             .unwrap_or_else(|| [0.0, 0.0])
             .into();
 
         // get normal values from current face index or default as vec
-        let normal: Vec3<f32> = face.face_i[i]
+        let normal: Vec3 = face.face_i[i]
             .normal_i
             .map(|x| normals[x - 1])
             .unwrap_or_else(|| [0.0, 0.0, 0.0])
@@ -227,7 +227,7 @@ impl ObjMeshBuilder {
     // - figure out the faces it is used in (using `face_to_vert`)
     // - average the normals of those faces and assign to vertex: (normal1 + normal2 + ... ) / normals.length
     fn calculate_normals(data: &mut mesh::MeshData) {
-        let mut f_normals: Vec<Vec3<f32>> = Vec::new();
+        let mut f_normals: Vec<Vec3> = Vec::new();
 
         let mut face_to_vert: Vec<Vec<usize>> = iter::repeat(Default::default())
             .take(data.vertices.len())
@@ -245,11 +245,11 @@ impl ObjMeshBuilder {
                     data.vertices[v1_i],
                     data.vertices[v2_i],
                 );
-                let u: Vec3<f32> = &v1.position - &v0.position;
-                let v: Vec3<f32> = &v2.position - &v0.position;
-                let normal = &v.cross(&u); // left handed
+                let u: Vec3 = &v1.position - &v0.position;
+                let v: Vec3 = &v2.position - &v0.position;
+                let normal = v.cross(u); // left handed
 
-                f_normals.push(*normal);
+                f_normals.push(normal);
 
                 face_to_vert[v0_i].push(f_normals.len() - 1);
                 face_to_vert[v1_i].push(f_normals.len() - 1);
@@ -259,14 +259,14 @@ impl ObjMeshBuilder {
 
         for (idx, vertex) in data.vertices.iter_mut().enumerate() {
             let faces = &face_to_vert[idx];
-            let mut normal: Vec3<f32> = Vec3::zero();
+            let mut normal: Vec3 = Vec3::zero();
 
             for face_idx in faces {
                 normal += f_normals[*face_idx];
             }
 
             let len = f_normals.len() as f32;
-            let normal = Vec3::new(normal.x() / len, normal.y() / len, normal.z() / len);
+            let normal = Vec3::new(normal.x / len, normal.y / len, normal.z / len);
             vertex.normal = normal;
         }
     }

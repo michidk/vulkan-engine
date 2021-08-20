@@ -17,6 +17,6 @@ ash-window = "0.7.0"
 gpu-allocator = { git="https://github.com/Traverse-Research/gpu-allocator", features=["vulkan"] }
 winit = "0.24.0"
 image = "0.23.13"
-crystal = { path = "../crystal" }
+gfx-maths = "0.2.4"
 ve-shader-reflect = { path = "../ve_shader_reflect" }
 ve_format = { path = "../ve_format"}

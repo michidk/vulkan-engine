@@ -1,7 +1,7 @@
 use std::{path::Path, process::exit};
 
 /// Renders a brdf example
-use crystal::prelude::*;
+use gfx_maths::*;
 use log::error;
 use vulkan_engine::{
     core::{

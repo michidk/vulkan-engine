@@ -1,9 +1,9 @@
-use crystal::prelude::*;
+use gfx_maths::*;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color {
-    color: Vec4<f32>,
+    color: Vec4,
 }
 
 impl Color {
@@ -64,27 +64,15 @@ impl Color {
     }
 }
 
-impl From<Vec3<f32>> for Color {
-    fn from(value: Vec3<f32>) -> Self {
-        Self::rgb_f32(*value.x(), *value.y(), *value.z())
+impl From<Vec3> for Color {
+    fn from(value: Vec3) -> Self {
+        Self::rgb_f32(value.x, value.y, value.z)
     }
 }
 
-impl From<Vec4<f32>> for Color {
-    fn from(value: Vec4<f32>) -> Self {
-        Self::rgba_f32(*value.x(), *value.y(), *value.z(), *value.w())
-    }
-}
-
-impl From<Vec3<u8>> for Color {
-    fn from(value: Vec3<u8>) -> Self {
-        Self::rgb(*value.x(), *value.y(), *value.z())
-    }
-}
-
-impl From<Vec4<u8>> for Color {
-    fn from(value: Vec4<u8>) -> Self {
-        Self::rgba(*value.x(), *value.y(), *value.z(), *value.w())
+impl From<Vec4> for Color {
+    fn from(value: Vec4) -> Self {
+        Self::rgba_f32(value.x, value.y, value.z, value.w)
     }
 }
 

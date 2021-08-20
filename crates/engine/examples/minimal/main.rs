@@ -1,7 +1,7 @@
 /// A minimal example that just initializes the engine but does not display anything
 use std::process::exit;
 
-use crystal::prelude::*;
+use gfx_maths::*;
 use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{

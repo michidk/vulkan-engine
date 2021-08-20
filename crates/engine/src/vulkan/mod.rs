@@ -1,3 +1,4 @@
+pub mod allocator;
 pub(crate) mod buffer;
 mod debug;
 pub mod descriptor_manager;
@@ -32,6 +33,7 @@ use crate::{
 };
 
 use self::{
+    allocator::Allocator,
     buffer::{PerFrameUniformBuffer, VulkanBuffer},
     debug::DebugMessenger,
     descriptor_manager::{DescriptorData, DescriptorManager},
@@ -48,7 +50,7 @@ pub struct VulkanManager {
     #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
-    pub allocator: std::mem::ManuallyDrop<Rc<vk_mem::Allocator>>,
+    pub allocator: std::mem::ManuallyDrop<Rc<Allocator>>,
     pub device: Rc<ash::Device>,
 
     debug: std::mem::ManuallyDrop<DebugMessenger>,
@@ -104,13 +106,11 @@ impl VulkanManager {
 
         let logical_device = Rc::new(logical_device);
 
-        let allocator_create_info = vk_mem::AllocatorCreateInfo {
+        let allocator = Rc::new(Allocator::new(
+            instance.clone(),
             physical_device,
-            device: (*logical_device).clone(),
-            instance: instance.clone(),
-            ..Default::default()
-        };
-        let allocator = Rc::new(vk_mem::Allocator::new(&allocator_create_info)?);
+            (*logical_device).clone(),
+        ));
 
         let mut swapchain = SwapchainWrapper::init(
             &instance,

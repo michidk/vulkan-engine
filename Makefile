@@ -2,15 +2,15 @@
 
 # run and compile
 run:
-	cargo run --example brdf
+	cargo +nightly run --example brdf
 
 build:
-	cargo build --example minimal
-	cargo build --example brdf
+	cargo +nightly build --example minimal
+	cargo +nightly build --example brdf
 
 build-release:
-	cargo build --release --example minimal
-	cargo build --release --example brdf
+	cargo +nightly build --release --example minimal
+	cargo +nightly build --release --example brdf
 
 ifeq ($(OS),Windows_NT)
 release: prepare shaders build-release
@@ -25,16 +25,16 @@ endif
 
 # test and lint
 check:
-	cargo check --all --examples
+	cargo +nightly check --all --examples
 
 test:
-	cargo test --all --examples
+	cargo +nightly test --all --examples
 
 clippy:
-	cargo clippy --all --examples -- -D warnings
+	cargo +nightly clippy --all --examples -- -D warnings
 
 fmt:
-	cargo fmt --all -- --check
+	cargo +nightly fmt --all -- --check
 
 lint: fmt clippy
 

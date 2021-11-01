@@ -35,7 +35,7 @@ BRDF testing:
 
 ## Examples
 
-Examples are in the `/examples` folder. They can be run with `cargo run --example <name>`.
+Examples are in the `/examples` folder. They can be run with `cargo +nightly run --example <name>`.
 | Name | Description |
 | ---- | ----------- |
 | minimal | Displays a triangle using vertex colors |

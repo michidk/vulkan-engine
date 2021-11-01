@@ -598,7 +598,6 @@ dependencies = [
  "backtrace",
  "log",
  "thiserror",
- "winapi",
 ]
 
 [[package]]

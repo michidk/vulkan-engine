@@ -15,7 +15,7 @@ thiserror = "1.0.30"
 anyhow = "1.0.44"
 ash = "0.33.3"
 ash-window = "0.7.0"
-gpu-allocator = { version="0.10.0", features=["vulkan"] }
+gpu-allocator = { version="0.10.0", default-features = false, features=["vulkan"] }
 winit = "0.25.0"
 image = "0.23.14"
 gfx-maths = "0.2.4"

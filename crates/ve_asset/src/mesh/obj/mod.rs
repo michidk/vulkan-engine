@@ -12,11 +12,11 @@ use crate::utils;
 use self::meta::ObjMeta;
 
 fn parse(path: &Path, meta: ObjMeta) -> Result<MeshData> {
-    Ok(parser::parse(&path, meta)?.build_mesh()?)
+    Ok(parser::parse(path, meta)?.build_mesh()?)
 }
 
 fn serialize(mesh: MeshData) -> Result<Vec<u8>> {
-    Ok(mesh.to_bytes().context("Could not serialize MeshData")?)
+    mesh.to_bytes().context("Could not serialize MeshData")
 }
 
 fn save(path: &Path, output_dir: &Path, data: Vec<u8>) -> Result<()> {
@@ -31,7 +31,7 @@ fn parse_meta(path: &Path) -> Result<ObjMeta> {
     let dir = path
         .parent()
         .with_context(|| format!("Path terminates in root or prefix: {}", path.display()))?;
-    let meta_file = utils::file_name(&path)?;
+    let meta_file = utils::file_name(path)?;
     let path = utils::combine_path(dir, meta_file, "toml")?;
 
     let meta: ObjMeta;
@@ -55,6 +55,6 @@ fn parse_meta(path: &Path) -> Result<ObjMeta> {
 
 pub(crate) fn process(path: &Path, output_dir: &Path) -> Result<()> {
     info!("Processing Wavefront `.obj`-file: `{}`", path.display());
-    let meta = parse_meta(&path)?;
+    let meta = parse_meta(path)?;
     save(path, output_dir, serialize(parse(path, meta)?)?)
 }

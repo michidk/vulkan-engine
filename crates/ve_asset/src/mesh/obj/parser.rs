@@ -82,7 +82,7 @@ fn parse_token(token: &str, value: &str, builder: &mut ObjMeshBuilder) -> Result
 }
 
 fn parse_vertex(value: &str) -> Result<ObjVertex, num::ParseFloatError> {
-    let vec = parse_numbers(&value)?;
+    let vec = parse_numbers(value)?;
 
     // check for colors
     let mut color = None;
@@ -118,7 +118,7 @@ fn parse_numbers(value: &str) -> Result<Vec<f32>, num::ParseFloatError> {
 fn parse_face(value: &str) -> Result<ObjFace, ParserError> {
     let face_indexes: Result<Vec<ObjFaceIndex>, _> = value
         .split(' ')
-        .map(|x| parse_face_index(x))
+        .map(parse_face_index)
         .collect::<Result<_, _>>();
     Ok(ObjFace {
         face_i: face_indexes?,

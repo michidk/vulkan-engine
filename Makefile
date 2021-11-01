@@ -42,8 +42,15 @@ lint: fmt clippy
 ## can i commit?
 cic: test lint
 
+ifeq ($(OS),Windows_NT)
 clean:
 	cargo clean
+	rd /s /q "./assets/shaders"
+else
+clean:
+	cargo clean
+	rm -r ./assets/shaders
+endif
 
 # installs binaries
 install:

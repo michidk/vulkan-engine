@@ -119,7 +119,7 @@ impl ObjMeshBuilder {
 
                     // duplicate the vertex if it was already defined with another uv or normal
                     let idx =
-                        Self::find_vertex(i, &uvs, &normals, &mut face, &obj_vert, &mut vertices);
+                        Self::find_vertex(i, &uvs, &normals, &mut face, obj_vert, &mut vertices);
 
                     // triangulate polygons for convex shapes (we might find faces which have more than three indexes)
                     if i > 1 {

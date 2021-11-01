@@ -51,7 +51,7 @@ fn main() -> Result<()> {
             .init();
     }
 
-    Ok(prepare(args)?)
+    prepare(args)
 }
 
 fn prepare(args: CliArgs) -> Result<()> {
@@ -87,13 +87,13 @@ fn prepare(args: CliArgs) -> Result<()> {
         let local_output_folder = output.parent().unwrap_or(output_path);
         if !local_output_folder.exists() {
             fs::create_dir_all(&local_output_folder)
-                .map_err(|x| CliError::ErrorCreatingOutputStructure(x))?;
+                .map_err(CliError::ErrorCreatingOutputStructure)?;
         }
 
         // check extension
         if let Some(Some(extension)) = path.extension().map(|x| x.to_str()) {
             match extension.to_ascii_lowercase().as_ref() {
-                "obj" => obj::process(&path, &local_output_folder)?,
+                "obj" => obj::process(path, local_output_folder)?,
                 "toml" => debug!("Ignored toml file: {}", &path.display()),
                 _ => warn!("Could not handle path: {}", &path.display()),
             }

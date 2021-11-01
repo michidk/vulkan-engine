@@ -27,6 +27,7 @@ fn main() {
                     "Compiling shader {}",
                     &path.file_name().unwrap().to_str().unwrap()
                 );
+
                 let _ = compile_shader(&shader_target_dir, &path, "vert");
                 let _ = compile_shader(&shader_target_dir, &path, "frag");
             }
@@ -44,6 +45,7 @@ fn compile_shader(
         &source_path.file_prefix().unwrap().to_str().unwrap(),
         shader_type
     ));
+
     let output = Command::new("glslc")
         .arg("--target-env=vulkan1.2")
         .arg("-fauto-combined-image-sampler")

@@ -21,3 +21,5 @@ image = "0.23.14"
 gfx-maths = "0.2.4"
 ve-shader-reflect = { path = "../ve_shader_reflect" }
 ve_format = { path = "../ve_format"}
+
+[dev-dependencies]

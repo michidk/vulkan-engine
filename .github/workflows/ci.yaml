@@ -9,12 +9,10 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+          toolchain: stable
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
@@ -27,12 +25,10 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+          toolchain: stable
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
@@ -45,12 +41,10 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+          toolchain: stable
           components: rustfmt, clippy
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
@@ -76,13 +70,10 @@ jobs:
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           target: x86_64-unknown-linux-gnu
-          override: true
-      - name: Install ve_shader
-        run: cargo install ve_shader
       - name: Build
-        run: make build-release-linux
+        run: make build
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
@@ -107,13 +98,10 @@ jobs:
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           target: x86_64-pc-windows-gnu
-          override: true
-      - name: Install ve_shader
-        run: cargo install ve_shader
       - name: Build
-        run: make build-release-mingw
+        run: make build
       - name: Upload
         uses: actions/upload-artifact@v2
         with:

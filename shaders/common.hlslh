@@ -8,3 +8,5 @@ struct Cam {
 };
 
 #define CAM_BINDING [[vk::binding(0, 0)]]
+
+

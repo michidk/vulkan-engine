@@ -5,8 +5,8 @@ use std::fs;
 use std::process::Command;
 
 fn main() {
-    // Tell Cshader_typeo that if the given file changes, to rerun this build script.
-    println!("cshader_typeo:rerun-if-changed=shaders");
+    // Tell Cargo that if the given file changes, to rerun this build script.
+    println!("cargo:rerun-if-changed=shaders/");
 
     let engine_dir = env::current_dir().unwrap(); // .
     let project_dir = engine_dir.parent().unwrap().parent().unwrap(); // ../../
@@ -45,7 +45,7 @@ fn compile_shader(
         shader_type
     ));
     let output = Command::new("glslc")
-        .arg("--tshader_typeet-env=vulkan1.2")
+        .arg("--target-env=vulkan1.2")
         .arg("-fauto-combined-image-sampler")
         .arg(format!("-fshader-stage={}", shader_type))
         .arg(format!("-fentry-point={}", shader_type))

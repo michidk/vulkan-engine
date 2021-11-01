@@ -29,6 +29,7 @@ impl From<DirectionalLight> for Light {
     }
 }
 
+#[derive(Default)]
 pub struct LightManager {
     pub directional_lights: Vec<DirectionalLight>,
     pub point_lights: Vec<PointLight>,
@@ -44,15 +45,6 @@ impl LightManager {
             Point(pl) => {
                 self.point_lights.push(pl);
             }
-        }
-    }
-}
-
-impl Default for LightManager {
-    fn default() -> Self {
-        LightManager {
-            directional_lights: Vec::new(),
-            point_lights: Vec::new(),
         }
     }
 }

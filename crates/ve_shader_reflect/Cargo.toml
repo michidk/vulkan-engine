@@ -1,0 +1,11 @@
+[package]
+name = "ve-shader-reflect"
+version = "0.1.0"
+authors = ["Robin Quint <rob2309@hotmail.de>"]
+description = "Creates material bindings for the shaders"
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+spirv_cross = { git="https://github.com/grovesNL/spirv_cross", rev="98d39abb762d50adb11ba9253569a74fff0ae3c6", features=["glsl"] }
+thiserror = "1.0.30"

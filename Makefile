@@ -1,4 +1,4 @@
-.PHONY: run build build-release shaders build-release-windows build-release-linux check test clippy clippy-hack fmt lint cic cicl prepare-release-windows prepare-release-linux clean install
+.PHONY: run build build-release release check test clippy fmt lint cic clean install
 
 # run and compile
 run:
@@ -12,27 +12,16 @@ build-release:
 	cargo +nightly build --release --example minimal
 	cargo +nightly build --release --example brdf
 
-shaders:
-	ve_shader "./shaders/*" -o ./assets/shaders/
-
-# build on windows for windows with make for windows
-build-release-windows: prepare-release-windows shaders build-release
+ifeq ($(OS),Windows_NT)
+release: prepare shaders build-release
 	xcopy /s /y "assets\*" ".\out\assets\*"
 	xcopy /s /y "target\release\examples\*" "out\"
-
-# build on windows for windows with mingw-make
-build-release-mingw: prepare-release-linux shaders build-release
+else
+release: prepare shaders build-release
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
 	cp ./target/release/examples/* ./out/
-
-# build on linux for linux with make for linux
-build-release-linux: prepare-release-linux shaders build-release
-	mkdir -p ./out/assets/
-	ls ./target/release/
-	ls ./target/release/examples/
-	cp -R ./assets/* ./out/assets/
-	cp ./target/release/examples/* ./out/
+endif
 
 # test and lint
 check:
@@ -53,14 +42,15 @@ lint: fmt clippy
 ## can i commit?
 cic: test lint
 
-prepare-release-windows:
-	mkdir "assets\shaders"
-
-prepare-release-linux:
-	mkdir -p ./assets/shaders
-
+ifeq ($(OS),Windows_NT)
 clean:
 	cargo clean
+	rd /s /q "./assets/shaders"
+else
+clean:
+	cargo clean
+	rm -r ./assets/shaders
+endif
 
 # installs binaries
 install:

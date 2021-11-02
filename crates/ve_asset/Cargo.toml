@@ -1,0 +1,19 @@
+[package]
+name = "ve_asset"
+version = "0.1.0"
+authors = ["Michael Lohr <michael@lohr-ffb.de>"]
+description = "This utility converts different game development assets into a more hardwar-oriented format."
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+gfx-maths = "0.2.4"
+ve_format = { path="../ve_format" }
+structopt = "0.3.25"
+thiserror = "1.0.30"
+anyhow = "1.0.44"
+log = "0.4.14"
+env_logger = "0.9.0"
+serde = { version = "1.0.130", features = ["derive"] }
+toml = "0.5.8"
+walkdir = "2.3.2"

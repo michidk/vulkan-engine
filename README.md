@@ -15,8 +15,6 @@ Currently implemented features are:
 - Deferred rendering
 - `.obj` parser
 - Runs on both Linux and Windows
-- Own math library (named `Crystal`)
-- Custom shader format ([ve-shader](https://github.com/michidk/ve-shader))
 
 ## Screenshots
 
@@ -28,11 +26,11 @@ BRDF testing:
 
 | Folder | Description | Readme |
 | ---- | ----------- | - |
-| `crystal` | A custom math library | [here](./crystal/README.md) |
-| `ve_format` | Stores some shared structs | [here](./ve_format/README.md) |
+| `engine` | Main engine library | This one |
 | `ve_asset` | Utility that converts files into our custom format | [here](./ve_asset/README.md) |
-| `vulkan-engine_derive` | Contains custom derive macros | None |
-| `src` | Main engine library | This one |
+| `ve_format` | Stores some shared structs | [here](./ve_format/README.md) |
+| `ve_shader_reflect` | Contains custom derive macros | [here](./ve_shader_reflect/README.md) |
+
 
 
 ## Examples
@@ -48,13 +46,10 @@ Examples are in the `/examples` folder. They can be run with `cargo +nightly run
 
 ### Prerequisites
 
-- [Rust](https://www.rust-lang.org/)
-- [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
-- Optional: [Vulkan ValidationLayers](https://github.com/KhronosGroup/Vulkan-ValidationLayers)
+- [Rust](https://www.rust-lang.org/) (2021 Edition)
+- [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/) (at least v1.2.189.2)
 
-You need our utility [ve-shader](https://github.com/michidk/ve-shader), which compiles our custom shader format. Install it with `cargo install ve_shader`. ve-shader in return requires [Python 2](https://www.python.org/), Git, cmake and ninja to run.
-
-Compile the shaders with `make shaders`. Then build with `make build` or run an exmaple with `make run`.
+Build with `make build` or run an exmaple with `make run`.
 
 ## Resources
 

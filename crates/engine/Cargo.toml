@@ -1,0 +1,25 @@
+[package]
+name = "vulkan_engine"
+version = "0.1.0"
+authors = ["Michael Lohr <michael@lohr.dev>", "Shemnei", "Robin Quint <rob2309@hotmail.de>"]
+readme = "../../README.md"
+edition = "2021"
+
+[lib]
+name = "vulkan_engine"
+
+[dependencies]
+env_logger = "0.9.0"
+log = "0.4.14"
+thiserror = "1.0.30"
+anyhow = "1.0.44"
+ash = "0.33.3"
+ash-window = "0.7.0"
+gpu-allocator = { version="0.10.0", default-features = false, features=["vulkan"] }
+winit = "0.25.0"
+image = "0.23.14"
+gfx-maths = "0.2.4"
+ve-shader-reflect = { path = "../ve_shader_reflect" }
+ve_format = { path = "../ve_format"}
+
+[dev-dependencies]

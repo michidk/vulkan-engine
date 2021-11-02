@@ -1,0 +1,16 @@
+[package]
+name = "ve_format"
+version = "0.1.0"
+authors = ["Michael Lohr <michael@lohr-ffb.de>"]
+description = "This library hold hardware-oriented structures for game engines."
+readme = "README.md"
+edition = "2021"
+
+[lib]
+name = "ve_format"
+
+[dependencies]
+serde = { version = "1.0.130", features = ["derive"] }
+bincode = "1.3.3"
+gfx-maths = { version = "0.2.4", features = ["serde"] }
+thiserror = "1.0.30"

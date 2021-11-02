@@ -6,8 +6,7 @@ use std::{
 };
 
 pub fn file_name(path: &Path) -> Result<&str> {
-    path
-        .file_stem()
+    path.file_stem()
         .ok_or(anyhow!("No file stem found"))?
         .to_str()
         .ok_or(anyhow!("Can't convert file stem to string"))

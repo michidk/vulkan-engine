@@ -54,7 +54,8 @@ fn compile_shader(
         .arg(&source_path.display().to_string())
         .arg(format!("-o{}", output_path.to_string_lossy()))
         .output()
-        .expect("failed to execute process");
+        .expect("failed to compile shaders using glslc");
+        
     println!("Shader Compiler Output: {:?}", output);
     output
 }

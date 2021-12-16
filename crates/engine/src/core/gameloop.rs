@@ -16,7 +16,7 @@ impl GameLoop {
     pub(crate) fn init(&self) {}
 
     // TODO: implement Update, Render traits and then create type def of combined type; then have a list of them in SceneManager, and call update for all of them
-    pub(crate) fn update(&self, vulkan_manager: &mut VulkanManager, _scene: &Scene) {
+    pub(crate) fn update(&self, vulkan_manager: &mut VulkanManager, _scene: &RefCell<Scene>) {
         if self.input.borrow().get_button_was_down(VirtualKeyCode::F) {
             vulkan_manager.enable_wireframe = !vulkan_manager.enable_wireframe;
         }

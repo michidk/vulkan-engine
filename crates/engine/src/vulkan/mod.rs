@@ -14,7 +14,7 @@ mod swapchain;
 pub mod texture;
 pub mod uploader;
 
-use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
+use std::{cell::RefCell, ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::{
     extensions::ext,
@@ -532,7 +532,7 @@ impl VulkanManager {
         }
     }
 
-    fn build_render_order(models: &[Model]) -> Vec<&Model> {
+    fn build_render_order(models: &[Rc<Model>]) -> Vec<&Model> {
         let mut res: Vec<&Model> = Vec::with_capacity(models.len());
 
         for obj in models {
@@ -852,7 +852,7 @@ impl VulkanManager {
     pub fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
-        scene: &Scene,
+        scene: Rc<RefCell<Scene>>,
     ) -> Result<(), vk::Result> {
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -914,7 +914,8 @@ impl VulkanManager {
             );
         }
 
-        let render_map = Self::build_render_order(&scene.models);
+        let models = &scene.borrow().models;
+        let render_map = Self::build_render_order(models);
         self.render_gpass(commandbuffer, &render_map)?;
 
         unsafe {
@@ -931,7 +932,7 @@ impl VulkanManager {
             );
         }
 
-        self.render_resolve_pass(commandbuffer, &scene.light_manager);
+        self.render_resolve_pass(commandbuffer, &scene.borrow().light_manager);
 
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);

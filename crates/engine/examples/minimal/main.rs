@@ -122,13 +122,13 @@ fn setup(engine: &mut Engine) {
     )
     .unwrap();
 
-    scene.add(Model {
-        material: material0,
-        mesh,
-        transform: Transform {
-            position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-        },
-    });
+    // scene.add(Model {
+    //     material: material0,
+    //     mesh,
+    //     transform: Transform {
+    //         position: Vec3::new(0.0, 0.0, 5.0),
+    //         rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+    //         scale: Vec3::new(1.0, 1.0, 1.0),
+    //     },
+    // });
 }

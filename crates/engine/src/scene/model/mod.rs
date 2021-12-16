@@ -9,5 +9,5 @@ pub mod mesh;
 pub struct Model {
     pub material: Rc<Material>,
     pub mesh: Rc<Mesh>,
-    pub transform: Transform,
+    pub transform: Transform, // TODO: remove
 }

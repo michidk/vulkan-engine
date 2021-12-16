@@ -28,19 +28,19 @@ impl Component for RendererComponent {
     fn attach(&mut self, scene: Rc<RefCell<Scene>>, entity: Weak<RefCell<Entity>>) {
         self.scene = Some(scene);
         self.entity = entity.upgrade();
-        println!("Attach")
+        // println!("Attach")
     }
     fn load(&mut self) {
-        if let Some(scene) = &mut self.scene {
-            scene.borrow_mut().add_model(Rc::clone(&self.model));
+        if let Some(scene) = &self.scene {
+            scene.borrow().add_model(Rc::clone(&self.model));
         }
-        println!("Load Ref");
+        // println!("Load Ref");
     }
     fn start(&self) {
-        println!("Start");
+        // println!("Start");
     }
     fn update(&self) {
-        println!("Update");
+    //     println!("Update");
     }
 }
 

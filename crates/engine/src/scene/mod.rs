@@ -16,7 +16,7 @@ use self::entity::Entity;
 pub struct Scene {
     self_weak: Weak<RefCell<Scene>>,
     pub light_manager: LightManager,
-    pub models: Vec<Rc<Model>>,
+    pub models: RefCell<Vec<Rc<Model>>>,
     pub root_entity: Rc<RefCell<Entity>>,
 }
 
@@ -28,7 +28,7 @@ impl Scene {
             RefCell::new(Self {
                 self_weak: self_weak.clone(),
                 light_manager: LightManager::default(),
-                models: Vec::new(),
+                models: RefCell::new(Vec::new()),
                 root_entity: Rc::clone(&root),
             })
 
@@ -37,8 +37,8 @@ impl Scene {
         self_rc
     }
 
-    pub fn add_model(&mut self, model: Rc<Model>) {
-        self.models.push(model);
+    pub fn add_model(&self, model: Rc<Model>) {
+        self.models.borrow_mut().push(model);
     }
 
     pub fn add_entity(&self, entity: Rc<RefCell<Entity>>) {

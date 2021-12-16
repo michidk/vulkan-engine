@@ -914,8 +914,9 @@ impl VulkanManager {
             );
         }
 
-        let models = &scene.borrow().models;
-        let render_map = Self::build_render_order(models);
+        let scene = &scene.borrow();
+        let models = scene.models.borrow_mut();
+        let render_map = Self::build_render_order(models.as_slice());
         self.render_gpass(commandbuffer, &render_map)?;
 
         unsafe {
@@ -932,7 +933,7 @@ impl VulkanManager {
             );
         }
 
-        self.render_resolve_pass(commandbuffer, &scene.borrow().light_manager);
+        self.render_resolve_pass(commandbuffer, &scene.light_manager);
 
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);

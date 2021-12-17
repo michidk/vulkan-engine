@@ -48,12 +48,6 @@ impl Scene {
     }
 }
 
-impl Drop for Scene {
-    fn drop(&mut self) {
-        println!("Dropping Scene");
-    }
-}
-
 impl Debug for Scene {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Scene")

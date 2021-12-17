@@ -1,10 +1,9 @@
 pub mod renderer;
-pub mod test;
 
 use std::{
     cell::RefCell,
     fmt::Debug,
-    rc::{Rc, Weak},
+    rc::Weak,
 };
 
 use super::{entity::Entity, Scene};

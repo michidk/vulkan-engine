@@ -94,12 +94,5 @@ impl Entity {
 
         self.scene = scene;
         self.attached = true;
-        println!("attach by attach()");
-    }
-}
-
-impl Drop for Entity {
-    fn drop(&mut self) {
-        println!("Dropping Entity root={}", self.is_root());
     }
 }

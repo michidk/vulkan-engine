@@ -14,7 +14,7 @@ mod swapchain;
 pub mod texture;
 pub mod uploader;
 
-use std::{cell::RefCell, ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
+use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::{
     extensions::ext,

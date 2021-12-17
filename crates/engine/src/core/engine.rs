@@ -90,7 +90,6 @@ impl Engine {
 
 impl Drop for Engine {
     fn drop(&mut self) {
-        println!("Dropping Engine");
         self.vulkan_manager.wait_idle();
     }
 }

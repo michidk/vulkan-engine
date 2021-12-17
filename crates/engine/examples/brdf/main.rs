@@ -136,7 +136,7 @@ fn setup(engine: &mut Engine) {
             // println!("start");
             let entity = Entity::new(Rc::downgrade(&scene.root_entity), "BRDF Sphere".to_string());
             let component = RendererComponent::new(Rc::new(model));
-            entity.borrow_mut().add_component(component);
+            entity.add_component(component);
             scene.add_entity(entity);
         }
     }

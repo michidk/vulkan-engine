@@ -9,29 +9,29 @@ use crate::scene::{entity::Entity, model::Model, Scene};
 use super::Component;
 
 pub struct RendererComponent {
-    scene: Weak<Scene>,
-    entity: Weak<RefCell<Entity>>,
+    scene: RefCell<Weak<Scene>>,
+    entity: RefCell<Weak<Entity>>,
     pub model: Rc<Model>,
 }
 
 impl RendererComponent {
-    pub fn new(model: Rc<Model>) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
-            scene: Weak::new(),
-            entity: Weak::new(),
+    pub fn new(model: Rc<Model>) -> Rc<Self> {
+        Rc::new(Self {
+            scene: Weak::new().into(),
+            entity: Weak::new().into(),
             model,
-        }))
+        })
     }
 }
 
 impl Component for RendererComponent {
-    fn attach(&mut self, scene: Weak<Scene>, entity: Weak<RefCell<Entity>>) {
-        self.scene = scene;
-        self.entity = entity;
+    fn attach(&self, scene: Weak<Scene>, entity: Weak<Entity>) {
+        *self.scene.borrow_mut() = scene;
+        *self.entity.borrow_mut() = entity;
         // println!("Attach")
     }
-    fn load(&mut self) {
-        if let Some(scene) = self.scene.upgrade() {
+    fn load(&self) {
+        if let Some(scene) = self.scene.borrow().upgrade() {
             scene.add_model(Rc::clone(&self.model));
         }
         // println!("Load Ref");

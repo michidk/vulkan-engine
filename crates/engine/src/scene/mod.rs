@@ -17,7 +17,7 @@ pub struct Scene {
     self_weak: Weak<Scene>,
     pub light_manager: LightManager,
     pub models: RefCell<Vec<Rc<Model>>>,
-    pub root_entity: Rc<RefCell<Entity>>,
+    pub root_entity: Rc<Entity>,
 }
 
 impl Scene {
@@ -29,7 +29,7 @@ impl Scene {
             models: RefCell::new(Vec::new()),
             root_entity: Rc::clone(&root),
         });
-        root.borrow_mut().attach(Rc::downgrade(&self_rc));
+        root.attach(Rc::downgrade(&self_rc));
         self_rc
     }
 
@@ -37,14 +37,14 @@ impl Scene {
         self.models.borrow_mut().push(model);
     }
 
-    pub fn add_entity(&self, entity: Rc<RefCell<Entity>>) {
-        self.root_entity.borrow_mut().add_child(Rc::clone(&entity));
+    pub fn add_entity(&self, entity: Rc<Entity>) {
+        self.root_entity.add_child(Rc::clone(&entity));
 
-        entity.borrow_mut().attach(self.self_weak.clone());
+        entity.attach(self.self_weak.clone());
     }
 
     pub fn load(&self) {
-        self.root_entity.borrow().load();
+        self.root_entity.load();
     }
 }
 

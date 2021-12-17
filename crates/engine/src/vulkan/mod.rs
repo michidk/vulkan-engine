@@ -661,7 +661,7 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for pl in &light_manager.point_lights {
+                    for pl in &*light_manager.point_lights.borrow() {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -685,7 +685,7 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for dl in &light_manager.directional_lights {
+                    for dl in &*light_manager.directional_lights.borrow() {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -852,7 +852,7 @@ impl VulkanManager {
     pub fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
-        scene: Rc<RefCell<Scene>>,
+        scene: Rc<Scene>,
     ) -> Result<(), vk::Result> {
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -914,7 +914,6 @@ impl VulkanManager {
             );
         }
 
-        let scene = &scene.borrow();
         let models = scene.models.borrow_mut();
         let render_map = Self::build_render_order(models.as_slice());
         self.render_gpass(commandbuffer, &render_map)?;

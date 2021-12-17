@@ -10,26 +10,26 @@ use super::Scene;
 #[derive(Debug)]
 pub struct Entity {
     self_weak: Weak<RefCell<Self>>,
-    parent: Option<Rc<RefCell<Entity>>>,
+    parent: Weak<RefCell<Entity>>,
     pub name: String,
     transform: Mat4,
     pub children: RefCell<Vec<Rc<RefCell<Entity>>>>,
     pub components: RefCell<Vec<Rc<RefCell<dyn Component>>>>,
-    scene: Option<Rc<RefCell<Scene>>>,
+    scene: Weak<Scene>,
     pub attached: bool,
 }
 
 impl Entity {
-    pub fn new(parent: Rc<RefCell<Entity>>, name: String) -> Rc<RefCell<Entity>> {
+    pub fn new(parent: Weak<RefCell<Entity>>, name: String) -> Rc<RefCell<Entity>> {
         Rc::new_cyclic(|self_weak| {
             RefCell::new(Entity {
                 self_weak: self_weak.clone(),
-                parent: Some(parent),
+                parent,
                 name: name.to_string(),
                 transform: Mat4::identity(),
                 children: RefCell::new(Vec::new()),
                 components: RefCell::new(Vec::new()),
-                scene: None,
+                scene: Weak::new(),
                 attached: false,
             })
         })
@@ -39,12 +39,12 @@ impl Entity {
         Rc::new_cyclic(|self_weak| {
             RefCell::new(Entity {
                 self_weak: self_weak.clone(),
-                parent: None,
+                parent: Weak::new(),
                 name: "Scene Root".to_string(),
                 transform: Mat4::identity(),
                 children: RefCell::new(Vec::new()),
                 components: RefCell::new(Vec::new()),
-                scene: None,
+                scene: Weak::new(),
                 attached: false,
             })
         })
@@ -60,44 +60,46 @@ impl Entity {
     }
 
     pub fn is_root(&self) -> bool {
-        !self.parent.is_some()
+        !self.parent.upgrade().is_some()
     }
 
     pub fn add_child(&self, child: Rc<RefCell<Entity>>) {
         self.children.borrow_mut().push(Rc::clone(&child));
 
-        if let Some(scene) = &self.scene {
-            child.borrow_mut().attach(Rc::clone(scene));
-            // println!("attach child by add_child");
-        }
+        child.borrow_mut().attach(Weak::clone(&self.scene));
+        // println!("attach child by add_child");
     }
 
     pub fn add_component(&self, component: Rc<RefCell<dyn Component>>) {
         let comp = Rc::clone(&component);
         self.components.borrow_mut().push(Rc::clone(&component));
 
-        if let Some(scene) = &self.scene {
-            comp.borrow_mut()
-                .attach(Rc::clone(&scene), Weak::clone(&self.self_weak));
-            // println!("attach comp by add_component");
-        }
+        comp.borrow_mut()
+            .attach(Weak::clone(&self.scene), Weak::clone(&self.self_weak));
+        // println!("attach comp by add_component");
     }
 
-    pub fn attach(&mut self, scene: Rc<RefCell<Scene>>) {
+    pub fn attach(&mut self, scene: Weak<Scene>) {
         if self.attached {
             return;
         }
 
         for comp in &*self.components.borrow() {
             comp.borrow_mut()
-                .attach(Rc::clone(&scene), Weak::clone(&self.self_weak));
+                .attach(Weak::clone(&scene), Weak::clone(&self.self_weak));
         }
         for child in &*self.children.borrow() {
-            child.borrow_mut().attach(Rc::clone(&scene));
+            child.borrow_mut().attach(Weak::clone(&scene));
         }
 
-        self.scene = Some(scene);
+        self.scene = scene;
         self.attached = true;
         println!("attach by attach()");
+    }
+}
+
+impl Drop for Entity {
+    fn drop(&mut self) {
+        println!("Dropping Entity root={}", self.is_root());
     }
 }

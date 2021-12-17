@@ -52,7 +52,7 @@ pub struct Engine {
     pub info: EngineInfo,
     pub gameloop: GameLoop,
     pub input: Rc<RefCell<Input>>,
-    pub scene: Rc<RefCell<Scene>>,
+    pub scene: Rc<Scene>,
     pub camera: Camera,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
@@ -90,6 +90,7 @@ impl Engine {
 
 impl Drop for Engine {
     fn drop(&mut self) {
+        println!("Dropping Engine");
         self.vulkan_manager.wait_idle();
     }
 }

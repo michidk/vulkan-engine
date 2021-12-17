@@ -3,11 +3,21 @@ use std::{path::Path, process::exit, rc::Rc};
 /// Renders a brdf example
 use gfx_maths::*;
 use log::error;
-use vulkan_engine::{core::{
+use vulkan_engine::{
+    core::{
         camera::Camera,
         engine::{self, Engine, EngineInit},
         window::{self, Dimensions},
-    }, scene::{component::renderer::RendererComponent, entity::Entity, light::{DirectionalLight, PointLight}, material::MaterialPipeline, model::Model, transform::Transform}};
+    },
+    scene::{
+        component::renderer::RendererComponent,
+        entity::Entity,
+        light::{DirectionalLight, PointLight},
+        material::MaterialPipeline,
+        model::Model,
+        transform::Transform,
+    },
+};
 use vulkan_engine::{
     scene::model::mesh::Mesh,
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
@@ -124,16 +134,17 @@ fn setup(engine: &mut Engine) {
             };
 
             // println!("start");
-            let entity = Entity::new(Rc::clone(&scene.borrow().root_entity), "BRDF Sphere".to_string());
+            let entity = Entity::new(Rc::downgrade(&scene.root_entity), "BRDF Sphere".to_string());
             let component = RendererComponent::new(Rc::new(model));
             entity.borrow_mut().add_component(component);
-            scene.borrow().add_entity(entity);
-            scene.borrow().load();
+            scene.add_entity(entity);
         }
     }
 
+    scene.load();
+
     // setup lights
-    let lights = &mut scene.borrow_mut().light_manager;
+    let lights = &scene.light_manager;
     lights.add_light(DirectionalLight {
         direction: Vec4::new(0., 1., 0., 0.0),
         illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),

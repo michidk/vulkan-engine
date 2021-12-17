@@ -5,18 +5,17 @@ pub mod material;
 pub mod model;
 pub mod transform;
 
-use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
 use self::entity::Entity;
 use self::light::LightManager;
 use self::model::Model;
+use self::transform::TransformData;
 
 pub struct Scene {
     self_weak: Weak<Scene>,
     pub light_manager: LightManager,
-    pub models: RefCell<Vec<Rc<Model>>>,
     pub root_entity: Rc<Entity>,
 }
 
@@ -26,15 +25,10 @@ impl Scene {
         let self_rc = Rc::new_cyclic(|self_weak| Self {
             self_weak: self_weak.clone(),
             light_manager: LightManager::default(),
-            models: RefCell::new(Vec::new()),
             root_entity: Rc::clone(&root),
         });
         root.attach(Rc::downgrade(&self_rc));
         self_rc
-    }
-
-    pub fn add_model(&self, model: Rc<Model>) {
-        self.models.borrow_mut().push(model);
     }
 
     pub fn add_entity(&self, entity: Rc<Entity>) {
@@ -45,6 +39,14 @@ impl Scene {
 
     pub fn load(&self) {
         self.root_entity.load();
+    }
+
+    pub fn collect_renderables(&self) -> Vec<(TransformData, Rc<Model>)> {
+        let mut res = Vec::new();
+
+        self.root_entity.collect_renderables(&mut res);
+
+        res
     }
 }
 

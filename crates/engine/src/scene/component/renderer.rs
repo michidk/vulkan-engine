@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::scene::{entity::Entity, model::Model, Scene};
+use crate::scene::{entity::Entity, model::Model, transform::TransformData, Scene};
 
 use super::Component;
 
@@ -31,9 +31,6 @@ impl Component for RendererComponent {
         // println!("Attach")
     }
     fn load(&self) {
-        if let Some(scene) = self.scene.borrow().upgrade() {
-            scene.add_model(Rc::clone(&self.model));
-        }
         // println!("Load Ref");
     }
     fn start(&self) {
@@ -41,6 +38,20 @@ impl Component for RendererComponent {
     }
     fn update(&self) {
         //     println!("Update");
+    }
+
+    fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
+        let entity = self.entity.borrow();
+        if let Some(entity) = entity.upgrade() {
+            let local2world = entity.get_local_to_world_matrix();
+            let world2local = entity.get_world_to_local_matrix();
+            let transform_data = TransformData {
+                model_matrix: local2world,
+                inv_model_matrix: world2local,
+            };
+
+            models.push((transform_data, self.model.clone()));
+        }
     }
 }
 

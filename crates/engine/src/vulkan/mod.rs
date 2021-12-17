@@ -28,6 +28,7 @@ use crate::{
         light::LightManager,
         material::Material,
         model::{mesh::Mesh, Model},
+        transform::TransformData,
         Scene,
     },
 };
@@ -532,28 +533,28 @@ impl VulkanManager {
         }
     }
 
-    fn build_render_order(models: &[Rc<Model>]) -> Vec<&Model> {
-        let mut res: Vec<&Model> = Vec::with_capacity(models.len());
+    fn build_render_order(models: &[(TransformData, Rc<Model>)]) -> Vec<(TransformData, &Model)> {
+        let mut res: Vec<(TransformData, &Model)> = Vec::with_capacity(models.len());
 
         for obj in models {
             let mut index = 0;
             for cmp in &res {
                 // order: pipeline -> material -> mesh
-                if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
+                if cmp.1.material.get_pipeline().as_raw() > obj.1.material.get_pipeline().as_raw() {
                     break;
                 }
-                if cmp.material.as_ref() as *const Material as *const u8
-                    > obj.material.as_ref() as *const Material as *const u8
+                if cmp.1.material.as_ref() as *const Material as *const u8
+                    > obj.1.material.as_ref() as *const Material as *const u8
                 {
                     break;
                 }
-                if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {
+                if cmp.1.mesh.as_ref() as *const Mesh > obj.1.mesh.as_ref() as *const Mesh {
                     break;
                 }
 
                 index += 1;
             }
-            res.insert(index, obj);
+            res.insert(index, (obj.0, obj.1.as_ref()));
         }
 
         res
@@ -562,7 +563,7 @@ impl VulkanManager {
     fn render_gpass(
         &mut self,
         commandbuffer: vk::CommandBuffer,
-        models: &[&Model],
+        models: &[(TransformData, &Model)],
     ) -> Result<(), vk::Result> {
         let mut last_pipeline = vk::Pipeline::null();
         let mut last_mat: *const u8 = null();
@@ -570,9 +571,9 @@ impl VulkanManager {
         for obj in models {
             unsafe {
                 let pipeline = if self.enable_wireframe {
-                    obj.material.get_wireframe_pipeline()
+                    obj.1.material.get_wireframe_pipeline()
                 } else {
-                    obj.material.get_pipeline()
+                    obj.1.material.get_pipeline()
                 };
 
                 if last_pipeline != pipeline {
@@ -587,20 +588,20 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    last_pipeline = obj.material.get_pipeline();
+                    last_pipeline = obj.1.material.get_pipeline();
                     last_mat = null();
                 }
 
-                let mat = obj.material.as_ref() as *const Material as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
+                let mat = obj.1.material.as_ref() as *const Material as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
                 if mat != last_mat {
                     let mat_desc_set = self.descriptor_manager.get_descriptor_set(
-                        obj.material.get_descriptor_set_layout(),
-                        &obj.material.get_descriptor_data(),
+                        obj.1.material.get_descriptor_set_layout(),
+                        &obj.1.material.get_descriptor_data(),
                     )?;
                     self.device.cmd_bind_descriptor_sets(
                         commandbuffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        obj.material.get_pipeline_layout(),
+                        obj.1.material.get_pipeline_layout(),
                         1,
                         &[mat_desc_set],
                         &[],
@@ -609,17 +610,17 @@ impl VulkanManager {
                     last_mat = mat;
                 }
 
-                let mesh = obj.mesh.as_ref() as *const Mesh;
+                let mesh = obj.1.mesh.as_ref() as *const Mesh;
                 if mesh != last_mesh {
                     self.device.cmd_bind_vertex_buffers(
                         commandbuffer,
                         0,
-                        &[obj.mesh.vertex_buffer],
+                        &[obj.1.mesh.vertex_buffer],
                         &[0],
                     );
                     self.device.cmd_bind_index_buffer(
                         commandbuffer,
-                        obj.mesh.index_buffer,
+                        obj.1.mesh.index_buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
@@ -627,15 +628,14 @@ impl VulkanManager {
                     last_mesh = mesh;
                 }
 
-                let transform_data = obj.transform.get_transform_data();
                 self.push_constants(
                     commandbuffer,
-                    obj.material.get_pipeline_layout(),
+                    obj.1.material.get_pipeline_layout(),
                     vk::ShaderStageFlags::VERTEX,
-                    &transform_data,
+                    &obj.0,
                 );
 
-                for sm in &obj.mesh.submeshes {
+                for sm in &obj.1.mesh.submeshes {
                     self.device
                         .cmd_draw_indexed(commandbuffer, sm.1, 1, sm.0, 0, 0);
                 }
@@ -914,7 +914,8 @@ impl VulkanManager {
             );
         }
 
-        let models = scene.models.borrow_mut();
+        let models = scene.collect_renderables();
+
         let render_map = Self::build_render_order(models.as_slice());
         self.render_gpass(commandbuffer, &render_map)?;
 

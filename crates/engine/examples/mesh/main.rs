@@ -121,14 +121,17 @@ fn setup(engine: &mut Engine) {
     let model = Model {
         material: brdf_material0,
         mesh,
-        transform: Transform {
+    };
+
+    let entity = Entity::new_with_transform(
+        Rc::downgrade(&scene.root_entity),
+        "Cube".to_string(),
+        Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.0f32.to_radians()),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
-    };
-
-    let entity = Entity::new(Rc::downgrade(&scene.root_entity), "Cube".to_string());
+    );
     let comp = RendererComponent::new(Rc::new(model));
     entity.add_component(comp);
     scene.add_entity(entity);

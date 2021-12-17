@@ -155,14 +155,17 @@ fn setup(engine: &mut Engine) {
     let model = Model {
         material: material0,
         mesh,
-        transform: Transform {
+    };
+
+    let entity = Entity::new_with_transform(
+        Rc::downgrade(&scene.root_entity),
+        "Quad".to_owned(),
+        Transform {
             position: Vec3::new(0.0, 0.0, 10.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
-    };
-
-    let entity = Entity::new(Rc::downgrade(&scene.root_entity), "Quad".to_owned());
+    );
     let comp = RendererComponent::new(Rc::new(model));
     entity.add_component(comp);
     scene.add_entity(entity);

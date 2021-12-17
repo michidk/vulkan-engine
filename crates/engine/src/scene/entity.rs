@@ -2,9 +2,11 @@ use std::cell::{Cell, RefCell};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
-use gfx_maths::Mat4;
+use gfx_maths::{Mat4, Quaternion, Vec3};
 
 use super::component::Component;
+use super::model::Model;
+use super::transform::{Transform, TransformData};
 use super::Scene;
 
 #[derive(Debug)]
@@ -12,7 +14,7 @@ pub struct Entity {
     self_weak: Weak<Self>,
     parent: Weak<Entity>,
     pub name: String,
-    transform: Mat4,
+    transform: Transform,
     pub children: RefCell<Vec<Rc<Entity>>>,
     pub components: RefCell<Vec<Rc<dyn Component>>>,
     scene: RefCell<Weak<Scene>>,
@@ -25,7 +27,28 @@ impl Entity {
             self_weak: self_weak.clone(),
             parent,
             name: name.to_string(),
-            transform: Mat4::identity(),
+            transform: Transform {
+                position: Vec3::zero(),
+                rotation: Quaternion::identity(),
+                scale: Vec3::one(),
+            },
+            children: RefCell::new(Vec::new()),
+            components: RefCell::new(Vec::new()),
+            scene: RefCell::new(Weak::new()),
+            attached: false.into(),
+        })
+    }
+
+    pub fn new_with_transform(
+        parent: Weak<Entity>,
+        name: String,
+        transform: Transform,
+    ) -> Rc<Entity> {
+        Rc::new_cyclic(|self_weak| Entity {
+            self_weak: self_weak.clone(),
+            parent,
+            name: name.to_string(),
+            transform,
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: RefCell::new(Weak::new()),
@@ -38,7 +61,11 @@ impl Entity {
             self_weak: self_weak.clone(),
             parent: Weak::new(),
             name: "Scene Root".to_string(),
-            transform: Mat4::identity(),
+            transform: Transform {
+                position: Vec3::zero(),
+                rotation: Quaternion::identity(),
+                scale: Vec3::one(),
+            },
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: RefCell::new(Weak::new()),
@@ -91,5 +118,41 @@ impl Entity {
 
         *self.scene.borrow_mut() = scene;
         self.attached.set(true);
+    }
+
+    pub fn collect_renderables(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
+        for comp in &*self.components.borrow() {
+            comp.render(models);
+        }
+
+        for child in &*self.children.borrow() {
+            child.collect_renderables(models);
+        }
+    }
+
+    pub fn get_model_matrix(&self) -> Mat4 {
+        self.transform.get_model_matrix()
+    }
+
+    pub fn get_local_to_world_matrix(&self) -> Mat4 {
+        if let Some(parent) = self.parent.upgrade() {
+            let parent_to_world = parent.get_local_to_world_matrix();
+            parent_to_world * self.get_model_matrix()
+        } else {
+            self.get_model_matrix()
+        }
+    }
+
+    pub fn get_inverse_model_matrix(&self) -> Mat4 {
+        self.transform.get_inverse_model_matrix()
+    }
+
+    pub fn get_world_to_local_matrix(&self) -> Mat4 {
+        if let Some(parent) = self.parent.upgrade() {
+            let world_to_parent = parent.get_world_to_local_matrix();
+            self.get_inverse_model_matrix() * world_to_parent
+        } else {
+            self.get_inverse_model_matrix()
+        }
     }
 }

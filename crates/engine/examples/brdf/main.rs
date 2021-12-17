@@ -126,15 +126,18 @@ fn setup(engine: &mut Engine) {
             let model = Model {
                 material,
                 mesh: mesh_sphere_smooth.clone(),
-                transform: Transform {
+            };
+
+            // println!("start");
+            let entity = Entity::new_with_transform(
+                Rc::downgrade(&scene.root_entity),
+                "BRDF Sphere".to_string(),
+                Transform {
                     position: Vec3::new(x as f32 - 5.0, y as f32 - 5.0, 10.0),
                     rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
                     scale: Vec3::new(0.5, 0.5, 0.5),
                 },
-            };
-
-            // println!("start");
-            let entity = Entity::new(Rc::downgrade(&scene.root_entity), "BRDF Sphere".to_string());
+            );
             let component = RendererComponent::new(Rc::new(model));
             entity.add_component(component);
             scene.add_entity(entity);

@@ -14,7 +14,7 @@ pub struct Entity {
     self_weak: Weak<Self>,
     parent: Weak<Entity>,
     pub name: String,
-    transform: Transform,
+    pub transform: RefCell<Transform>,
     pub children: RefCell<Vec<Rc<Entity>>>,
     pub components: RefCell<Vec<Rc<dyn Component>>>,
     scene: RefCell<Weak<Scene>>,
@@ -31,7 +31,8 @@ impl Entity {
                 position: Vec3::zero(),
                 rotation: Quaternion::identity(),
                 scale: Vec3::one(),
-            },
+            }
+            .into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: RefCell::new(Weak::new()),
@@ -48,7 +49,7 @@ impl Entity {
             self_weak: self_weak.clone(),
             parent,
             name: name.to_string(),
-            transform,
+            transform: transform.into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: RefCell::new(Weak::new()),
@@ -65,7 +66,8 @@ impl Entity {
                 position: Vec3::zero(),
                 rotation: Quaternion::identity(),
                 scale: Vec3::one(),
-            },
+            }
+            .into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: RefCell::new(Weak::new()),
@@ -94,7 +96,7 @@ impl Entity {
         // println!("attach child by add_child");
     }
 
-    pub fn add_component(&self, component: Rc<dyn Component>) {
+    pub fn add_component(&self, component: Rc<dyn Component>) -> &Self {
         self.components.borrow_mut().push(Rc::clone(&component));
 
         component.attach(
@@ -102,6 +104,8 @@ impl Entity {
             Weak::clone(&self.self_weak),
         );
         // println!("attach comp by add_component");
+
+        self
     }
 
     pub fn attach(&self, scene: Weak<Scene>) {
@@ -131,7 +135,7 @@ impl Entity {
     }
 
     pub fn get_model_matrix(&self) -> Mat4 {
-        self.transform.get_model_matrix()
+        self.transform.borrow().get_model_matrix()
     }
 
     pub fn get_local_to_world_matrix(&self) -> Mat4 {
@@ -144,7 +148,7 @@ impl Entity {
     }
 
     pub fn get_inverse_model_matrix(&self) -> Mat4 {
-        self.transform.get_inverse_model_matrix()
+        self.transform.borrow().get_inverse_model_matrix()
     }
 
     pub fn get_world_to_local_matrix(&self) -> Mat4 {
@@ -153,6 +157,16 @@ impl Entity {
             self.get_inverse_model_matrix() * world_to_parent
         } else {
             self.get_inverse_model_matrix()
+        }
+    }
+
+    pub fn update(&self, delta: f32) {
+        for comp in &*self.components.borrow() {
+            comp.update(delta);
+        }
+
+        for child in &*self.children.borrow() {
+            child.update(delta);
         }
     }
 }

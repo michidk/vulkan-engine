@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::core::engine::EngineInit;
 use winit::event::Event;
 
@@ -141,6 +143,8 @@ impl Window {
 }
 
 pub fn start(engine_init: EngineInit) -> ! {
+    let mut last_time = Instant::now();
+
     let mut engine = engine_init.engine;
     engine.window.on_start();
     engine_init.eventloop.run(move |event, _, controlflow| {
@@ -162,9 +166,14 @@ pub fn start(engine_init: EngineInit) -> ! {
             // render
             Event::MainEventsCleared => {
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
+
+                let now = Instant::now();
+                let delta = (now - last_time).as_secs_f32();
+                last_time = now;
+
                 engine
                     .gameloop
-                    .update(&mut engine.vulkan_manager, &engine.scene);
+                    .update(&mut engine.vulkan_manager, &engine.scene, delta);
                 engine.render();
                 engine.input.borrow_mut().rollover_state();
             }

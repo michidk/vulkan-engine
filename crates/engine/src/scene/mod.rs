@@ -48,6 +48,10 @@ impl Scene {
 
         res
     }
+
+    pub fn update(&self, delta: f32) {
+        self.root_entity.update(delta);
+    }
 }
 
 impl Debug for Scene {

@@ -36,7 +36,7 @@ impl Component for RendererComponent {
     fn start(&self) {
         // println!("Start");
     }
-    fn update(&self) {
+    fn update(&self, _delta: f32) {
         //     println!("Update");
     }
 

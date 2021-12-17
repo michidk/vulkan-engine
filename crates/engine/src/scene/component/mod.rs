@@ -11,7 +11,7 @@ pub trait Component: Debug {
     fn attach(&self, scene: Weak<Scene>, entity: Weak<Entity>);
     fn load(&self);
     fn start(&self);
-    fn update(&self);
+    fn update(&self, delta: f32);
 
-    fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {}
+    fn render(&self, _models: &mut Vec<(TransformData, Rc<Model>)>) {}
 }

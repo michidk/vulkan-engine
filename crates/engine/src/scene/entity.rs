@@ -51,6 +51,7 @@ impl Entity {
     }
 
     pub fn load(&self) {
+        // println!("Loading Entity: {}", self.name);
         self.components.borrow().iter().for_each(|component| {
             component.load();
         });

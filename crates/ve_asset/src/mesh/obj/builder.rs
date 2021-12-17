@@ -86,9 +86,9 @@ impl ObjMeshBuilder {
 
     pub(crate) fn push_normal(&mut self, mut normal: [f32; 3]) {
         // invert normals if necessary
-        for n in 0..3 {
+        for (n, normal) in normal.iter_mut().enumerate() {
             if self.meta.flip_axis[n] {
-                normal[n] = -normal[n];
+                *normal = -*normal;
             }
         }
 
@@ -159,8 +159,8 @@ impl ObjMeshBuilder {
 
     fn find_vertex(
         i: usize,
-        uvs: &Vec<[f32; 2]>,
-        normals: &Vec<[f32; 3]>,
+        uvs: &[[f32; 2]],
+        normals: &[[f32; 3]],
         face: &mut ObjFace,
         obj_vert: &ObjVertex,
         vertices: &mut Vec<mesh::Vertex>,
@@ -200,7 +200,9 @@ impl ObjMeshBuilder {
 
         let vert_idx: usize;
         // create new vertex if not already existing
-        if potential_vert_idx.is_none() {
+        if let Some(potential_vert_idx) = potential_vert_idx {
+            vert_idx = potential_vert_idx;
+        } else {
             let vertex = mesh::Vertex {
                 position,
                 color,
@@ -209,8 +211,6 @@ impl ObjMeshBuilder {
             };
             vertices.push(vertex);
             vert_idx = vertices.len() - 1;
-        } else {
-            vert_idx = potential_vert_idx.unwrap();
         }
 
         vert_idx
@@ -245,8 +245,8 @@ impl ObjMeshBuilder {
                     data.vertices[v1_i],
                     data.vertices[v2_i],
                 );
-                let u: Vec3 = &v1.position - &v0.position;
-                let v: Vec3 = &v2.position - &v0.position;
+                let u: Vec3 = v1.position - v0.position;
+                let v: Vec3 = v2.position - v0.position;
                 let normal = v.cross(u); // left handed
 
                 f_normals.push(normal);

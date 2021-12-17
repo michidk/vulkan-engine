@@ -1,9 +1,6 @@
 pub mod renderer;
 
-use std::{
-    fmt::Debug,
-    rc::Weak,
-};
+use std::{fmt::Debug, rc::Weak};
 
 use super::{entity::Entity, Scene};
 

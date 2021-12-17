@@ -7,9 +7,9 @@ use std::{
 
 pub fn file_name(path: &Path) -> Result<&str> {
     path.file_stem()
-        .ok_or(anyhow!("No file stem found"))?
+        .ok_or_else(|| anyhow!("No file stem found"))?
         .to_str()
-        .ok_or(anyhow!("Can't convert file stem to string"))
+        .ok_or_else(|| anyhow!("Can't convert file stem to string"))
 }
 
 pub fn combine_path(directory: &Path, file_name: &str, extension: &str) -> Result<PathBuf> {

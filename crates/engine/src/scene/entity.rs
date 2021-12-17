@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
@@ -21,32 +21,28 @@ pub struct Entity {
 
 impl Entity {
     pub fn new(parent: Weak<Entity>, name: String) -> Rc<Entity> {
-        Rc::new_cyclic(|self_weak| {
-            Entity {
-                self_weak: self_weak.clone(),
-                parent,
-                name: name.to_string(),
-                transform: Mat4::identity(),
-                children: RefCell::new(Vec::new()),
-                components: RefCell::new(Vec::new()),
-                scene: RefCell::new(Weak::new()),
-                attached: false.into(),
-            }
+        Rc::new_cyclic(|self_weak| Entity {
+            self_weak: self_weak.clone(),
+            parent,
+            name: name.to_string(),
+            transform: Mat4::identity(),
+            children: RefCell::new(Vec::new()),
+            components: RefCell::new(Vec::new()),
+            scene: RefCell::new(Weak::new()),
+            attached: false.into(),
         })
     }
 
     pub(crate) fn new_root() -> Rc<Entity> {
-        Rc::new_cyclic(|self_weak| {
-            Entity {
-                self_weak: self_weak.clone(),
-                parent: Weak::new(),
-                name: "Scene Root".to_string(),
-                transform: Mat4::identity(),
-                children: RefCell::new(Vec::new()),
-                components: RefCell::new(Vec::new()),
-                scene: RefCell::new(Weak::new()),
-                attached: false.into(),
-            }
+        Rc::new_cyclic(|self_weak| Entity {
+            self_weak: self_weak.clone(),
+            parent: Weak::new(),
+            name: "Scene Root".to_string(),
+            transform: Mat4::identity(),
+            children: RefCell::new(Vec::new()),
+            components: RefCell::new(Vec::new()),
+            scene: RefCell::new(Weak::new()),
+            attached: false.into(),
         })
     }
 
@@ -61,7 +57,7 @@ impl Entity {
     }
 
     pub fn is_root(&self) -> bool {
-        !self.parent.upgrade().is_some()
+        self.parent.upgrade().is_none()
     }
 
     pub fn add_child(&self, child: Rc<Entity>) {
@@ -74,7 +70,10 @@ impl Entity {
     pub fn add_component(&self, component: Rc<dyn Component>) {
         self.components.borrow_mut().push(Rc::clone(&component));
 
-        component.attach(Weak::clone(&self.scene.borrow()), Weak::clone(&self.self_weak));
+        component.attach(
+            Weak::clone(&self.scene.borrow()),
+            Weak::clone(&self.self_weak),
+        );
         // println!("attach comp by add_component");
     }
 

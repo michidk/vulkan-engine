@@ -16,11 +16,12 @@ pub struct Entity {
     pub children: RefCell<Vec<Rc<RefCell<Entity>>>>,
     pub components: RefCell<Vec<Rc<RefCell<dyn Component>>>>,
     scene: Option<Rc<RefCell<Scene>>>,
-    pub attached: bool,
+    pub attached: bool, // TODO: also check if the enitity was loaded before
 }
 
 impl Entity {
     pub fn new(parent: Rc<RefCell<Entity>>, name: String) -> Rc<RefCell<Entity>> {
+        // println!("Created entity: {}", name);
         Rc::new_cyclic(|self_weak| {
             RefCell::new(Entity {
                 self_weak: self_weak.clone(),
@@ -36,6 +37,7 @@ impl Entity {
     }
 
     pub(crate) fn new_root() -> Rc<RefCell<Entity>> {
+        // println!("Created root entity");
         Rc::new_cyclic(|self_weak| {
             RefCell::new(Entity {
                 self_weak: self_weak.clone(),
@@ -51,6 +53,7 @@ impl Entity {
     }
 
     pub fn load(&self) {
+        // println!("Loading Entity: {}", self.name);
         self.components.borrow().iter().for_each(|component| {
             component.borrow_mut().load();
         });
@@ -98,6 +101,6 @@ impl Entity {
 
         self.scene = Some(scene);
         self.attached = true;
-        println!("attach by attach()");
+        // println!("attach by attach()");
     }
 }

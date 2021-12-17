@@ -128,9 +128,10 @@ fn setup(engine: &mut Engine) {
             let component = RendererComponent::new(Rc::new(model));
             entity.borrow_mut().add_component(component);
             scene.borrow().add_entity(entity);
-            scene.borrow().load();
         }
     }
+
+    scene.borrow().load();
 
     // setup lights
     let lights = &mut scene.borrow_mut().light_manager;

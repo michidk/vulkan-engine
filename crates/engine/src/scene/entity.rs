@@ -20,9 +20,9 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub(crate) fn new(scene: &Rc<Scene>, name: String) -> Rc<Entity> {
+    pub(crate) fn new(scene: &Rc<Scene>, parent: &Rc<Entity>, name: String) -> Rc<Entity> {
         let res = Rc::new(Entity {
-            parent: Rc::downgrade(&scene.root_entity).into(),
+            parent: Rc::downgrade(parent).into(),
             name,
             transform: Transform {
                 position: Vec3::zero(),
@@ -35,18 +35,19 @@ impl Entity {
             scene: Rc::downgrade(scene),
         });
 
-        scene.root_entity.add_child(res.clone());
+        parent.add_child(res.clone());
 
         res
     }
 
     pub(crate) fn new_with_transform(
         scene: &Rc<Scene>,
+        parent: &Rc<Entity>,
         name: String,
         transform: Transform,
     ) -> Rc<Entity> {
         let res = Rc::new(Entity {
-            parent: Rc::downgrade(&scene.root_entity).into(),
+            parent: Rc::downgrade(parent).into(),
             name,
             transform: transform.into(),
             children: RefCell::new(Vec::new()),
@@ -54,7 +55,7 @@ impl Entity {
             scene: Rc::downgrade(scene),
         });
 
-        scene.root_entity.add_child(res.clone());
+        parent.add_child(res.clone());
 
         res
     }

@@ -1,5 +1,3 @@
-#![feature(path_file_prefix)]
-
 use std::env;
 use std::fs;
 use std::process::Command;
@@ -42,7 +40,7 @@ fn compile_shader(
 ) -> std::process::Output {
     let output_path = target_dir.join(format!(
         "{}-{}.spv",
-        &source_path.file_prefix().unwrap().to_str().unwrap(),
+        &source_path.file_stem().unwrap().to_str().unwrap(),
         shader_type
     ));
 

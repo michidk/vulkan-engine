@@ -374,7 +374,8 @@ impl VulkanManager {
         let debug_create_info =
             &mut debug::get_debug_create_info(startup_debug_severity, startup_debug_type);
 
-        let layer_names = debug::get_layer_names();
+        let layer_names = debug::VALIDATION_LAYERS.map(|e| CString::new(e).unwrap());
+        let layer_names = layer_names.map(|e| e.as_ptr());
         if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(entry) {
             instance_create_info = instance_create_info
                 .push_next(debug_create_info)

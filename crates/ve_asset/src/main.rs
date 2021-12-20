@@ -1,5 +1,3 @@
-#![feature(once_cell)]
-
 pub(crate) mod mesh;
 pub(crate) mod utils;
 

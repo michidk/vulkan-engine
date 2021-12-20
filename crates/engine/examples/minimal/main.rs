@@ -12,7 +12,6 @@ use vulkan_engine::{
     },
     scene::{
         component::renderer::RendererComponent,
-        entity::Entity,
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
@@ -129,8 +128,7 @@ fn setup(engine: &mut Engine) {
         mesh,
     };
 
-    let entity = Entity::new_with_transform(
-        Rc::downgrade(&scene.root_entity),
+    let entity = scene.new_entity_with_transform(
         "Quad".to_owned(),
         Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
@@ -138,9 +136,8 @@ fn setup(engine: &mut Engine) {
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
     );
-    let comp = RendererComponent::new(Rc::new(model));
-    entity.add_component(comp);
-    scene.add_entity(entity);
+    let comp = entity.new_component::<RendererComponent>();
+    *comp.model.borrow_mut() = Some(Rc::new(model));
 
     scene.load();
 

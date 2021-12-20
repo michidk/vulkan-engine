@@ -11,7 +11,6 @@ use vulkan_engine::{
     },
     scene::{
         component::renderer::RendererComponent,
-        entity::Entity,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -129,8 +128,7 @@ fn setup(engine: &mut Engine) {
             };
 
             // println!("start");
-            let entity = Entity::new_with_transform(
-                Rc::downgrade(&scene.root_entity),
+            let entity = scene.new_entity_with_transform(
                 "BRDF Sphere".to_string(),
                 Transform {
                     position: Vec3::new(x as f32 - 5.0, y as f32 - 5.0, 10.0),
@@ -138,9 +136,8 @@ fn setup(engine: &mut Engine) {
                     scale: Vec3::new(0.5, 0.5, 0.5),
                 },
             );
-            let component = RendererComponent::new(Rc::new(model));
-            entity.add_component(component);
-            scene.add_entity(entity);
+            let component = entity.new_component::<RendererComponent>();
+            *component.model.borrow_mut() = Some(Rc::new(model));
         }
     }
 

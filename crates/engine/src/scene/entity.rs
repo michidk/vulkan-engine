@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
@@ -11,22 +11,19 @@ use super::Scene;
 
 #[derive(Debug)]
 pub struct Entity {
-    self_weak: Weak<Self>,
-    parent: Weak<Entity>,
+    parent: RefCell<Weak<Entity>>,
     pub name: String,
     pub transform: RefCell<Transform>,
     pub children: RefCell<Vec<Rc<Entity>>>,
     pub components: RefCell<Vec<Rc<dyn Component>>>,
-    scene: RefCell<Weak<Scene>>,
-    pub attached: Cell<bool>,
+    pub scene: Weak<Scene>,
 }
 
 impl Entity {
-    pub fn new(parent: Weak<Entity>, name: String) -> Rc<Entity> {
-        Rc::new_cyclic(|self_weak| Entity {
-            self_weak: self_weak.clone(),
-            parent,
-            name: name.to_string(),
+    pub(crate) fn new(scene: &Rc<Scene>, name: String) -> Rc<Entity> {
+        let res = Rc::new(Entity {
+            parent: Rc::downgrade(&scene.root_entity).into(),
+            name,
             transform: Transform {
                 position: Vec3::zero(),
                 rotation: Quaternion::identity(),
@@ -35,32 +32,36 @@ impl Entity {
             .into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
-            scene: RefCell::new(Weak::new()),
-            attached: false.into(),
-        })
+            scene: Rc::downgrade(scene),
+        });
+
+        scene.root_entity.add_child(res.clone());
+
+        res
     }
 
-    pub fn new_with_transform(
-        parent: Weak<Entity>,
+    pub(crate) fn new_with_transform(
+        scene: &Rc<Scene>,
         name: String,
         transform: Transform,
     ) -> Rc<Entity> {
-        Rc::new_cyclic(|self_weak| Entity {
-            self_weak: self_weak.clone(),
-            parent,
-            name: name.to_string(),
+        let res = Rc::new(Entity {
+            parent: Rc::downgrade(&scene.root_entity).into(),
+            name,
             transform: transform.into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
-            scene: RefCell::new(Weak::new()),
-            attached: false.into(),
-        })
+            scene: Rc::downgrade(scene),
+        });
+
+        scene.root_entity.add_child(res.clone());
+
+        res
     }
 
-    pub(crate) fn new_root() -> Rc<Entity> {
-        Rc::new_cyclic(|self_weak| Entity {
-            self_weak: self_weak.clone(),
-            parent: Weak::new(),
+    pub(crate) fn new_root() -> Entity {
+        Entity {
+            parent: Weak::new().into(),
             name: "Scene Root".to_string(),
             transform: Transform {
                 position: Vec3::zero(),
@@ -70,9 +71,8 @@ impl Entity {
             .into(),
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
-            scene: RefCell::new(Weak::new()),
-            attached: false.into(),
-        })
+            scene: Weak::new(),
+        }
     }
 
     pub fn load(&self) {
@@ -86,42 +86,24 @@ impl Entity {
     }
 
     pub fn is_root(&self) -> bool {
-        self.parent.upgrade().is_none()
+        self.parent.borrow().upgrade().is_none()
     }
 
-    pub fn add_child(&self, child: Rc<Entity>) {
-        self.children.borrow_mut().push(Rc::clone(&child));
-
-        child.attach(Weak::clone(&self.scene.borrow()));
-        // println!("attach child by add_child");
+    fn add_child(&self, child: Rc<Entity>) {
+        self.children.borrow_mut().push(child);
     }
 
-    pub fn add_component(&self, component: Rc<dyn Component>) -> &Self {
-        self.components.borrow_mut().push(Rc::clone(&component));
-
-        component.attach(
-            Weak::clone(&self.scene.borrow()),
-            Weak::clone(&self.self_weak),
-        );
-        // println!("attach comp by add_component");
-
-        self
+    pub fn attach_to(self: &Rc<Entity>, new_parent: &Rc<Entity>) {
+        *self.parent.borrow_mut() = Rc::downgrade(new_parent);
+        new_parent.add_child(self.clone());
     }
 
-    pub fn attach(&self, scene: Weak<Scene>) {
-        if self.attached.get() {
-            return;
-        }
+    pub fn new_component<T: 'static + Component>(self: &Rc<Self>) -> Rc<T> {
+        let comp = T::create(self);
 
-        for comp in &*self.components.borrow() {
-            comp.attach(Weak::clone(&scene), Weak::clone(&self.self_weak));
-        }
-        for child in &*self.children.borrow() {
-            child.attach(Weak::clone(&scene));
-        }
+        self.components.borrow_mut().push(comp.clone());
 
-        *self.scene.borrow_mut() = scene;
-        self.attached.set(true);
+        comp
     }
 
     pub fn collect_renderables(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
@@ -139,7 +121,7 @@ impl Entity {
     }
 
     pub fn get_local_to_world_matrix(&self) -> Mat4 {
-        if let Some(parent) = self.parent.upgrade() {
+        if let Some(parent) = self.parent.borrow().upgrade() {
             let parent_to_world = parent.get_local_to_world_matrix();
             parent_to_world * self.get_model_matrix()
         } else {
@@ -152,7 +134,7 @@ impl Entity {
     }
 
     pub fn get_world_to_local_matrix(&self) -> Mat4 {
-        if let Some(parent) = self.parent.upgrade() {
+        if let Some(parent) = self.parent.borrow().upgrade() {
             let world_to_parent = parent.get_world_to_local_matrix();
             self.get_inverse_model_matrix() * world_to_parent
         } else {

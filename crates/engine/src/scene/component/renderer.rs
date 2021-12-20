@@ -4,32 +4,27 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::scene::{entity::Entity, model::Model, transform::TransformData, Scene};
+use crate::scene::{entity::Entity, model::Model, transform::TransformData};
 
 use super::Component;
 
 pub struct RendererComponent {
-    scene: RefCell<Weak<Scene>>,
     entity: RefCell<Weak<Entity>>,
-    pub model: Rc<Model>,
-}
-
-impl RendererComponent {
-    pub fn new(model: Rc<Model>) -> Rc<Self> {
-        Rc::new(Self {
-            scene: Weak::new().into(),
-            entity: Weak::new().into(),
-            model,
-        })
-    }
+    pub model: RefCell<Option<Rc<Model>>>,
 }
 
 impl Component for RendererComponent {
-    fn attach(&self, scene: Weak<Scene>, entity: Weak<Entity>) {
-        *self.scene.borrow_mut() = scene;
-        *self.entity.borrow_mut() = entity;
-        // println!("Attach")
+    fn create(entity: &Rc<Entity>) -> Rc<Self>
+    where
+        Self: Sized,
+    {
+        let res = RendererComponent {
+            entity: Rc::downgrade(entity).into(),
+            model: None.into(),
+        };
+        Rc::new(res)
     }
+
     fn load(&self) {
         // println!("Load Ref");
     }
@@ -43,14 +38,16 @@ impl Component for RendererComponent {
     fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
         let entity = self.entity.borrow();
         if let Some(entity) = entity.upgrade() {
-            let local2world = entity.get_local_to_world_matrix();
-            let world2local = entity.get_world_to_local_matrix();
-            let transform_data = TransformData {
-                model_matrix: local2world,
-                inv_model_matrix: world2local,
-            };
+            if let Some(model) = &*self.model.borrow() {
+                let local2world = entity.get_local_to_world_matrix();
+                let world2local = entity.get_world_to_local_matrix();
+                let transform_data = TransformData {
+                    model_matrix: local2world,
+                    inv_model_matrix: world2local,
+                };
 
-            models.push((transform_data, self.model.clone()));
+                models.push((transform_data, model.clone()));
+            }
         }
     }
 }

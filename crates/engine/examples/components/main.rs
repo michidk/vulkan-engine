@@ -1,5 +1,5 @@
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     path::Path,
     process::exit,
     rc::{Rc, Weak},
@@ -21,7 +21,6 @@ use vulkan_engine::{
         material::MaterialPipeline,
         model::Model,
         transform::Transform,
-        Scene,
     },
 };
 use vulkan_engine::{
@@ -141,8 +140,7 @@ fn setup(engine: &mut Engine) {
     });
 
     {
-        let entity_tl = Entity::new_with_transform(
-            Rc::downgrade(&scene.root_entity),
+        let entity_tl = scene.new_entity_with_transform(
             "Top Left Rotating Sphere".to_owned(),
             Transform {
                 position: Vec3::new(0.0, 0.0, 10.0),
@@ -150,11 +148,13 @@ fn setup(engine: &mut Engine) {
                 scale: Vec3::one(),
             },
         );
-        entity_tl.add_component(RendererComponent::new(model_red));
-        entity_tl.add_component(RotateComponent::new());
+        *entity_tl
+            .new_component::<RendererComponent>()
+            .model
+            .borrow_mut() = Some(model_red);
+        entity_tl.new_component::<RotateComponent>();
 
-        let entity_tr = Entity::new_with_transform(
-            Rc::downgrade(&entity_tl),
+        let entity_tr = scene.new_entity_with_transform(
             "Top Right Rotating Sphere".to_owned(),
             Transform {
                 position: Vec3::new(3.0, 0.0, 0.0),
@@ -162,12 +162,14 @@ fn setup(engine: &mut Engine) {
                 scale: Vec3::one(),
             },
         );
-        entity_tr.add_component(RendererComponent::new(model_silver.clone()));
-        entity_tr.add_component(ScaleComponent::new());
-        entity_tl.add_child(entity_tr);
+        *entity_tr
+            .new_component::<RendererComponent>()
+            .model
+            .borrow_mut() = Some(model_silver.clone());
+        entity_tr.new_component::<ScaleComponent>();
+        entity_tr.attach_to(&entity_tl);
 
-        let entity_bl = Entity::new_with_transform(
-            Rc::downgrade(&entity_tl),
+        let entity_bl = scene.new_entity_with_transform(
             "Bottom Left Rotating Sphere".to_owned(),
             Transform {
                 position: Vec3::new(0.0, -3.0, 0.0),
@@ -175,12 +177,14 @@ fn setup(engine: &mut Engine) {
                 scale: Vec3::one(),
             },
         );
-        entity_bl.add_component(RendererComponent::new(model_silver.clone()));
-        entity_bl.add_component(ScaleComponent::new());
-        entity_tl.add_child(entity_bl);
+        *entity_bl
+            .new_component::<RendererComponent>()
+            .model
+            .borrow_mut() = Some(model_silver.clone());
+        entity_bl.new_component::<ScaleComponent>();
+        entity_bl.attach_to(&entity_tl);
 
-        let entity_br = Entity::new_with_transform(
-            Rc::downgrade(&entity_tl),
+        let entity_br = scene.new_entity_with_transform(
             "Bottom Right Rotating Sphere".to_owned(),
             Transform {
                 position: Vec3::new(3.0, -3.0, 0.0),
@@ -188,10 +192,11 @@ fn setup(engine: &mut Engine) {
                 scale: Vec3::one(),
             },
         );
-        entity_br.add_component(RendererComponent::new(model_silver));
-        entity_tl.add_child(entity_br);
-
-        scene.add_entity(entity_tl);
+        *entity_br
+            .new_component::<RendererComponent>()
+            .model
+            .borrow_mut() = Some(model_silver);
+        entity_br.attach_to(&entity_tl);
     }
 
     scene.load();
@@ -230,27 +235,17 @@ fn setup(engine: &mut Engine) {
 
 #[derive(Debug)]
 struct RotateComponent {
-    scene: RefCell<Weak<Scene>>,
-    entity: RefCell<Weak<Entity>>,
-}
-
-impl RotateComponent {
-    pub fn new() -> Rc<Self> {
-        Rc::new(Self {
-            scene: Weak::new().into(),
-            entity: Weak::new().into(),
-        })
-    }
+    entity: Weak<Entity>,
 }
 
 impl Component for RotateComponent {
-    fn attach(
-        &self,
-        scene: std::rc::Weak<vulkan_engine::scene::Scene>,
-        entity: std::rc::Weak<Entity>,
-    ) {
-        *self.scene.borrow_mut() = scene;
-        *self.entity.borrow_mut() = entity;
+    fn create(entity: &Rc<Entity>) -> Rc<Self>
+    where
+        Self: Sized,
+    {
+        Rc::new(Self {
+            entity: Rc::downgrade(entity),
+        })
     }
 
     fn load(&self) {}
@@ -258,8 +253,7 @@ impl Component for RotateComponent {
     fn start(&self) {}
 
     fn update(&self, delta: f32) {
-        let entity = self.entity.borrow();
-        if let Some(entity) = entity.upgrade() {
+        if let Some(entity) = self.entity.upgrade() {
             let mut transform = entity.transform.borrow_mut();
 
             let mut rotation = transform.rotation;
@@ -272,29 +266,19 @@ impl Component for RotateComponent {
 
 #[derive(Debug)]
 struct ScaleComponent {
-    scene: RefCell<Weak<Scene>>,
-    entity: RefCell<Weak<Entity>>,
+    entity: Weak<Entity>,
     total_time: Cell<f32>,
 }
 
-impl ScaleComponent {
-    pub fn new() -> Rc<Self> {
+impl Component for ScaleComponent {
+    fn create(entity: &Rc<Entity>) -> Rc<Self>
+    where
+        Self: Sized,
+    {
         Rc::new(Self {
-            scene: Weak::new().into(),
-            entity: Weak::new().into(),
+            entity: Rc::downgrade(entity),
             total_time: 0.0f32.into(),
         })
-    }
-}
-
-impl Component for ScaleComponent {
-    fn attach(
-        &self,
-        scene: std::rc::Weak<vulkan_engine::scene::Scene>,
-        entity: std::rc::Weak<Entity>,
-    ) {
-        *self.scene.borrow_mut() = scene;
-        *self.entity.borrow_mut() = entity;
     }
 
     fn load(&self) {}
@@ -302,8 +286,7 @@ impl Component for ScaleComponent {
     fn start(&self) {}
 
     fn update(&self, delta: f32) {
-        let entity = self.entity.borrow();
-        if let Some(entity) = entity.upgrade() {
+        if let Some(entity) = self.entity.upgrade() {
             let time = self.total_time.get() + delta;
             self.total_time.set(time);
 

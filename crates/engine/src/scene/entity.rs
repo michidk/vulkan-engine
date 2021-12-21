@@ -4,6 +4,8 @@ use std::rc::{Rc, Weak};
 
 use gfx_maths::{Mat4, Quaternion, Vec3};
 
+use crate::core::input::Input;
+
 use super::component::Component;
 use super::model::Model;
 use super::transform::{Transform, TransformData};
@@ -143,13 +145,13 @@ impl Entity {
         }
     }
 
-    pub fn update(&self, delta: f32) {
+    pub fn update(&self, input: &Input, delta: f32) {
         for comp in &*self.components.borrow() {
-            comp.update(delta);
+            comp.update(input, delta);
         }
 
         for child in &*self.children.borrow() {
-            child.update(delta);
+            child.update(input, delta);
         }
     }
 }

@@ -7,8 +7,11 @@ pub mod transform;
 
 use std::cell::RefCell;
 use std::fmt::Debug;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
+use crate::core::input::Input;
+
+use self::component::camera_component::CameraComponent;
 use self::entity::Entity;
 use self::light::LightManager;
 use self::model::Model;
@@ -17,6 +20,7 @@ use self::transform::{Transform, TransformData};
 pub struct Scene {
     pub light_manager: LightManager,
     root_entity: RefCell<Rc<Entity>>,
+    pub(crate) main_camera: RefCell<Weak<CameraComponent>>,
 }
 
 impl Scene {
@@ -25,6 +29,7 @@ impl Scene {
         let res = Rc::new(Self {
             light_manager: LightManager::default(),
             root_entity: RefCell::new(Rc::new(Entity::new_root())),
+            main_camera: RefCell::new(Weak::new()),
         });
         root.scene = Rc::downgrade(&res);
         *res.root_entity.borrow_mut() = Rc::new(root);
@@ -56,8 +61,12 @@ impl Scene {
         res
     }
 
-    pub fn update(&self, delta: f32) {
-        self.root_entity.borrow().update(delta);
+    pub fn update(&self, input: &Input, delta: f32) {
+        self.root_entity.borrow().update(input, delta);
+    }
+
+    pub(crate) fn set_main_camera(&self, cam: Weak<CameraComponent>) {
+        *self.main_camera.borrow_mut() = cam;
     }
 }
 

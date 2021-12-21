@@ -31,9 +31,6 @@ impl Component for RendererComponent {
     fn start(&self) {
         // println!("Start");
     }
-    fn update(&self, _delta: f32) {
-        //     println!("Update");
-    }
 
     fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
         let entity = self.entity.borrow();

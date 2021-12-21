@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    core::{camera::Camera, gameloop::GameLoop, input::Input, window},
+    core::{gameloop::GameLoop, input::Input, window},
     scene::Scene,
     vulkan::VulkanManager,
 };
@@ -20,7 +20,7 @@ pub struct EngineInit {
 }
 
 impl EngineInit {
-    pub fn new(info: EngineInfo, camera: Camera) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(info: EngineInfo) -> Result<Self, Box<dyn std::error::Error>> {
         let scene = Scene::new();
         let eventloop = winit::event_loop::EventLoop::new();
         let window = info.window_info.build(&eventloop)?;
@@ -36,7 +36,6 @@ impl EngineInit {
                 gameloop,
                 input,
                 scene,
-                camera,
                 vulkan_manager,
                 window,
             },
@@ -53,7 +52,6 @@ pub struct Engine {
     pub gameloop: GameLoop,
     pub input: Rc<RefCell<Input>>,
     pub scene: Rc<Scene>,
-    pub camera: Camera,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
 }
@@ -66,18 +64,9 @@ impl Engine {
     pub(crate) fn render(&mut self) {
         let vk = &mut self.vulkan_manager;
 
-        // move cam
-        self.camera.movement(&self.input.borrow());
-
         // prepare for render
         let image_index = vk.next_frame();
         vk.wait_for_fence();
-
-        self.camera.update_buffer(
-            &vk.allocator,
-            &mut vk.uniform_buffer,
-            vk.current_frame_index,
-        );
 
         vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
             .expect("updating the command buffer");

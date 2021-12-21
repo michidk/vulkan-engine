@@ -1,4 +1,3 @@
-pub mod camera;
 pub mod engine;
 pub mod gameloop;
 pub mod input;

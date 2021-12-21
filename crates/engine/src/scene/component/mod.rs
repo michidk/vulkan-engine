@@ -1,6 +1,9 @@
+pub mod camera_component;
 pub mod renderer;
 
 use std::{fmt::Debug, rc::Rc};
+
+use crate::core::input::Input;
 
 use super::{entity::Entity, model::Model, transform::TransformData};
 
@@ -11,7 +14,7 @@ pub trait Component: Debug {
 
     fn load(&self);
     fn start(&self);
-    fn update(&self, delta: f32);
 
+    fn update(&self, _input: &Input, _delta: f32) {}
     fn render(&self, _models: &mut Vec<(TransformData, Rc<Model>)>) {}
 }

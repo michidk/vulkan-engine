@@ -10,12 +10,12 @@ use gfx_maths::*;
 use log::error;
 use vulkan_engine::{
     core::{
-        camera::Camera,
         engine::{self, Engine, EngineInit},
+        input::Input,
         window::{self, Dimensions},
     },
     scene::{
-        component::{renderer::RendererComponent, Component},
+        component::{camera_component::CameraComponent, renderer::RendererComponent, Component},
         entity::Entity,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
@@ -44,18 +44,8 @@ fn main() {
         app_name: "Components Example",
     };
 
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine_info.window_info.initial_dimensions.width as f32
-                / engine_info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
     // setup engine
-    let engine_init = EngineInit::new(engine_info, camera);
+    let engine_init = EngineInit::new(engine_info);
 
     // start engine
     match engine_init {
@@ -138,6 +128,16 @@ fn setup(engine: &mut Engine) {
         material: material_silver,
         mesh: mesh_sphere_smooth,
     });
+
+    let entity_cam = scene.new_entity_with_transform(
+        "Main Camera".to_owned(),
+        Transform {
+            position: Vec3::new(0.0, 0.0, -5.0),
+            rotation: Quaternion::identity(),
+            scale: Vec3::one(),
+        },
+    );
+    entity_cam.new_component::<CameraComponent>();
 
     {
         let entity_tl = scene.new_entity_with_transform(
@@ -252,7 +252,7 @@ impl Component for RotateComponent {
 
     fn start(&self) {}
 
-    fn update(&self, delta: f32) {
+    fn update(&self, _input: &Input, delta: f32) {
         if let Some(entity) = self.entity.upgrade() {
             let mut transform = entity.transform.borrow_mut();
 
@@ -285,7 +285,7 @@ impl Component for ScaleComponent {
 
     fn start(&self) {}
 
-    fn update(&self, delta: f32) {
+    fn update(&self, _input: &Input, delta: f32) {
         if let Some(entity) = self.entity.upgrade() {
             let time = self.total_time.get() + delta;
             self.total_time.set(time);

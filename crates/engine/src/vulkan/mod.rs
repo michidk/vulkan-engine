@@ -22,9 +22,9 @@ use ash::{
 };
 
 use crate::{
-    core::camera::{self, CamData},
     core::engine::EngineInfo,
     scene::{
+        component::camera_component::CamData,
         light::LightManager,
         material::Material,
         model::{mesh::Mesh, Model},
@@ -35,7 +35,7 @@ use crate::{
 
 use self::{
     allocator::Allocator,
-    buffer::{PerFrameUniformBuffer, VulkanBuffer},
+    buffer::{MutableBuffer, PerFrameUniformBuffer, VulkanBuffer},
     debug::DebugMessenger,
     descriptor_manager::{DescriptorData, DescriptorManager},
     error::GraphicsResult,
@@ -65,7 +65,7 @@ pub struct VulkanManager {
     pub renderpass: vk::RenderPass,
     pub pools: PoolsWrapper,
     pub commandbuffers: Vec<vk::CommandBuffer>,
-    pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
+    pub(crate) uniform_buffer: PerFrameUniformBuffer<CamData>,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
     pipeline_layout_gpass: vk::PipelineLayout,
     pub pipeline_layout_resolve_pass: vk::PipelineLayout,
@@ -855,6 +855,16 @@ impl VulkanManager {
         swapchain_image_index: usize,
         scene: Rc<Scene>,
     ) -> Result<(), vk::Result> {
+        let cam_comp = scene
+            .main_camera
+            .borrow()
+            .upgrade()
+            .expect("Scene has to have a CameraComponent");
+        let cam_data = cam_comp.get_cam_data(1920.0 / 1080.0);
+        self.uniform_buffer
+            .set_data(&self.allocator, &cam_data, self.current_frame_index)
+            .unwrap();
+
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
         unsafe {

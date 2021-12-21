@@ -6,12 +6,11 @@ use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::{
-        camera::Camera,
         engine::{self, Engine, EngineInit},
         window::{self, Dimensions},
     },
     scene::{
-        component::renderer::RendererComponent,
+        component::{camera_component::CameraComponent, renderer::RendererComponent},
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
@@ -35,18 +34,8 @@ fn main() {
         app_name: "Vulkan Minimal Example",
     };
 
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine_info.window_info.initial_dimensions.width as f32
-                / engine_info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
     // setup engine
-    let engine_engine = EngineInit::new(engine_info, camera);
+    let engine_engine = EngineInit::new(engine_info);
 
     // start engine
     match engine_engine {
@@ -138,6 +127,16 @@ fn setup(engine: &mut Engine) {
     );
     let comp = entity.new_component::<RendererComponent>();
     *comp.model.borrow_mut() = Some(Rc::new(model));
+
+    let main_cam = scene.new_entity_with_transform(
+        "Main Camera".to_owned(),
+        Transform {
+            position: Vec3::new(0.0, 0.0, -5.0),
+            rotation: Quaternion::identity(),
+            scale: Vec3::one(),
+        },
+    );
+    main_cam.new_component::<CameraComponent>();
 
     scene.load();
 

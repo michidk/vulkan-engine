@@ -1,13 +1,10 @@
-use spirv_cross::{
-    glsl,
-    spirv::{Ast, Decoration, Module, Resource, Type},
-};
+use spirv_layout::Module;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
     #[error("Reflection error: {0}")]
-    ReflectError(#[from] spirv_cross::ErrorCode),
+    ReflectError(#[from] spirv_layout::Error),
     #[error("Incompatible shader property names: {0} and {1}")]
     IncompatiblePropertyNames(String, String),
     #[error("Incompatible shader properties: {0} and {1}")]
@@ -109,14 +106,12 @@ pub struct ShaderInfo {
     pub push_constants: Option<BlockLayout>,
 }
 
-type Refl = Ast<glsl::Target>;
 type Result<T> = std::result::Result<T, Error>;
 
 pub fn reflect_shader(spv_code: &[u32]) -> Result<ShaderInfo> {
-    let module = Module::from_words(spv_code);
-    let mut refl = Refl::parse(&module)?;
+    let module = Module::from_words(spv_code)?;
 
-    let set_bindings = reflect_shader_bindings(&mut refl)?;
+    let set_bindings = reflect_shader_bindings(&module)?;
 
     Ok(ShaderInfo {
         set_bindings,
@@ -124,130 +119,65 @@ pub fn reflect_shader(spv_code: &[u32]) -> Result<ShaderInfo> {
     })
 }
 
-fn reflect_shader_bindings(refl: &mut Refl) -> Result<Vec<SetBinding>> {
-    let ubos = refl.get_shader_resources()?.uniform_buffers;
+fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
+    let mut set_bindings = Vec::new();
 
-    let mut set_bindings = Vec::with_capacity(ubos.len());
-    reflect_ubos(refl, &ubos, &mut set_bindings)?;
-    reflect_image_bindings(refl, &mut set_bindings)?;
+    for var in module.get_uniforms() {
+        let set = var.set.unwrap();
+        let binding = var.binding.unwrap();
+        let var_name = var.name.clone().unwrap_or_else(|| "".to_owned());
 
-    Ok(set_bindings)
-}
+        let data = match module.get_type(var.type_id).unwrap() {
+            spirv_layout::Type::Image2D { .. } => SetBindingData::Image {
+                dim: ImageDimension::Two,
+            },
+            spirv_layout::Type::Sampler => SetBindingData::Sampler,
+            spirv_layout::Type::SampledImage { .. } => SetBindingData::SampledImage {
+                dim: ImageDimension::Two,
+            },
+            spirv_layout::Type::Struct { elements } => {
+                let total_size = module.get_type_size(var.type_id).unwrap();
+                let mut members = Vec::new();
 
-fn reflect_image_bindings(refl: &mut Refl, set_bindings: &mut Vec<SetBinding>) -> Result<()> {
-    let resources = refl.get_shader_resources()?;
+                for member in elements {
+                    let kind = match module.get_type(member.type_id).unwrap() {
+                        spirv_layout::Type::Float32 => BlockMemberType::Float,
+                        spirv_layout::Type::Vec2 => BlockMemberType::FloatVector(2),
+                        spirv_layout::Type::Vec3 => BlockMemberType::FloatVector(3),
+                        spirv_layout::Type::Vec4 => BlockMemberType::FloatVector(4),
+                        spirv_layout::Type::Mat3 => BlockMemberType::FloatMatrix(3),
+                        spirv_layout::Type::Mat4 => BlockMemberType::FloatMatrix(4),
+                        _ => BlockMemberType::Unsupported,
+                    };
 
-    for img in &resources.sampled_images {
-        let set = refl.get_decoration(img.id, Decoration::DescriptorSet)?;
-        let binding = refl.get_decoration(img.id, Decoration::Binding)?;
+                    members.push(BlockMember {
+                        kind,
+                        offset: member.offset.unwrap(),
+                        size: 0,
+                        name: member.name.clone().unwrap(),
+                    });
+                }
 
-        let var_name = refl.get_name(img.id)?;
-
-        let img_type = refl.get_type(img.base_type_id)?;
-
-        let dim_raw;
-        if let Type::SampledImage { image, .. } = img_type {
-            dim_raw = image.dim;
-        } else {
-            continue;
-        }
-
-        let dim = match dim_raw {
-            spirv_cross::spirv::Dim::Dim1D => ImageDimension::One,
-            spirv_cross::spirv::Dim::Dim2D => ImageDimension::Two,
-            spirv_cross::spirv::Dim::Dim3D => ImageDimension::Three,
-            spirv_cross::spirv::Dim::DimCube => ImageDimension::Cube,
-            spirv_cross::spirv::Dim::DimSubpassData => ImageDimension::SubpassInput,
-            _ => continue,
+                SetBindingData::UniformBuffer {
+                    layout: BlockLayout {
+                        members,
+                        block_name: "".to_owned(),
+                        total_size,
+                    },
+                }
+            }
+            _ => SetBindingData::Sampler,
         };
 
         set_bindings.push(SetBinding {
             set,
             binding,
-            data: SetBindingData::SampledImage { dim },
+            data,
             var_name,
         });
     }
 
-    Ok(())
-}
-
-fn reflect_ubos(
-    refl: &mut Refl,
-    ubos: &[Resource],
-    set_bindings: &mut Vec<SetBinding>,
-) -> Result<()> {
-    for ubo in ubos {
-        let set = refl.get_decoration(ubo.id, Decoration::DescriptorSet)?;
-        let binding = refl.get_decoration(ubo.id, Decoration::Binding)?;
-
-        let var_name = refl.get_name(ubo.id)?;
-        let block_name = refl.get_name(ubo.base_type_id)?;
-
-        let block_type = refl.get_type(ubo.base_type_id)?;
-        let block_size = refl.get_declared_struct_size(ubo.base_type_id)?;
-
-        let member_types;
-        if let Type::Struct {
-            member_types: mt, ..
-        } = block_type
-        {
-            member_types = mt;
-        } else {
-            // should never happend since every ubo has base_type of Struct but rust requires it
-            continue;
-        }
-
-        let mut members = Vec::new();
-        for (i, type_id) in member_types.iter().enumerate() {
-            let offset =
-                refl.get_member_decoration(ubo.base_type_id, i as u32, Decoration::Offset)?;
-            let size = refl.get_declared_struct_member_size(ubo.base_type_id, i as u32)?;
-
-            let member_type = refl.get_type(*type_id)?;
-
-            let name = refl.get_member_name(ubo.base_type_id, i as u32)?;
-
-            let kind = match member_type {
-                Type::Float {
-                    vecsize, columns, ..
-                } => {
-                    if vecsize == 1 && columns == 1 {
-                        BlockMemberType::Float
-                    } else if columns == 1 {
-                        BlockMemberType::FloatVector(vecsize)
-                    } else if vecsize == columns {
-                        BlockMemberType::FloatMatrix(vecsize)
-                    } else {
-                        BlockMemberType::Unsupported
-                    }
-                }
-                _ => BlockMemberType::Unsupported,
-            };
-
-            members.push(BlockMember {
-                kind,
-                offset,
-                size,
-                name,
-            });
-        }
-
-        set_bindings.push(SetBinding {
-            set,
-            binding,
-            data: SetBindingData::UniformBuffer {
-                layout: BlockLayout {
-                    members,
-                    block_name,
-                    total_size: block_size,
-                },
-            },
-            var_name,
-        });
-    }
-
-    Ok(())
+    Ok(set_bindings)
 }
 
 pub fn merge(a: ShaderInfo, b: &ShaderInfo, names_must_match: bool) -> Result<ShaderInfo> {

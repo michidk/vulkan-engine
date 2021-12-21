@@ -1,5 +1,5 @@
 /// A minimal example that just initializes the engine but does not display anything
-use std::process::exit;
+use std::{process::exit, rc::Rc};
 
 use gfx_maths::*;
 use log::error;
@@ -11,6 +11,7 @@ use vulkan_engine::{
         window::{self, Dimensions},
     },
     scene::{
+        component::renderer::RendererComponent,
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
@@ -122,13 +123,31 @@ fn setup(engine: &mut Engine) {
     )
     .unwrap();
 
-    scene.add(Model {
+    let model = Model {
         material: material0,
         mesh,
-        transform: Transform {
+    };
+
+    let entity = scene.new_entity_with_transform(
+        "Quad".to_owned(),
+        Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+            rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.0f32.to_radians()),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
-    });
+    );
+    let comp = entity.new_component::<RendererComponent>();
+    *comp.model.borrow_mut() = Some(Rc::new(model));
+
+    scene.load();
+
+    // scene.add(Model {
+    //     material: material0,
+    //     mesh,
+    //     transform: Transform {
+    //         position: Vec3::new(0.0, 0.0, 5.0),
+    //         rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+    //         scale: Vec3::new(1.0, 1.0, 1.0),
+    //     },
+    // });
 }

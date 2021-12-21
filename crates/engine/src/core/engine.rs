@@ -52,7 +52,7 @@ pub struct Engine {
     pub info: EngineInfo,
     pub gameloop: GameLoop,
     pub input: Rc<RefCell<Input>>,
-    pub scene: Scene,
+    pub scene: Rc<Scene>,
     pub camera: Camera,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
@@ -79,7 +79,7 @@ impl Engine {
             vk.current_frame_index,
         );
 
-        vk.update_commandbuffer(image_index as usize, &self.scene)
+        vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
             .expect("updating the command buffer");
 
         // finanlize renderpass

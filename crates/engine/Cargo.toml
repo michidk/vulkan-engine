@@ -23,3 +23,6 @@ ve-shader-reflect = { path = "../ve_shader_reflect" }
 ve_format = { path = "../ve_format"}
 
 [dev-dependencies]
+
+[features]
+debug_refcell = []

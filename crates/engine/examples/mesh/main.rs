@@ -1,4 +1,4 @@
-use std::{path::Path, process::exit};
+use std::{path::Path, process::exit, rc::Rc};
 
 /// Renders a brdf example
 use gfx_maths::*;
@@ -10,6 +10,7 @@ use vulkan_engine::{
         window::{self, Dimensions},
     },
     scene::{
+        component::renderer::RendererComponent,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -119,17 +120,23 @@ fn setup(engine: &mut Engine) {
     let model = Model {
         material: brdf_material0,
         mesh,
-        transform: Transform {
+    };
+
+    let entity = scene.new_entity_with_transform(
+        "Cube".to_string(),
+        Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
             rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.0f32.to_radians()),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
-    };
+    );
+    let comp = entity.new_component::<RendererComponent>();
+    *comp.model.borrow_mut() = Some(Rc::new(model));
 
-    scene.add(model);
+    scene.load();
 
     // setup scene
-    let lights = &mut scene.light_manager;
+    let lights = &scene.light_manager;
     lights.add_light(DirectionalLight {
         direction: Vec4::new(-1., 1., -1., 0.0),
         illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),

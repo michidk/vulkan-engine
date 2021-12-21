@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use gfx_maths::*;
 
 #[repr(C)]
@@ -29,21 +31,29 @@ impl From<DirectionalLight> for Light {
     }
 }
 
-#[derive(Default)]
 pub struct LightManager {
-    pub directional_lights: Vec<DirectionalLight>,
-    pub point_lights: Vec<PointLight>,
+    pub directional_lights: RefCell<Vec<DirectionalLight>>,
+    pub point_lights: RefCell<Vec<PointLight>>,
+}
+
+impl Default for LightManager {
+    fn default() -> Self {
+        Self {
+            directional_lights: RefCell::new(Vec::new()),
+            point_lights: RefCell::new(Vec::new()),
+        }
+    }
 }
 
 impl LightManager {
-    pub fn add_light<T: Into<Light>>(&mut self, l: T) {
+    pub fn add_light<T: Into<Light>>(&self, l: T) {
         use Light::*;
         match l.into() {
             Directional(dl) => {
-                self.directional_lights.push(dl);
+                self.directional_lights.borrow_mut().push(dl);
             }
             Point(pl) => {
-                self.point_lights.push(pl);
+                self.point_lights.borrow_mut().push(pl);
             }
         }
     }

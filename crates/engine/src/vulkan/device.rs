@@ -67,5 +67,5 @@ pub fn select_physical_device(
         return Err(GraphicsError::NoSuitableGpu);
     }
 
-    Ok(candidates.pop_last().unwrap().1) // use physical device with the highest score
+    Ok(*candidates.values().last().unwrap())
 }

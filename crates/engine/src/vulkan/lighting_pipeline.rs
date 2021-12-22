@@ -9,14 +9,14 @@ use super::pipeline;
 /// A LightingPipeline can be thought of as a specific lighting equation to be applied to a specific set of [`Materials`](crate::scene::material::Material).
 pub struct LightingPipeline {
     /// The [`vk::Pipeline`] to be used for rendering point lights
-    pub point_pipeline: Option<vk::Pipeline>,
+    pub(crate) point_pipeline: Option<vk::Pipeline>,
     /// The [`vk::Pipeline`] to be used for rendering directional lights
-    pub directional_pipeline: Option<vk::Pipeline>,
+    pub(crate) directional_pipeline: Option<vk::Pipeline>,
     /// The [`vk::Pipeline`] to be used for rendering ambient lighting (or unlit materials).
     /// Will be rendered exactly once each frame.
-    pub ambient_pipeline: Option<vk::Pipeline>,
+    pub(crate) ambient_pipeline: Option<vk::Pipeline>,
     /// The stencil value that identifies this LightingPipeline in the GPass attachments.
-    pub stencil_id: u8,
+    pub(crate) stencil_id: u8,
     device: Rc<ash::Device>,
 }
 

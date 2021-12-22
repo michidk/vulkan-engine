@@ -53,7 +53,7 @@ impl Scene {
         self.root_entity.borrow().load();
     }
 
-    pub fn collect_renderables(&self) -> Vec<(TransformData, Rc<Model>)> {
+    pub(crate) fn collect_renderables(&self) -> Vec<(TransformData, Rc<Model>)> {
         let mut res = Vec::new();
 
         self.root_entity.borrow().collect_renderables(&mut res);
@@ -61,7 +61,7 @@ impl Scene {
         res
     }
 
-    pub fn update(&self, input: &Input, delta: f32) {
+    pub(crate) fn update(&self, input: &Input, delta: f32) {
         self.root_entity.borrow().update(input, delta);
     }
 

@@ -4,7 +4,7 @@ use winit::event::VirtualKeyCode;
 use super::input::Input;
 use crate::{scene::Scene, vulkan::VulkanManager};
 
-pub struct GameLoop {
+pub(crate) struct GameLoop {
     input: Rc<RefCell<Input>>,
 }
 

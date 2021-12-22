@@ -8,19 +8,12 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn get_model_matrix(&self) -> Mat4 {
+    pub(crate) fn get_model_matrix(&self) -> Mat4 {
         Mat4::local_to_world(self.position, self.rotation, self.scale)
     }
 
-    pub fn get_inverse_model_matrix(&self) -> Mat4 {
+    pub(crate) fn get_inverse_model_matrix(&self) -> Mat4 {
         Mat4::world_to_local(self.position, self.rotation, self.scale)
-    }
-
-    pub fn get_transform_data(&self) -> TransformData {
-        TransformData {
-            model_matrix: self.get_model_matrix(),
-            inv_model_matrix: self.get_inverse_model_matrix(),
-        }
     }
 }
 

@@ -49,7 +49,7 @@ impl EngineInit {
 
 pub struct Engine {
     pub info: EngineInfo,
-    pub gameloop: GameLoop,
+    pub(crate) gameloop: GameLoop,
     pub input: Rc<RefCell<Input>>,
     pub scene: Rc<Scene>,
     pub vulkan_manager: VulkanManager,

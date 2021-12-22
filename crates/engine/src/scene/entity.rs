@@ -78,7 +78,7 @@ impl Entity {
         }
     }
 
-    pub fn load(&self) {
+    pub(crate) fn load(&self) {
         // println!("Loading Entity: {}", self.name);
         self.components.borrow().iter().for_each(|component| {
             component.load();
@@ -109,7 +109,7 @@ impl Entity {
         comp
     }
 
-    pub fn collect_renderables(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
+    pub(crate) fn collect_renderables(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
         for comp in &*self.components.borrow() {
             comp.render(models);
         }
@@ -145,7 +145,7 @@ impl Entity {
         }
     }
 
-    pub fn update(&self, input: &Input, delta: f32) {
+    pub(crate) fn update(&self, input: &Input, delta: f32) {
         for comp in &*self.components.borrow() {
             comp.update(input, delta);
         }

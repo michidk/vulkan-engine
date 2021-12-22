@@ -15,10 +15,13 @@ pub enum Error {
 pub enum BlockMemberType {
     Unsupported,
     Float,
+    /// A vec2, vec3 or vec4, indicated by the u32
     FloatVector(u32),
+    /// A mat3 or mat4, indicated by the u32
     FloatMatrix(u32),
 }
 
+/// Describes a single member of a struct
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockMember {
     pub kind: BlockMemberType,
@@ -28,19 +31,23 @@ pub struct BlockMember {
 }
 
 impl BlockMember {
+    /// compares two [`BlockMember`], ignoring their names
     fn equal_ignore_names(&self, r: &BlockMember) -> bool {
         self.kind == r.kind && self.offset == r.offset && self.size == r.size
     }
 }
 
+/// Describes the layout of a struct
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockLayout {
     pub members: Vec<BlockMember>,
     pub block_name: String,
+    /// The total size needed for a Vulkan buffer
     pub total_size: u32,
 }
 
 impl BlockLayout {
+    /// compares two [`BlockLayout`], ignoring the `block_name` and the members' names
     fn equal_ignore_names(&self, r: &BlockLayout) -> bool {
         if self.total_size != r.total_size {
             false
@@ -64,6 +71,7 @@ pub enum ImageDimension {
     SubpassInput,
 }
 
+/// Describes the contents of a single binding in a DescriptorSet
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SetBindingData {
     Sampler,
@@ -73,6 +81,7 @@ pub enum SetBindingData {
 }
 
 impl SetBindingData {
+    /// Compares two [`SetBindingData`], ignoring the names contained in [`UniformBuffer`](SetBindingData::UniformBuffer)
     fn equal_ignore_names(&self, r: &SetBindingData) -> bool {
         match self {
             SetBindingData::UniformBuffer { layout } => match r {
@@ -86,6 +95,7 @@ impl SetBindingData {
     }
 }
 
+/// Describes a single binding of a in a DescriptorSet
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SetBinding {
     pub set: u32,
@@ -95,11 +105,13 @@ pub struct SetBinding {
 }
 
 impl SetBinding {
+    /// Compares two [`SetBinding`], ignoring `var_name` and any names contained in `data`
     fn equal_ignore_names(&self, r: &SetBinding) -> bool {
         self.set == r.set && self.binding == r.binding && self.data.equal_ignore_names(&r.data)
     }
 }
 
+/// Describes the layout of a ShaderModule
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderInfo {
     pub set_bindings: Vec<SetBinding>,
@@ -108,6 +120,7 @@ pub struct ShaderInfo {
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Builds reflection data from a stream of SPIRV-words.
 pub fn reflect_shader(spv_code: &[u32]) -> Result<ShaderInfo> {
     let module = Module::from_words(spv_code)?;
 
@@ -123,7 +136,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
     let mut set_bindings = Vec::new();
 
     for var in module.get_uniforms() {
-        let set = var.set.unwrap();
+        let set = var.set.unwrap(); // every uniform must have a set and binding per SPIRV Spec
         let binding = var.binding.unwrap();
         let var_name = var.name.clone().unwrap_or_else(|| "".to_owned());
 
@@ -153,7 +166,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                     members.push(BlockMember {
                         kind,
                         offset: member.offset.unwrap(),
-                        size: 0,
+                        size: 0, // currently unused
                         name: member.name.clone().unwrap(),
                     });
                 }
@@ -161,7 +174,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                 SetBindingData::UniformBuffer {
                     layout: BlockLayout {
                         members,
-                        block_name: "".to_owned(),
+                        block_name: "".to_owned(), // currently unused
                         total_size,
                     },
                 }
@@ -180,6 +193,11 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
     Ok(set_bindings)
 }
 
+/// Merges the reflection data of two ShaderModules.
+///
+/// Should only be used on vertex and fragment shaders that belong together.
+///
+/// `names_must_match` indicates whether variable, block and member names must match in both shader modules.
 pub fn merge(a: ShaderInfo, b: &ShaderInfo, names_must_match: bool) -> Result<ShaderInfo> {
     let mut res = a;
 

@@ -1,18 +1,18 @@
-pub mod allocator;
+pub(crate) mod allocator;
 pub(crate) mod buffer;
 mod debug;
-pub mod descriptor_manager;
+pub(crate) mod descriptor_manager;
 mod device;
 pub mod error;
 pub mod lighting_pipeline;
-pub mod pipeline;
+pub(crate) mod pipeline;
 pub mod pp_effect;
 mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
 pub mod texture;
-pub mod uploader;
+pub(crate) mod uploader;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
@@ -60,18 +60,18 @@ pub struct VulkanManager {
     #[allow(dead_code)]
     physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
-    pub queues: Queues,
-    pub swapchain: SwapchainWrapper,
+    pub(crate) queues: Queues,
+    pub(crate) swapchain: SwapchainWrapper,
     pub renderpass: vk::RenderPass,
-    pub pools: PoolsWrapper,
-    pub commandbuffers: Vec<vk::CommandBuffer>,
+    pub(crate) pools: PoolsWrapper,
+    pub(crate) commandbuffers: Vec<vk::CommandBuffer>,
     pub(crate) uniform_buffer: PerFrameUniformBuffer<CamData>,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
     pipeline_layout_gpass: vk::PipelineLayout,
     pub pipeline_layout_resolve_pass: vk::PipelineLayout,
-    pub descriptor_manager: DescriptorManager<8>,
+    pub(crate) descriptor_manager: DescriptorManager<8>,
     max_frames_in_flight: u8,
-    pub current_frame_index: u8,
+    pub(crate) current_frame_index: u8,
     image_acquire_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     frame_resource_fences: Vec<vk::Fence>,
@@ -82,11 +82,11 @@ pub struct VulkanManager {
     pub renderpass_pp: vk::RenderPass,
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
-    pub enable_wireframe: bool,
+    pub(crate) enable_wireframe: bool,
 }
 
 impl VulkanManager {
-    pub fn new(
+    pub(crate) fn new(
         engine_info: EngineInfo,
         window: &winit::window::Window,
         max_frames_in_flight: u8,
@@ -339,10 +339,6 @@ impl VulkanManager {
         self.pp_effects.push(pp_effect);
     }
 
-    pub fn get_current_frame_index(&self) -> u8 {
-        self.current_frame_index
-    }
-
     fn init_instance(
         engine_info: EngineInfo,
         entry: &ash::Entry,
@@ -385,7 +381,7 @@ impl VulkanManager {
         Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
 
-    pub fn next_frame(&mut self) -> u32 {
+    pub(crate) fn next_frame(&mut self) -> u32 {
         self.current_frame_index = (self.current_frame_index + 1) % self.max_frames_in_flight;
 
         self.swapchain
@@ -850,7 +846,7 @@ impl VulkanManager {
         Ok(())
     }
 
-    pub fn update_commandbuffer(
+    pub(crate) fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
         scene: Rc<Scene>,
@@ -957,7 +953,7 @@ impl VulkanManager {
         Ok(())
     }
 
-    pub fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             self.device
                 .device_wait_idle()
@@ -979,7 +975,7 @@ impl VulkanManager {
         Ok(())
     }
 
-    pub fn wait_for_fence(&mut self) {
+    pub(crate) fn wait_for_fence(&mut self) {
         unsafe {
             self.device
                 .wait_for_fences(
@@ -998,7 +994,7 @@ impl VulkanManager {
     }
 
     /// submits queued commands
-    pub fn submit(&self) {
+    pub(crate) fn submit(&self) {
         let semaphores_available =
             [self.image_acquire_semaphores[self.current_frame_index as usize]];
         let waiting_stages = [vk::PipelineStageFlags::TRANSFER]; // wait for image acquisition before blitting the final image to the swapchain
@@ -1023,7 +1019,7 @@ impl VulkanManager {
     }
 
     /// add present command to queue
-    pub fn present(&mut self, image_index: u32) {
+    pub(crate) fn present(&mut self, image_index: u32) {
         let swapchains = [self.swapchain.swapchain];
         let indices = [image_index];
         let wait_semaphores = [self.render_finished_semaphores[self.current_frame_index as usize]];
@@ -1052,7 +1048,7 @@ impl VulkanManager {
         };
     }
 
-    pub fn wait_idle(&self) {
+    pub(crate) fn wait_idle(&self) {
         unsafe {
             self.device
                 .device_wait_idle()

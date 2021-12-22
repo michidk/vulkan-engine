@@ -32,8 +32,8 @@ impl From<DirectionalLight> for Light {
 }
 
 pub struct LightManager {
-    pub directional_lights: RefCell<Vec<DirectionalLight>>,
-    pub point_lights: RefCell<Vec<PointLight>>,
+    pub(crate) directional_lights: RefCell<Vec<DirectionalLight>>,
+    pub(crate) point_lights: RefCell<Vec<PointLight>>,
 }
 
 impl Default for LightManager {

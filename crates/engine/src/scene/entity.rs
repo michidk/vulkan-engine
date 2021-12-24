@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
-use gfx_maths::{Mat4, Quaternion, Vec3};
+use gfx_maths::{Mat4, Quaternion, Vec3, Vec4};
 
 use crate::core::input::Input;
 
@@ -143,6 +143,37 @@ impl Entity {
         } else {
             self.get_inverse_model_matrix()
         }
+    }
+
+    pub fn get_local_view_matrix(&self) -> Mat4 {
+        self.transform.borrow().get_view_matrix()
+    }
+
+    pub fn get_view_matrix(&self) -> Mat4 {
+        if let Some(parent) = self.parent.borrow().upgrade() {
+            let parent_view = parent.get_local_view_matrix();
+            self.get_local_view_matrix() * parent_view
+        } else {
+            self.get_local_view_matrix()
+        }
+    }
+
+    pub fn get_local_inverse_view_matrix(&self) -> Mat4 {
+        self.transform.borrow().get_inverse_view_matrix()
+    }
+
+    pub fn get_inverse_view_matrix(&self) -> Mat4 {
+        if let Some(parent) = self.parent.borrow().upgrade() {
+            let parent_inv_view = parent.get_local_inverse_view_matrix();
+            parent_inv_view * self.get_local_inverse_view_matrix()
+        } else {
+            self.get_local_inverse_view_matrix()
+        }
+    }
+
+    pub fn get_global_position(&self) -> Vec3 {
+        let pos = self.get_local_to_world_matrix() * Vec4::new(0.0, 0.0, 0.0, 1.0);
+        Vec3::new(pos.x, pos.y, pos.z)
     }
 
     pub(crate) fn update(&self, input: &Input, delta: f32) {

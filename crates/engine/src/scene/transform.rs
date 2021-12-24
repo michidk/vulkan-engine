@@ -15,6 +15,14 @@ impl Transform {
     pub(crate) fn get_inverse_model_matrix(&self) -> Mat4 {
         Mat4::world_to_local(self.position, self.rotation, self.scale)
     }
+
+    pub(crate) fn get_view_matrix(&self) -> Mat4 {
+        Mat4::rotate(-self.rotation) * Mat4::translate(-self.position)
+    }
+
+    pub(crate) fn get_inverse_view_matrix(&self) -> Mat4 {
+        Mat4::translate(self.position) * Mat4::rotate(self.rotation)
+    }
 }
 
 #[repr(C)]

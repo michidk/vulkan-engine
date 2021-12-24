@@ -106,24 +106,23 @@ pub(crate) struct CamData {
 impl CameraComponent {
     pub(crate) fn get_cam_data(&self, aspect: f32) -> CamData {
         let entity = self.entity.upgrade().unwrap();
-        let transform = entity.transform.borrow();
 
         CamData {
-            view_matrix: Mat4::rotate(-transform.rotation) * Mat4::translate(-transform.position),
+            view_matrix: entity.get_view_matrix(),
             projection_matrix: Mat4::perspective_vulkan(
                 self.fovy.to_radians(),
                 self.near,
                 self.far,
                 aspect,
             ),
-            inv_view_matrix: Mat4::translate(transform.position) * Mat4::rotate(transform.rotation),
+            inv_view_matrix: entity.get_inverse_view_matrix(),
             inv_projection_matrix: Mat4::inverse_perspective_vulkan(
                 self.fovy.to_radians(),
                 self.near,
                 self.far,
                 aspect,
             ),
-            pos: transform.position,
+            pos: entity.get_global_position(),
         }
     }
 }

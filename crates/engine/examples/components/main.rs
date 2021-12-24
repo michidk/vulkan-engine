@@ -15,7 +15,10 @@ use vulkan_engine::{
         window::{self, Dimensions},
     },
     scene::{
-        component::{camera_component::CameraComponent, renderer::RendererComponent, Component},
+        component::{
+            camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
+            renderer::RendererComponent, Component,
+        },
         entity::Entity,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
@@ -138,6 +141,7 @@ fn setup(engine: &mut Engine) {
         },
     );
     entity_cam.new_component::<CameraComponent>();
+    entity_cam.new_component::<DebugMovementComponent>();
 
     {
         let entity_tl = scene.new_entity_with_transform(

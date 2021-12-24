@@ -1,4 +1,5 @@
 pub mod camera_component;
+pub mod debug_movement_component;
 pub mod renderer;
 
 use std::{fmt::Debug, rc::Rc};

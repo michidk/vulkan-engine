@@ -9,7 +9,10 @@ use vulkan_engine::{
         window::{self, Dimensions},
     },
     scene::{
-        component::{camera_component::CameraComponent, renderer::RendererComponent},
+        component::{
+            camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
+            renderer::RendererComponent,
+        },
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -131,6 +134,7 @@ fn setup(engine: &mut Engine) {
         },
     );
     main_cam.new_component::<CameraComponent>();
+    main_cam.new_component::<DebugMovementComponent>();
 
     scene.load();
 

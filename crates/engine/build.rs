@@ -4,7 +4,7 @@ use std::process::Command;
 
 fn main() {
     // Tell Cargo that if the given file changes, to rerun this build script.
-    println!("cargo:rerun-if-changed=shaders/");
+    println!("cargo:rerun-if-changed=../../shaders/");
 
     let engine_dir = env::current_dir().unwrap(); // .
     let project_dir = engine_dir.parent().unwrap().parent().unwrap(); // ../../

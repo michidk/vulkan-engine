@@ -91,7 +91,7 @@ impl VulkanManager {
         window: &winit::window::Window,
         max_frames_in_flight: u8,
     ) -> GraphicsResult<Self> {
-        let entry = unsafe { ash::Entry::new() }.map_err(anyhow::Error::from)?;
+        let entry = unsafe { ash::Entry::load() }.map_err(anyhow::Error::from)?;
         let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
         let debug = DebugMessenger::init(&entry, &instance)?;

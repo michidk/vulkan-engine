@@ -1,9 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
+use egui::epaint::ClippedShape;
+
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
     scene::Scene,
-    vulkan::VulkanManager,
+    vulkan::{VulkanManager, texture::{Texture2D, TextureFilterMode}},
 };
 
 use super::window::Window;
@@ -29,6 +31,9 @@ impl EngineInit {
         let input = Rc::new(RefCell::new(Input::new()));
         let gameloop = GameLoop::new(input.clone());
 
+        let gui_context = egui::CtxRef::default();
+        let gui_state = egui_winit::State::new(&window.winit_window);
+
         Ok(Self {
             eventloop,
             engine: Engine {
@@ -38,6 +43,8 @@ impl EngineInit {
                 scene,
                 vulkan_manager,
                 window,
+                gui_context,
+                gui_state,
             },
         })
     }
@@ -54,6 +61,8 @@ pub struct Engine {
     pub scene: Rc<Scene>,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
+    pub gui_context: egui::CtxRef,
+    pub gui_state: egui_winit::State,
 }
 
 impl Engine {
@@ -61,11 +70,14 @@ impl Engine {
         self.gameloop.init();
     }
 
-    pub(crate) fn render(&mut self) {
+    pub(crate) fn render(&mut self, gui_shapes: Vec<ClippedShape>) {
+        let gui_meshes = self.gui_context.tessellate(gui_shapes);
+
         let vk = &mut self.vulkan_manager;
 
         // prepare for render
         let image_index = vk.next_frame();
+        vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
         vk.wait_for_fence();
 
         vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))

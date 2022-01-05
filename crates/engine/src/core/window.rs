@@ -150,22 +150,32 @@ pub fn start(engine_init: EngineInit) -> ! {
     engine_init.eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
         engine.input.borrow_mut().update(&event, &engine);
+
         match event {
-            // close
-            Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => *controlflow = winit::event_loop::ControlFlow::Exit,
-            // focus
-            Event::WindowEvent {
-                event: winit::event::WindowEvent::Focused(state),
-                ..
-            } => {
-                engine.window.on_focus(state);
+            Event::WindowEvent { event, .. } => {
+                engine.gui_state.on_event(&engine.gui_context, &event);
+
+                match event {
+                    winit::event::WindowEvent::CloseRequested => *controlflow = winit::event_loop::ControlFlow::Exit,
+                    winit::event::WindowEvent::Focused(state) => { engine.window.on_focus(state); },
+                    _ => {},
+                }
             }
             // render
             Event::MainEventsCleared => {
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
+
+                let raw_input = engine.gui_state.take_egui_input(&engine.window.winit_window);
+                let (output, gui_data) = engine.gui_context.run(raw_input, |ctx| {
+                    egui::SidePanel::left("debug_panel")
+                        .show(ctx, |ui| {
+                            ui.label("Hello World!");
+                            if ui.button("Test Button").clicked() {
+                                log::warn!("Button pressed");
+                            }
+                        });
+                });
+                engine.gui_state.handle_output(&engine.window.winit_window, &engine.gui_context, output);
 
                 let now = Instant::now();
                 let delta = (now - last_time).as_secs_f32();
@@ -174,7 +184,7 @@ pub fn start(engine_init: EngineInit) -> ! {
                 engine
                     .gameloop
                     .update(&mut engine.vulkan_manager, &engine.scene, delta);
-                engine.render();
+                engine.render(gui_data);
                 engine.input.borrow_mut().rollover_state();
             }
             _ => {}

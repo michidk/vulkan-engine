@@ -20,6 +20,9 @@ use ash::{
     extensions::ext,
     vk::{self, Handle},
 };
+use egui::{epaint::ClippedShape, ClippedMesh};
+use gfx_maths::Mat4;
+use gpu_allocator::MemoryLocation;
 
 use crate::{
     core::engine::EngineInfo,
@@ -44,7 +47,7 @@ use self::{
     queue::{PoolsWrapper, QueueFamilies, Queues},
     surface::SurfaceWrapper,
     swapchain::SwapchainWrapper,
-    uploader::Uploader,
+    uploader::Uploader, texture::{Texture2D, TextureFilterMode},
 };
 
 pub struct VulkanManager {
@@ -83,6 +86,18 @@ pub struct VulkanManager {
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
     pub(crate) enable_wireframe: bool,
+
+    desc_layout_ui: vk::DescriptorSetLayout,
+    pipe_layout_ui: vk::PipelineLayout,
+    renderpass_ui: vk::RenderPass,
+    pipeline_ui: vk::Pipeline,
+
+    ui_texture_version: u64,
+    ui_texture: Option<Rc<Texture2D>>,
+
+    ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
+    ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
+    ui_meshes: Vec<(egui::Rect, u64, u64)>,
 }
 
 impl VulkanManager {
@@ -159,7 +174,22 @@ impl VulkanManager {
             vk::Format::D24_UNORM_S8_UINT,
             &logical_device,
         )?;
-        swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp)?;
+
+        let sampler_linear_info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .min_lod(0.0)
+            .max_lod(vk::LOD_CLAMP_NONE)
+            .build();
+        let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
+
+        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) = pipeline::create_ui_pipeline(&logical_device, sampler_linear, swapchain.surface_format.format);
+
+        swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp, renderpass_ui)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
@@ -255,18 +285,6 @@ impl VulkanManager {
             frame_resource_fences.push(unsafe { logical_device.create_fence(&fence_info, None)? });
         }
 
-        let sampler_linear_info = vk::SamplerCreateInfo::builder()
-            .mag_filter(vk::Filter::LINEAR)
-            .min_filter(vk::Filter::LINEAR)
-            .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
-            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .min_lod(0.0)
-            .max_lod(vk::LOD_CLAMP_NONE)
-            .build();
-        let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
-
         let desc_layout_pp_samplers = [sampler_linear];
         let desc_layout_pp_bindings = [vk::DescriptorSetLayoutBinding::builder()
             .binding(0)
@@ -294,6 +312,18 @@ impl VulkanManager {
             max_frames_in_flight as u64,
             queue_families.graphics_q_index,
         );
+
+        let mut ui_vertex_buffers = Vec::with_capacity(max_frames_in_flight as usize);
+        for _ in 0..max_frames_in_flight {
+            let (buffer, alloc) = allocator.create_buffer(20 * 1000, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+            ui_vertex_buffers.push((buffer, alloc, 1000));
+        }
+
+        let mut ui_index_buffers = Vec::with_capacity(max_frames_in_flight as usize);
+        for _ in 0..max_frames_in_flight {
+            let (buffer, alloc) = allocator.create_buffer(4 * 1000, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+            ui_index_buffers.push((buffer, alloc, 1000));
+        }
 
         Ok(Self {
             entry,
@@ -328,6 +358,18 @@ impl VulkanManager {
             pp_effects: Vec::new(),
             uploader: std::mem::ManuallyDrop::new(uploader),
             enable_wireframe: false,
+
+            desc_layout_ui,
+            pipe_layout_ui,
+            renderpass_ui,
+            pipeline_ui,
+
+            ui_texture_version: u64::MAX,
+            ui_texture: None,
+
+            ui_vertex_buffers,
+            ui_index_buffers,
+            ui_meshes: Vec::new(),
         })
     }
 
@@ -714,8 +756,7 @@ impl VulkanManager {
     fn render_pp(
         &mut self,
         commandbuffer: vk::CommandBuffer,
-        swapchain_image_index: usize,
-    ) -> Result<(), vk::Result> {
+    ) -> Result<bool, vk::Result> {
         // resolve image contains finished scene rendering in hdr format
         // for each pp effect:
         //      - transition src image (either resolve_image or g0_image) to SHADER_READONLY_OPTIMAL layout (done by previous pp renderpass and resolve pass)
@@ -723,10 +764,7 @@ impl VulkanManager {
         //      - begin pp renderpass with correct framebuffer
         //      - bind pipeline and correct descriptor set
         //      - draw fullscreen quad
-        // transition swapchain image to TRANSFER_DST_OPTIMAL
-        // transition final dst image (either resolve_image or g0_image) to TRANSFER_SRC_OPTIMAL
-        // ImageBlit to swapchain
-        // Transition swapchain image to PRESENT_SRC_KHR
+        // transition final dst image (either resolve_image or g0_image) to COLOR_ATTACHMENT_OPTIMAL
 
         let mut direction = false;
 
@@ -789,6 +827,101 @@ impl VulkanManager {
             direction = !direction;
         }
 
+        // transition final destination image to COLOR_ATTACHMENT_OPTIMAL
+        self.transition_images(
+            commandbuffer,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            &[
+                ImageTransition {
+                    image: if direction {
+                        self.swapchain.g0_image
+                    } else {
+                        self.swapchain.resolve_image
+                    },
+                    from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    to: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                    dst_access: vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                },
+            ],
+        );
+
+        Ok(direction)
+    }
+
+    fn render_ui(&mut self, commandbuffer: vk::CommandBuffer, direction: bool, swapchain_image_index: usize) -> Result<(), vk::Result> {
+        // begin the ui renderpass
+        self.begin_renderpass(commandbuffer, 
+            self.renderpass_ui, 
+            if direction {
+                self.swapchain.framebuffer_pp_a
+            } else {
+                self.swapchain.framebuffer_pp_b
+            }, &[]);
+
+        // bind the ui pipeline
+        unsafe {
+            self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.pipeline_ui);
+            self.device.cmd_set_viewport(commandbuffer, 0, &[
+                vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: self.swapchain.extent.width as f32,
+                    height: self.swapchain.extent.height as f32,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }
+            ]);
+        }
+
+        // bind the descriptor set containing the font texture
+        unsafe {
+            let set = self.descriptor_manager.get_descriptor_set(self.desc_layout_ui, &[
+                DescriptorData::ImageSampler { image: self.ui_texture.as_ref().unwrap().view, layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, sampler: self.sampler_linear }
+            ])?;
+
+            self.device.cmd_bind_descriptor_sets(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.pipe_layout_ui, 0, &[
+                set
+            ], &[]);
+
+            let proj_matrix = Mat4::orthographic_vulkan(
+                0.0, self.swapchain.extent.width as f32,
+                self.swapchain.extent.height as f32, 0.0,
+                -1.0, 1.0
+            );
+            self.push_constants(commandbuffer, self.pipe_layout_ui, vk::ShaderStageFlags::VERTEX, &proj_matrix);
+
+            let vertex_buffer = self.ui_vertex_buffers[self.current_frame_index as usize].0;
+            let index_buffer = self.ui_index_buffers[self.current_frame_index as usize].0;
+
+            self.device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer], &[0]);
+            self.device.cmd_bind_index_buffer(commandbuffer, index_buffer, 0, vk::IndexType::UINT32);
+        }
+
+        // render every mesh
+        for (rect, start_index, index_count) in &self.ui_meshes {
+            unsafe {
+                // TODO: set correct scissor
+                self.device.cmd_set_scissor(commandbuffer, 0, &[
+                    vk::Rect2D{
+                        offset: vk::Offset2D {
+                            x: 0,
+                            y: 0,
+                        },
+                        extent: vk::Extent2D { width: self.swapchain.extent.width, height: self.swapchain.extent.height },
+                    }
+                ]);
+
+                self.device.cmd_draw_indexed(commandbuffer, *index_count as u32, 1, *start_index as u32, 0, 0);
+            }
+        }
+
+        // end the ui renderpass
+        unsafe {
+            self.device.cmd_end_render_pass(commandbuffer);
+        }
+
         // transition swapchain image to TRANSFER_DST_OPTIMAL and final pp image to TRANSFER_SRC_OPTIMAL
         self.transition_images(
             commandbuffer,
@@ -808,7 +941,7 @@ impl VulkanManager {
                     } else {
                         self.swapchain.resolve_image
                     },
-                    from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    from: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                     to: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                     wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
                     dst_access: vk::AccessFlags::TRANSFER_READ,
@@ -839,7 +972,7 @@ impl VulkanManager {
                 from: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 to: vk::ImageLayout::PRESENT_SRC_KHR,
                 wait_access: vk::AccessFlags::TRANSFER_WRITE,
-                dst_access: vk::AccessFlags::empty(), // can be empty because vkQueuePresentKHR waits for a semaphore, which automatically makes all memory writes visible
+                dst_access: vk::AccessFlags::empty(),
             }],
         );
 
@@ -945,7 +1078,8 @@ impl VulkanManager {
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);
 
-            self.render_pp(commandbuffer, swapchain_image_index)?;
+            let direction = self.render_pp(commandbuffer)?;
+            self.render_ui(commandbuffer, direction, swapchain_image_index)?;
 
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -971,7 +1105,7 @@ impl VulkanManager {
             &self.allocator,
         )?;
         self.swapchain
-            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp)?;
+            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp, self.renderpass_ui)?;
         Ok(())
     }
 
@@ -991,6 +1125,83 @@ impl VulkanManager {
 
         self.descriptor_manager.next_frame();
         self.uploader.submit_uploads(self.queues.graphics_queue);
+    }
+
+    pub(crate) fn upload_ui_data(&mut self, gui_context: egui::CtxRef, gui_meshes: Vec<ClippedMesh>) {
+        let font_image = gui_context.font_image();
+        if font_image.version != self.ui_texture_version {
+            self.ui_texture_version = font_image.version;
+
+            let num_pixels = font_image.width * font_image.height;
+            let mut pixels = vec![0; num_pixels * 4];
+            for i in 0..num_pixels {
+                let alpha = font_image.pixels[i];
+                pixels[i * 4 + 0] = 0xFFu8;
+                pixels[i * 4 + 1] = 0xFFu8;
+                pixels[i * 4 + 2] = 0xFFu8;
+                pixels[i * 4 + 3] = alpha;
+            }
+
+            self.ui_texture = Some(Texture2D::new(font_image.width as u32, font_image.height as u32, 
+                &pixels, 
+                TextureFilterMode::Linear, (*self.allocator).clone(), &mut (*self.uploader), self.device.clone()).unwrap());
+
+            log::warn!("Uploaded ui_texture of size {}x{}", font_image.width, font_image.height);
+        }
+
+        self.ui_meshes.clear();
+
+        let num_vertices: u64 = gui_meshes.iter().map(|m| m.1.vertices.len()).sum::<usize>() as u64;
+        let mut vertex_buffer = Vec::with_capacity(num_vertices as usize);
+
+        let num_indices: u64 = gui_meshes.iter().map(|m| m.1.indices.len()).sum::<usize>() as u64;
+        let mut index_buffer = Vec::with_capacity(num_indices as usize);
+
+        for m in gui_meshes {
+            let vertex_offset = vertex_buffer.len();
+
+            let start_index = index_buffer.len() as u64;
+
+            for v in m.1.vertices {
+                vertex_buffer.push(v);
+            }
+
+            for i in m.1.indices {
+                index_buffer.push(i + vertex_offset as u32);
+            }
+
+            let index_count = index_buffer.len() as u64 - start_index;
+
+            self.ui_meshes.push((m.0, start_index, index_count));
+        }
+
+        {
+            let (buffer, alloc, cap) = &mut self.ui_vertex_buffers[self.current_frame_index as usize];
+            if *cap < num_vertices {
+                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+
+                let (new_buffer, new_alloc) = self.allocator.create_buffer(20 * num_vertices, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+                *buffer = new_buffer;
+                *alloc = new_alloc;
+                *cap = num_vertices;
+            }
+
+            self.uploader.enqueue_buffer_upload(*buffer, 0, &vertex_buffer);
+        }
+
+        {
+            let (buffer, alloc, cap) = &mut self.ui_index_buffers[self.current_frame_index as usize];
+            if *cap < num_indices {
+                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+
+                let (new_buffer, new_alloc) = self.allocator.create_buffer(4 * num_indices, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+                *buffer = new_buffer;
+                *alloc = new_alloc;
+                *cap = num_vertices;
+            }
+
+            self.uploader.enqueue_buffer_upload(*buffer, 0, &index_buffer);
+        }
     }
 
     /// submits queued commands

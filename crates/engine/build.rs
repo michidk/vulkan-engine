@@ -5,6 +5,7 @@ use std::process::Command;
 fn main() {
     // Tell Cargo that if the given file changes, to rerun this build script.
     println!("cargo:rerun-if-changed=../../shaders/");
+    println!("cargo:rerun-if-changed=../../assets/shaders/");
 
     let engine_dir = env::current_dir().unwrap(); // .
     let project_dir = engine_dir.parent().unwrap().parent().unwrap(); // ../../
@@ -54,6 +55,8 @@ fn compile_shader(
         .output()
         .expect("failed to compile shaders using glslc");
 
-    println!("Shader Compiler Output: {:?}", output);
+    println!("Shader Compiler Output: {:#?}", output);
+    assert!(output.status.success());
+
     output
 }

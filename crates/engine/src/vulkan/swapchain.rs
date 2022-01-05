@@ -244,6 +244,7 @@ impl SwapchainWrapper {
         logical_device: &ash::Device,
         renderpass: vk::RenderPass,
         pp_renderpass: vk::RenderPass,
+        ui_renderpass: vk::RenderPass,
     ) -> Result<(), vk::Result> {
         // deferred framebuffer
         let views = [

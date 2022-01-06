@@ -127,6 +127,10 @@ impl Input {
                 window.set_mode(WindowMode::Windowed);
             }
         }
+
+        if self.get_button_down(VirtualKeyCode::Escape) {
+            window.set_capture_cursor(!window.get_capture_cursor());
+        }
     }
 
     // run this right after the gameloop update

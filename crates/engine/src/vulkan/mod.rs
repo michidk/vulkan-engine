@@ -16,7 +16,7 @@ pub(crate) mod uploader;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::vk::{self, Handle};
-use egui::ClippedMesh;
+use egui::{ClippedMesh, epaint::Vertex};
 use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
 
@@ -180,7 +180,7 @@ impl VulkanManager {
             .build();
         let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
 
-        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) = pipeline::create_ui_pipeline(&logical_device, sampler_linear, swapchain.surface_format.format);
+        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) = pipeline::create_ui_pipeline(&logical_device, sampler_linear);
 
         swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp, renderpass_ui)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
@@ -843,9 +843,9 @@ impl VulkanManager {
             self.device.cmd_set_viewport(commandbuffer, 0, &[
                 vk::Viewport {
                     x: 0.0,
-                    y: 0.0,
+                    y: self.swapchain.extent.height as f32,
                     width: self.swapchain.extent.width as f32,
-                    height: self.swapchain.extent.height as f32,
+                    height: -(self.swapchain.extent.height as f32),
                     min_depth: 0.0,
                     max_depth: 1.0,
                 }
@@ -1122,8 +1122,6 @@ impl VulkanManager {
             self.ui_texture = Some(Texture2D::new(font_image.width as u32, font_image.height as u32, 
                 &pixels, 
                 TextureFilterMode::Linear, (*self.allocator).clone(), &mut (*self.uploader), self.device.clone()).unwrap());
-
-            log::warn!("Uploaded ui_texture of size {}x{}", font_image.width, font_image.height);
         }
 
         self.ui_meshes.clear();

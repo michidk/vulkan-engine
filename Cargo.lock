@@ -583,9 +583,9 @@ dependencies = [
 
 [[package]]
 name = "gfx-maths"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2607a2abd1c1c595eff8dd692d8e431b910cea6de2e24a573708d97f51acbb7e"
+checksum = "f1e02d558ca97760da1ea48edbbbbdc82455a8d9a7fc000118bdcafb42667dbf"
 dependencies = [
  "auto_ops",
  "serde",

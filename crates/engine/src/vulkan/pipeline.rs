@@ -182,13 +182,13 @@ pub(crate) fn create_pipeline(
     Ok(graphicspipeline)
 }
 
-pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampler, swapchain_format: vk::Format) -> (vk::DescriptorSetLayout, vk::PipelineLayout, vk::RenderPass, vk::Pipeline) {
+pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampler) -> (vk::DescriptorSetLayout, vk::PipelineLayout, vk::RenderPass, vk::Pipeline) {
     let desc_set_layout = {
         let samplers = [sampler_linear];
         let bindings = [
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(0)
-                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .immutable_samplers(&samplers)
@@ -221,12 +221,12 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
     let renderpass = {
         let attachments = [
             vk::AttachmentDescription::builder()
-                .format(swapchain_format)
+                .format(vk::Format::R16G16B16A16_SFLOAT)
                 .samples(vk::SampleCountFlags::TYPE_1)
                 .load_op(vk::AttachmentLoadOp::LOAD)
                 .store_op(vk::AttachmentStoreOp::STORE)
                 .initial_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                 .build()
         ];
         let refs = [
@@ -309,7 +309,7 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
         let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
             .depth_clamp_enable(false)
             .rasterizer_discard_enable(false)
-            .polygon_mode(vk::PolygonMode::LINE)
+            .polygon_mode(vk::PolygonMode::FILL)
             .cull_mode(vk::CullModeFlags::NONE)
             .front_face(vk::FrontFace::CLOCKWISE)
             .depth_bias_enable(false)

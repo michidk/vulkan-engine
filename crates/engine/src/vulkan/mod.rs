@@ -1,6 +1,5 @@
 pub(crate) mod allocator;
 pub(crate) mod buffer;
-mod debug;
 pub(crate) mod descriptor_manager;
 mod device;
 pub mod error;
@@ -16,11 +15,8 @@ pub(crate) mod uploader;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{
-    extensions::ext,
-    vk::{self, Handle},
-};
-use egui::{epaint::ClippedShape, ClippedMesh};
+use ash::vk::{self, Handle};
+use egui::ClippedMesh;
 use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
 
@@ -39,7 +35,6 @@ use crate::{
 use self::{
     allocator::Allocator,
     buffer::{MutableBuffer, PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
     descriptor_manager::{DescriptorData, DescriptorManager},
     error::GraphicsResult,
     lighting_pipeline::LightingPipeline,
@@ -57,7 +52,6 @@ pub struct VulkanManager {
     pub allocator: std::mem::ManuallyDrop<Rc<Allocator>>,
     pub device: Rc<ash::Device>,
 
-    debug: std::mem::ManuallyDrop<DebugMessenger>,
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
     #[allow(dead_code)]
@@ -109,7 +103,6 @@ impl VulkanManager {
         let entry = unsafe { ash::Entry::load() }.map_err(anyhow::Error::from)?;
         let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
-        let debug = DebugMessenger::init(&entry, &instance)?;
         let surface = SurfaceWrapper::init(window, &entry, &instance);
 
         let (physical_device, physical_device_properties, _physical_device_features) =
@@ -328,7 +321,6 @@ impl VulkanManager {
         Ok(Self {
             entry,
             instance,
-            debug: std::mem::ManuallyDrop::new(debug),
             surface: std::mem::ManuallyDrop::new(surface),
             physical_device,
             physical_device_properties,
@@ -396,29 +388,14 @@ impl VulkanManager {
             .api_version(vk::make_api_version(1, 2, 0, 0));
 
         let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
-        let mut extension_names_raw = surface_extensions
+        let extension_names_raw = surface_extensions
             .iter()
             .map(|ext| ext.as_ptr())
             .collect::<Vec<_>>();
-        extension_names_raw.push(ext::DebugUtils::name().as_ptr()); // still wanna use the debug extensions
 
-        let mut instance_create_info = vk::InstanceCreateInfo::builder()
+        let instance_create_info = vk::InstanceCreateInfo::builder()
             .application_info(&app_info)
             .enabled_extension_names(&extension_names_raw);
-
-        // handle validation layers
-        let startup_debug_severity = debug::startup_debug_severity();
-        let startup_debug_type = debug::startup_debug_type();
-        let debug_create_info =
-            &mut debug::get_debug_create_info(startup_debug_severity, startup_debug_type);
-
-        let layer_names = debug::VALIDATION_LAYERS.map(|e| CString::new(e).unwrap());
-        let layer_names = layer_names.map(|e| e.as_ptr());
-        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(entry) {
-            instance_create_info = instance_create_info
-                .push_next(debug_create_info)
-                .enabled_layer_names(&layer_names);
-        }
 
         Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
@@ -1321,7 +1298,6 @@ impl Drop for VulkanManager {
             self.device.destroy_device(None);
             // --segfault
             std::mem::ManuallyDrop::drop(&mut self.surface);
-            std::mem::ManuallyDrop::drop(&mut self.debug);
             self.instance.destroy_instance(None)
         };
     }

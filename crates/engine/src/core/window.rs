@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use crate::core::engine::EngineInit;
+use egui::{Label, Rgba, Color32};
 use winit::event::Event;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -183,8 +184,15 @@ pub fn start(engine_init: EngineInit) -> ! {
                 let (output, gui_data) = engine.gui_context.run(raw_input, |ctx| {
                     egui::Window::new("Debug info")
                         .title_bar(true)
+                        .resizable(false)
+                        .collapsible(false)
                         .show(ctx, |ui| {
-                            ui.label(format!("FPS: {}", fps));
+                            let fps_color = match fps {
+                                0..=30 => Color32::RED,
+                                31..=59 => Color32::YELLOW,
+                                _ => Color32::WHITE,
+                            };
+                            ui.colored_label(fps_color, format!("FPS: {}", fps));
                         });
                 });
                 engine.gui_state.handle_output(

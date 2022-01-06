@@ -385,7 +385,7 @@ impl VulkanManager {
             .application_version(vk::make_api_version(0, 0, 1, 0))
             .engine_name(&app_name)
             .engine_version(vk::make_api_version(0, 0, 1, 0))
-            .api_version(vk::make_api_version(1, 2, 0, 0));
+            .api_version(vk::API_VERSION_1_2);
 
         let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
         let extension_names_raw = surface_extensions

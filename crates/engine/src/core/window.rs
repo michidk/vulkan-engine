@@ -164,16 +164,22 @@ pub fn start(engine_init: EngineInit) -> ! {
                 engine.gui_state.on_event(&engine.gui_context, &event);
 
                 match event {
-                    winit::event::WindowEvent::CloseRequested => *controlflow = winit::event_loop::ControlFlow::Exit,
-                    winit::event::WindowEvent::Focused(state) => { engine.window.on_focus(state); },
-                    _ => {},
+                    winit::event::WindowEvent::CloseRequested => {
+                        *controlflow = winit::event_loop::ControlFlow::Exit
+                    }
+                    winit::event::WindowEvent::Focused(state) => {
+                        engine.window.on_focus(state);
+                    }
+                    _ => {}
                 }
             }
             // render
             Event::MainEventsCleared => {
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
 
-                let raw_input = engine.gui_state.take_egui_input(&engine.window.winit_window);
+                let raw_input = engine
+                    .gui_state
+                    .take_egui_input(&engine.window.winit_window);
                 let (output, gui_data) = engine.gui_context.run(raw_input, |ctx| {
                     egui::Window::new("Debug info")
                         .title_bar(true)
@@ -181,7 +187,11 @@ pub fn start(engine_init: EngineInit) -> ! {
                             ui.label(format!("FPS: {}", fps));
                         });
                 });
-                engine.gui_state.handle_output(&engine.window.winit_window, &engine.gui_context, output);
+                engine.gui_state.handle_output(
+                    &engine.window.winit_window,
+                    &engine.gui_context,
+                    output,
+                );
 
                 let now = Instant::now();
                 let delta = (now - last_time).as_secs_f32();

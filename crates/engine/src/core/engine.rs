@@ -5,7 +5,7 @@ use egui::epaint::ClippedShape;
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
     scene::Scene,
-    vulkan::{VulkanManager, texture::{Texture2D, TextureFilterMode}},
+    vulkan::VulkanManager,
 };
 
 use super::window::Window;

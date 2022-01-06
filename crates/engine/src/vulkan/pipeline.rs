@@ -182,32 +182,36 @@ pub(crate) fn create_pipeline(
     Ok(graphicspipeline)
 }
 
-pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampler) -> (vk::DescriptorSetLayout, vk::PipelineLayout, vk::RenderPass, vk::Pipeline) {
+pub(crate) fn create_ui_pipeline(
+    device: &ash::Device,
+    sampler_linear: vk::Sampler,
+) -> (
+    vk::DescriptorSetLayout,
+    vk::PipelineLayout,
+    vk::RenderPass,
+    vk::Pipeline,
+) {
     let desc_set_layout = {
         let samplers = [sampler_linear];
-        let bindings = [
-            vk::DescriptorSetLayoutBinding::builder()
-                .binding(0)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-                .immutable_samplers(&samplers)
-                .build()
-        ];
+        let bindings = [vk::DescriptorSetLayoutBinding::builder()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .immutable_samplers(&samplers)
+            .build()];
         let info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(&bindings)
             .build();
 
-        unsafe{device.create_descriptor_set_layout(&info, None)}.unwrap()
+        unsafe { device.create_descriptor_set_layout(&info, None) }.unwrap()
     };
 
-    let ranges = [
-        vk::PushConstantRange::builder()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .offset(0)
-            .size(64)
-            .build()
-    ];
+    let ranges = [vk::PushConstantRange::builder()
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .offset(0)
+        .size(64)
+        .build()];
 
     let pipeline_layout = {
         let sets = [desc_set_layout];
@@ -215,37 +219,31 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
             .set_layouts(&sets)
             .push_constant_ranges(&ranges)
             .build();
-        unsafe{device.create_pipeline_layout(&info, None)}.unwrap()
+        unsafe { device.create_pipeline_layout(&info, None) }.unwrap()
     };
 
     let renderpass = {
-        let attachments = [
-            vk::AttachmentDescription::builder()
-                .format(vk::Format::R16G16B16A16_SFLOAT)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .load_op(vk::AttachmentLoadOp::LOAD)
-                .store_op(vk::AttachmentStoreOp::STORE)
-                .initial_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .build()
-        ];
-        let refs = [
-            vk::AttachmentReference::builder()
-                .attachment(0)
-                .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .build()
-        ];
-        let subpasses = [
-            vk::SubpassDescription::builder()
-                .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-                .color_attachments(&refs)
-                .build()
-        ];
+        let attachments = [vk::AttachmentDescription::builder()
+            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .load_op(vk::AttachmentLoadOp::LOAD)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .initial_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .build()];
+        let refs = [vk::AttachmentReference::builder()
+            .attachment(0)
+            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .build()];
+        let subpasses = [vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&refs)
+            .build()];
         let info = vk::RenderPassCreateInfo::builder()
             .attachments(&attachments)
             .subpasses(&subpasses)
             .build();
-        unsafe{device.create_render_pass(&info, None)}.unwrap()
+        unsafe { device.create_render_pass(&info, None) }.unwrap()
     };
 
     let pipeline = {
@@ -254,7 +252,8 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
 
         let mut spv_vert = Vec::new();
         let mut spv_frag = Vec::new();
-        let (vert_mod, frag_mod) = create_shader_modules("ui", device, &mut spv_vert, &mut spv_frag).unwrap();
+        let (vert_mod, frag_mod) =
+            create_shader_modules("ui", device, &mut spv_vert, &mut spv_frag).unwrap();
 
         let stages = [
             vk::PipelineShaderStageCreateInfo::builder()
@@ -268,13 +267,11 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
                 .name(&frag_func_name)
                 .build(),
         ];
-        let vertex_bindings = [
-            vk::VertexInputBindingDescription::builder()
-                .binding(0)
-                .stride(20)
-                .input_rate(vk::VertexInputRate::VERTEX)
-                .build()
-        ];
+        let vertex_bindings = [vk::VertexInputBindingDescription::builder()
+            .binding(0)
+            .stride(20)
+            .input_rate(vk::VertexInputRate::VERTEX)
+            .build()];
         let vertex_attribs = [
             vk::VertexInputAttributeDescription::builder()
                 .location(0)
@@ -319,26 +316,26 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
             .rasterization_samples(vk::SampleCountFlags::TYPE_1)
             .sample_shading_enable(false)
             .build();
-        let color_blend_attachments = [
-            vk::PipelineColorBlendAttachmentState::builder()
-                .blend_enable(true)
-                .src_color_blend_factor(vk::BlendFactor::ONE)
-                .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                .color_blend_op(vk::BlendOp::ADD)
-                .src_alpha_blend_factor(vk::BlendFactor::ONE)
-                .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
-                .alpha_blend_op(vk::BlendOp::ADD)
-                .color_write_mask(vk::ColorComponentFlags::R | vk::ColorComponentFlags::G | vk::ColorComponentFlags::B | vk::ColorComponentFlags::A)
-                .build()
-        ];
+        let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::ONE)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
+            )
+            .build()];
         let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
             .logic_op_enable(false)
             .attachments(&color_blend_attachments)
             .build();
-        let dynamic_states = [
-            vk::DynamicState::VIEWPORT,
-            vk::DynamicState::SCISSOR,
-        ];
+        let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
             .dynamic_states(&dynamic_states)
             .build();
@@ -355,7 +352,9 @@ pub(crate) fn create_ui_pipeline(device: &ash::Device, sampler_linear: vk::Sampl
             .render_pass(renderpass)
             .subpass(0)
             .build();
-        let res = unsafe{device.create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)}.unwrap()[0];
+        let res =
+            unsafe { device.create_graphics_pipelines(vk::PipelineCache::null(), &[info], None) }
+                .unwrap()[0];
 
         unsafe {
             device.destroy_shader_module(vert_mod, None);

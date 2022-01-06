@@ -16,7 +16,7 @@ pub(crate) mod uploader;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::vk::{self, Handle};
-use egui::{ClippedMesh, epaint::Vertex};
+use egui::ClippedMesh;
 use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
 
@@ -42,7 +42,8 @@ use self::{
     queue::{PoolsWrapper, QueueFamilies, Queues},
     surface::SurfaceWrapper,
     swapchain::SwapchainWrapper,
-    uploader::Uploader, texture::{Texture2D, TextureFilterMode},
+    texture::{Texture2D, TextureFilterMode},
+    uploader::Uploader,
 };
 
 pub struct VulkanManager {
@@ -180,9 +181,10 @@ impl VulkanManager {
             .build();
         let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
 
-        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) = pipeline::create_ui_pipeline(&logical_device, sampler_linear);
+        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) =
+            pipeline::create_ui_pipeline(&logical_device, sampler_linear);
 
-        swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp, renderpass_ui)?;
+        swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
@@ -308,13 +310,25 @@ impl VulkanManager {
 
         let mut ui_vertex_buffers = Vec::with_capacity(max_frames_in_flight as usize);
         for _ in 0..max_frames_in_flight {
-            let (buffer, alloc) = allocator.create_buffer(20 * 1000, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+            let (buffer, alloc) = allocator
+                .create_buffer(
+                    20 * 1000,
+                    vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                    MemoryLocation::GpuOnly,
+                )
+                .unwrap();
             ui_vertex_buffers.push((buffer, alloc, 1000));
         }
 
         let mut ui_index_buffers = Vec::with_capacity(max_frames_in_flight as usize);
         for _ in 0..max_frames_in_flight {
-            let (buffer, alloc) = allocator.create_buffer(4 * 1000, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+            let (buffer, alloc) = allocator
+                .create_buffer(
+                    4 * 1000,
+                    vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+                    MemoryLocation::GpuOnly,
+                )
+                .unwrap();
             ui_index_buffers.push((buffer, alloc, 1000));
         }
 
@@ -730,10 +744,7 @@ impl VulkanManager {
         }
     }
 
-    fn render_pp(
-        &mut self,
-        commandbuffer: vk::CommandBuffer,
-    ) -> Result<bool, vk::Result> {
+    fn render_pp(&mut self, commandbuffer: vk::CommandBuffer) -> Result<bool, vk::Result> {
         // resolve image contains finished scene rendering in hdr format
         // for each pp effect:
         //      - transition src image (either resolve_image or g0_image) to SHADER_READONLY_OPTIMAL layout (done by previous pp renderpass and resolve pass)
@@ -809,88 +820,134 @@ impl VulkanManager {
             commandbuffer,
             vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
             vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            &[
-                ImageTransition {
-                    image: if direction {
-                        self.swapchain.g0_image
-                    } else {
-                        self.swapchain.resolve_image
-                    },
-                    from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    to: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-                    dst_access: vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            &[ImageTransition {
+                image: if direction {
+                    self.swapchain.g0_image
+                } else {
+                    self.swapchain.resolve_image
                 },
-            ],
+                from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                to: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                dst_access: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                    | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            }],
         );
 
         Ok(direction)
     }
 
-    fn render_ui(&mut self, commandbuffer: vk::CommandBuffer, direction: bool, swapchain_image_index: usize) -> Result<(), vk::Result> {
+    fn render_ui(
+        &mut self,
+        commandbuffer: vk::CommandBuffer,
+        direction: bool,
+        swapchain_image_index: usize,
+    ) -> Result<(), vk::Result> {
         // begin the ui renderpass
-        self.begin_renderpass(commandbuffer, 
-            self.renderpass_ui, 
+        self.begin_renderpass(
+            commandbuffer,
+            self.renderpass_ui,
             if direction {
                 self.swapchain.framebuffer_pp_a
             } else {
                 self.swapchain.framebuffer_pp_b
-            }, &[]);
+            },
+            &[],
+        );
 
         // bind the ui pipeline
         unsafe {
-            self.device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.pipeline_ui);
-            self.device.cmd_set_viewport(commandbuffer, 0, &[
-                vk::Viewport {
+            self.device.cmd_bind_pipeline(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_ui,
+            );
+            self.device.cmd_set_viewport(
+                commandbuffer,
+                0,
+                &[vk::Viewport {
                     x: 0.0,
                     y: self.swapchain.extent.height as f32,
                     width: self.swapchain.extent.width as f32,
                     height: -(self.swapchain.extent.height as f32),
                     min_depth: 0.0,
                     max_depth: 1.0,
-                }
-            ]);
+                }],
+            );
         }
 
         // bind the descriptor set containing the font texture
         unsafe {
-            let set = self.descriptor_manager.get_descriptor_set(self.desc_layout_ui, &[
-                DescriptorData::ImageSampler { image: self.ui_texture.as_ref().unwrap().view, layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, sampler: self.sampler_linear }
-            ])?;
+            let set = self.descriptor_manager.get_descriptor_set(
+                self.desc_layout_ui,
+                &[DescriptorData::ImageSampler {
+                    image: self.ui_texture.as_ref().unwrap().view,
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    sampler: self.sampler_linear,
+                }],
+            )?;
 
-            self.device.cmd_bind_descriptor_sets(commandbuffer, vk::PipelineBindPoint::GRAPHICS, self.pipe_layout_ui, 0, &[
-                set
-            ], &[]);
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipe_layout_ui,
+                0,
+                &[set],
+                &[],
+            );
 
             let proj_matrix = Mat4::orthographic_vulkan(
-                0.0, self.swapchain.extent.width as f32,
-                self.swapchain.extent.height as f32, 0.0,
-                -1.0, 1.0
+                0.0,
+                self.swapchain.extent.width as f32,
+                self.swapchain.extent.height as f32,
+                0.0,
+                -1.0,
+                1.0,
             );
-            self.push_constants(commandbuffer, self.pipe_layout_ui, vk::ShaderStageFlags::VERTEX, &proj_matrix);
+            self.push_constants(
+                commandbuffer,
+                self.pipe_layout_ui,
+                vk::ShaderStageFlags::VERTEX,
+                &proj_matrix,
+            );
 
             let vertex_buffer = self.ui_vertex_buffers[self.current_frame_index as usize].0;
             let index_buffer = self.ui_index_buffers[self.current_frame_index as usize].0;
 
-            self.device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer], &[0]);
-            self.device.cmd_bind_index_buffer(commandbuffer, index_buffer, 0, vk::IndexType::UINT32);
+            self.device
+                .cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer], &[0]);
+            self.device.cmd_bind_index_buffer(
+                commandbuffer,
+                index_buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
         }
 
         // render every mesh
-        for (rect, start_index, index_count) in &self.ui_meshes {
+        for (_rect, start_index, index_count) in &self.ui_meshes {
             unsafe {
                 // TODO: set correct scissor
-                self.device.cmd_set_scissor(commandbuffer, 0, &[
-                    vk::Rect2D{
-                        offset: vk::Offset2D {
-                            x: 0,
-                            y: 0,
+                self.device.cmd_set_scissor(
+                    commandbuffer,
+                    0,
+                    &[vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: vk::Extent2D {
+                            width: self.swapchain.extent.width,
+                            height: self.swapchain.extent.height,
                         },
-                        extent: vk::Extent2D { width: self.swapchain.extent.width, height: self.swapchain.extent.height },
-                    }
-                ]);
+                    }],
+                );
 
-                self.device.cmd_draw_indexed(commandbuffer, *index_count as u32, 1, *start_index as u32, 0, 0);
+                self.device.cmd_draw_indexed(
+                    commandbuffer,
+                    *index_count as u32,
+                    1,
+                    *start_index as u32,
+                    0,
+                    0,
+                );
             }
         }
 
@@ -1082,7 +1139,7 @@ impl VulkanManager {
             &self.allocator,
         )?;
         self.swapchain
-            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp, self.renderpass_ui)?;
+            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp)?;
         Ok(())
     }
 
@@ -1107,7 +1164,11 @@ impl VulkanManager {
         self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 
-    pub(crate) fn upload_ui_data(&mut self, gui_context: egui::CtxRef, gui_meshes: Vec<ClippedMesh>) {
+    pub(crate) fn upload_ui_data(
+        &mut self,
+        gui_context: egui::CtxRef,
+        gui_meshes: Vec<ClippedMesh>,
+    ) {
         let font_image = gui_context.font_image();
         if font_image.version != self.ui_texture_version {
             self.ui_texture_version = font_image.version;
@@ -1116,15 +1177,24 @@ impl VulkanManager {
             let mut pixels = vec![0; num_pixels * 4];
             for i in 0..num_pixels {
                 let alpha = font_image.pixels[i];
-                pixels[i * 4 + 0] = 0xFFu8;
+                pixels[i * 4] = 0xFFu8;
                 pixels[i * 4 + 1] = 0xFFu8;
                 pixels[i * 4 + 2] = 0xFFu8;
                 pixels[i * 4 + 3] = alpha;
             }
 
-            self.ui_texture = Some(Texture2D::new(font_image.width as u32, font_image.height as u32, 
-                &pixels, 
-                TextureFilterMode::Linear, (*self.allocator).clone(), &mut (*self.uploader), self.device.clone()).unwrap());
+            self.ui_texture = Some(
+                Texture2D::new(
+                    font_image.width as u32,
+                    font_image.height as u32,
+                    &pixels,
+                    TextureFilterMode::Linear,
+                    (*self.allocator).clone(),
+                    &mut (*self.uploader),
+                    self.device.clone(),
+                )
+                .unwrap(),
+            );
         }
 
         self.ui_meshes.clear();
@@ -1154,31 +1224,49 @@ impl VulkanManager {
         }
 
         {
-            let (buffer, alloc, cap) = &mut self.ui_vertex_buffers[self.current_frame_index as usize];
+            let (buffer, alloc, cap) =
+                &mut self.ui_vertex_buffers[self.current_frame_index as usize];
             if *cap < num_vertices {
                 self.allocator.destroy_buffer(*buffer, (*alloc).clone());
 
-                let (new_buffer, new_alloc) = self.allocator.create_buffer(20 * num_vertices, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+                let (new_buffer, new_alloc) = self
+                    .allocator
+                    .create_buffer(
+                        20 * num_vertices,
+                        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                        MemoryLocation::GpuOnly,
+                    )
+                    .unwrap();
                 *buffer = new_buffer;
                 *alloc = new_alloc;
                 *cap = num_vertices;
             }
 
-            self.uploader.enqueue_buffer_upload(*buffer, 0, &vertex_buffer);
+            self.uploader
+                .enqueue_buffer_upload(*buffer, 0, &vertex_buffer);
         }
 
         {
-            let (buffer, alloc, cap) = &mut self.ui_index_buffers[self.current_frame_index as usize];
+            let (buffer, alloc, cap) =
+                &mut self.ui_index_buffers[self.current_frame_index as usize];
             if *cap < num_indices {
                 self.allocator.destroy_buffer(*buffer, (*alloc).clone());
 
-                let (new_buffer, new_alloc) = self.allocator.create_buffer(4 * num_indices, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
+                let (new_buffer, new_alloc) = self
+                    .allocator
+                    .create_buffer(
+                        4 * num_indices,
+                        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+                        MemoryLocation::GpuOnly,
+                    )
+                    .unwrap();
                 *buffer = new_buffer;
                 *alloc = new_alloc;
                 *cap = num_indices;
             }
 
-            self.uploader.enqueue_buffer_upload(*buffer, 0, &index_buffer);
+            self.uploader
+                .enqueue_buffer_upload(*buffer, 0, &index_buffer);
         }
     }
 
@@ -1253,8 +1341,10 @@ impl Drop for VulkanManager {
                 .device_wait_idle()
                 .expect("something wrong while waiting");
 
-            self.device.destroy_descriptor_set_layout(self.desc_layout_ui, None);
-            self.device.destroy_pipeline_layout(self.pipe_layout_ui, None);
+            self.device
+                .destroy_descriptor_set_layout(self.desc_layout_ui, None);
+            self.device
+                .destroy_pipeline_layout(self.pipe_layout_ui, None);
             self.device.destroy_render_pass(self.renderpass_ui, None);
             self.device.destroy_pipeline(self.pipeline_ui, None);
 
@@ -1263,7 +1353,7 @@ impl Drop for VulkanManager {
             for (buffer, alloc, _) in &self.ui_vertex_buffers {
                 self.allocator.destroy_buffer(*buffer, alloc.clone());
             }
-            for(buffer, alloc, _) in &self.ui_index_buffers {
+            for (buffer, alloc, _) in &self.ui_index_buffers {
                 self.allocator.destroy_buffer(*buffer, alloc.clone());
             }
 

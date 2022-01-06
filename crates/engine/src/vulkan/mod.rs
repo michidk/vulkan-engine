@@ -925,17 +925,19 @@ impl VulkanManager {
         }
 
         // render every mesh
-        for (_rect, start_index, index_count) in &self.ui_meshes {
+        for (rect, start_index, index_count) in &self.ui_meshes {
             unsafe {
-                // TODO: set correct scissor
                 self.device.cmd_set_scissor(
                     commandbuffer,
                     0,
                     &[vk::Rect2D {
-                        offset: vk::Offset2D { x: 0, y: 0 },
+                        offset: vk::Offset2D { 
+                            x: rect.left() as i32, 
+                            y: rect.top() as i32, 
+                        },
                         extent: vk::Extent2D {
-                            width: self.swapchain.extent.width,
-                            height: self.swapchain.extent.height,
+                            width: rect.width() as u32,
+                            height: rect.height() as u32,
                         },
                     }],
                 );

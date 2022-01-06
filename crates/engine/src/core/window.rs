@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::core::engine::EngineInit;
-use egui::{Label, Rgba, Color32};
+use egui::Color32;
 use winit::event::Event;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -34,11 +34,15 @@ impl InitialWindowInfo {
         let monitor_pos = monitor.position();
         let monitor_size = monitor.size();
         let window_size = winit_window.outer_size();
-
-        winit_window.set_outer_position(winit::dpi::PhysicalPosition {
-            x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
-            y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
-        });
+        
+        if window_size.width > monitor_size.width || window_size.height > monitor_size.height {
+            winit_window.set_maximized(true);
+        } else {
+            winit_window.set_outer_position(winit::dpi::PhysicalPosition {
+                x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
+                y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
+            });
+        }
 
         Ok(Window::new(winit_window))
     }

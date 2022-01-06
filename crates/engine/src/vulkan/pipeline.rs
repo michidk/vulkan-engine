@@ -190,6 +190,7 @@ pub(crate) fn create_ui_pipeline(
     vk::PipelineLayout,
     vk::RenderPass,
     vk::Pipeline,
+    vk::Pipeline,
 ) {
     let desc_set_layout = {
         let samplers = [sampler_linear];
@@ -246,7 +247,7 @@ pub(crate) fn create_ui_pipeline(
         unsafe { device.create_render_pass(&info, None) }.unwrap()
     };
 
-    let pipeline = {
+    let (pipeline, pipeline_wireframe) = {
         let vert_func_name = std::ffi::CString::new("vert").unwrap();
         let frag_func_name = std::ffi::CString::new("frag").unwrap();
 
@@ -254,6 +255,16 @@ pub(crate) fn create_ui_pipeline(
         let mut spv_frag = Vec::new();
         let (vert_mod, frag_mod) =
             create_shader_modules("ui", device, &mut spv_vert, &mut spv_frag).unwrap();
+
+        let mut spv_vert_wireframe = Vec::new();
+        let mut spv_frag_wireframe = Vec::new();
+        let (vert_mod_wireframe, frag_mod_wireframe) = create_shader_modules(
+            "ui_debug",
+            device,
+            &mut spv_vert_wireframe,
+            &mut spv_frag_wireframe,
+        )
+        .unwrap();
 
         let stages = [
             vk::PipelineShaderStageCreateInfo::builder()
@@ -352,17 +363,58 @@ pub(crate) fn create_ui_pipeline(
             .render_pass(renderpass)
             .subpass(0)
             .build();
-        let res =
-            unsafe { device.create_graphics_pipelines(vk::PipelineCache::null(), &[info], None) }
-                .unwrap()[0];
+
+        let stages_wireframe = [
+            vk::PipelineShaderStageCreateInfo::builder()
+                .stage(vk::ShaderStageFlags::VERTEX)
+                .module(vert_mod_wireframe)
+                .name(&vert_func_name)
+                .build(),
+            vk::PipelineShaderStageCreateInfo::builder()
+                .stage(vk::ShaderStageFlags::FRAGMENT)
+                .module(frag_mod_wireframe)
+                .name(&frag_func_name)
+                .build(),
+        ];
+        let info_wireframe = vk::GraphicsPipelineCreateInfo::builder()
+            .stages(&stages_wireframe)
+            .vertex_input_state(&vertex_input_state)
+            .input_assembly_state(&input_assembly_state)
+            .viewport_state(&viewport_state)
+            .rasterization_state(&rasterization_state)
+            .multisample_state(&multisample_state)
+            .color_blend_state(&color_blend_state)
+            .dynamic_state(&dynamic_state)
+            .layout(pipeline_layout)
+            .render_pass(renderpass)
+            .subpass(0)
+            .build();
+
+        let res = unsafe {
+            device.create_graphics_pipelines(
+                vk::PipelineCache::null(),
+                &[info, info_wireframe],
+                None,
+            )
+        }
+        .unwrap();
 
         unsafe {
             device.destroy_shader_module(vert_mod, None);
             device.destroy_shader_module(frag_mod, None);
+
+            device.destroy_shader_module(vert_mod_wireframe, None);
+            device.destroy_shader_module(frag_mod_wireframe, None);
         }
 
-        res
+        (res[0], res[1])
     };
 
-    (desc_set_layout, pipeline_layout, renderpass, pipeline)
+    (
+        desc_set_layout,
+        pipeline_layout,
+        renderpass,
+        pipeline,
+        pipeline_wireframe,
+    )
 }

@@ -193,9 +193,7 @@ pub fn start(engine_init: EngineInit) -> ! {
                 let delta = (now - last_time).as_secs_f32();
                 last_time = now;
 
-                engine
-                    .gameloop
-                    .update(&mut engine.vulkan_manager, &engine.scene, delta);
+                engine.gameloop.update(&engine.scene, delta);
                 engine.render();
                 engine.input.borrow_mut().rollover_state();
             }

@@ -81,11 +81,13 @@ pub struct VulkanManager {
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
     pub(crate) enable_wireframe: bool,
+    pub(crate) enable_ui_wireframe: bool,
 
     desc_layout_ui: vk::DescriptorSetLayout,
     pipe_layout_ui: vk::PipelineLayout,
     renderpass_ui: vk::RenderPass,
     pipeline_ui: vk::Pipeline,
+    pipeline_ui_wireframe: vk::Pipeline,
 
     ui_texture_version: u64,
     ui_texture: Option<Rc<Texture2D>>,
@@ -181,7 +183,7 @@ impl VulkanManager {
             .build();
         let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
 
-        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui) =
+        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui, pipeline_ui_wireframe) =
             pipeline::create_ui_pipeline(&logical_device, sampler_linear);
 
         swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp)?;
@@ -364,11 +366,13 @@ impl VulkanManager {
             pp_effects: Vec::new(),
             uploader: std::mem::ManuallyDrop::new(uploader),
             enable_wireframe: false,
+            enable_ui_wireframe: false,
 
             desc_layout_ui,
             pipe_layout_ui,
             renderpass_ui,
             pipeline_ui,
+            pipeline_ui_wireframe,
 
             ui_texture_version: u64::MAX,
             ui_texture: None,
@@ -860,7 +864,11 @@ impl VulkanManager {
             self.device.cmd_bind_pipeline(
                 commandbuffer,
                 vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_ui,
+                if self.enable_ui_wireframe {
+                    self.pipeline_ui_wireframe
+                } else {
+                    self.pipeline_ui
+                },
             );
             self.device.cmd_set_viewport(
                 commandbuffer,

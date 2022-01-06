@@ -46,9 +46,10 @@ impl EngineInit {
                 gui_context,
                 gui_state,
 
-                frame_time: Instant::now(),
-                frame_count: 0,
+                fps_time: Instant::now(),
+                fps_count: 0,
                 fps: 0,
+                last_frame: Instant::now(),
             },
         })
     }
@@ -68,9 +69,10 @@ pub struct Engine {
     pub gui_context: egui::CtxRef,
     pub gui_state: egui_winit::State,
 
-    frame_time: Instant,
-    frame_count: usize,
+    fps_time: Instant,
+    fps_count: usize,
     fps: usize,
+    last_frame: Instant,
 }
 
 impl Engine {
@@ -89,12 +91,15 @@ impl Engine {
     }
 
     pub(crate) fn render(&mut self) {
-        self.frame_count += 1;
-        if self.frame_time.elapsed().as_secs() >= 1 {
-            self.fps = self.frame_count;
-            self.frame_count = 0;
-            self.frame_time = Instant::now();
+        self.fps_count += 1;
+        if self.fps_time.elapsed().as_secs() >= 1 {
+            self.fps = self.fps_count;
+            self.fps_count = 0;
+            self.fps_time = Instant::now();
         }
+
+        let frame_time = self.last_frame.elapsed().as_secs_f64();
+        self.last_frame = Instant::now();
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
         let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
@@ -109,6 +114,13 @@ impl Engine {
                         _ => Color32::WHITE,
                     };
                     ui.colored_label(fps_color, format!("FPS: {}", self.fps));
+                    ui.colored_label(
+                        fps_color,
+                        format!("Frame time: {:.3} ms", frame_time * 1000.0),
+                    );
+
+                    ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
+                    ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Wireframe");
                 });
 
             let root_entity = self.scene.root_entity.borrow();

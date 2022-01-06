@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use egui::Color32;
+use egui::{CollapsingHeader, Color32, RichText, ScrollArea};
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
-    scene::{entity::Entity, Scene},
+    scene::{component::Component, entity::Entity, Scene},
     vulkan::VulkanManager,
 };
 
@@ -50,6 +50,12 @@ impl EngineInit {
                 fps_count: 0,
                 fps: 0,
                 last_frame: Instant::now(),
+
+                ui_vertex_count: 0,
+                ui_index_count: 0,
+                ui_mesh_count: 0,
+
+                scene_graph_visible: false,
             },
         })
     }
@@ -73,6 +79,12 @@ pub struct Engine {
     fps_count: usize,
     fps: usize,
     last_frame: Instant,
+
+    ui_vertex_count: u32,
+    ui_index_count: u32,
+    ui_mesh_count: u32,
+
+    scene_graph_visible: bool,
 }
 
 impl Engine {
@@ -80,14 +92,25 @@ impl Engine {
         self.gameloop.init();
     }
 
-    fn render_entity(ui: &mut egui::Ui, entity: &Entity) {
-        ui.collapsing(format!("{} - (ID {})", entity.name, entity.id), |ui| {
-            let children = entity.children.borrow();
+    fn render_component(ui: &mut egui::Ui, component: &dyn Component) {
+        ui.label(component.inspector_name());
+    }
 
-            for child in &*children {
-                Self::render_entity(ui, child);
-            }
-        });
+    fn render_entity(ui: &mut egui::Ui, entity: &Entity) {
+        ui.collapsing(
+            RichText::new(format!("{} - (ID {})", entity.name, entity.id)).strong(),
+            |ui| {
+                let components = entity.components.borrow();
+                for comp in &*components {
+                    Self::render_component(ui, &**comp);
+                }
+
+                let children = entity.children.borrow();
+                for child in &*children {
+                    Self::render_entity(ui, child);
+                }
+            },
+        );
     }
 
     pub(crate) fn render(&mut self) {
@@ -103,7 +126,7 @@ impl Engine {
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
         let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
-            egui::Window::new("Debug Statistics")
+            egui::Window::new("Debug Tools")
                 .title_bar(true)
                 .collapsible(false)
                 .resizable(false)
@@ -120,23 +143,40 @@ impl Engine {
                     );
 
                     ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
-                    ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Wireframe");
+
+                    ui.checkbox(&mut self.scene_graph_visible, "Scene graph");
+
+                    CollapsingHeader::new("UI Debugging").show(ui, |ui| {
+                        ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Wireframe");
+
+                        ui.label(format!("Vertices: {}", self.ui_vertex_count));
+                        ui.label(format!(
+                            "Indices: {} ({} triangles)",
+                            self.ui_index_count,
+                            self.ui_index_count / 3
+                        ));
+                        ui.label(format!("Draw calls: {}", self.ui_mesh_count));
+                    });
                 });
 
             let root_entity = self.scene.root_entity.borrow();
-            egui::Window::new("Scene graph")
-                .title_bar(true)
-                .collapsible(true)
-                .resizable(true)
-                .default_size([100.0, 500.0])
-                .scroll2([false, true])
-                .show(ctx, |ui| {
-                    Self::render_entity(ui, &root_entity);
-                });
+            if self.scene_graph_visible {
+                egui::SidePanel::right("Scene graph")
+                    .resizable(true)
+                    .show(ctx, |ui| {
+                        ScrollArea::vertical().show(ui, |ui| {
+                            Self::render_entity(ui, &root_entity);
+                        });
+                    });
+            }
         });
         self.gui_state
             .handle_output(&self.window.winit_window, &self.gui_context, output);
         let gui_meshes = self.gui_context.tessellate(shapes);
+
+        self.ui_vertex_count = gui_meshes.iter().map(|m| m.1.vertices.len() as u32).sum();
+        self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
+        self.ui_mesh_count = gui_meshes.len() as u32;
 
         let vk = &mut self.vulkan_manager;
 

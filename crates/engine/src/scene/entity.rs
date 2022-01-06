@@ -100,8 +100,20 @@ impl Entity {
         self.children.borrow_mut().push(child);
     }
 
+    fn remove_child(&self, child_id: u64) {
+        let pos = self.children.borrow().iter().position(|e| e.id == child_id);
+        if let Some(pos) = pos {
+            self.children.borrow_mut().remove(pos);
+        }
+    }
+
     pub fn attach_to(self: &Rc<Entity>, new_parent: &Rc<Entity>) {
-        *self.parent.borrow_mut() = Rc::downgrade(new_parent);
+        let mut parent = self.parent.borrow_mut();
+        if let Some(parent) = parent.upgrade() {
+            parent.remove_child(self.id);
+        }
+
+        *parent = Rc::downgrade(new_parent);
         new_parent.add_child(self.clone());
     }
 

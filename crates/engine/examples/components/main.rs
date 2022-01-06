@@ -266,6 +266,10 @@ impl Component for RotateComponent {
             transform.rotation = rotation;
         }
     }
+
+    fn inspector_name(&self) -> &'static str {
+        "RotateComponent"
+    }
 }
 
 #[derive(Debug)]
@@ -297,5 +301,9 @@ impl Component for ScaleComponent {
             let mut transform = entity.transform.borrow_mut();
             transform.scale = Vec3::one() * ((time * 0.5).sin() + 1.0);
         }
+    }
+
+    fn inspector_name(&self) -> &'static str {
+        "ScaleComponent"
     }
 }

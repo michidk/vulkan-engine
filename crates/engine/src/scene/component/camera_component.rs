@@ -36,6 +36,10 @@ impl Component for CameraComponent {
     fn load(&self) {}
 
     fn start(&self) {}
+
+    fn inspector_name(&self) -> &'static str {
+        "CameraComponent"
+    }
 }
 
 #[repr(C)]

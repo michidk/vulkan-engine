@@ -13,6 +13,8 @@ pub trait Component: Debug {
     where
         Self: Sized;
 
+    fn inspector_name(&self) -> &'static str;
+
     fn load(&self);
     fn start(&self);
 

@@ -86,4 +86,8 @@ impl Component for DebugMovementComponent {
 
         transform.rotation = rotation;
     }
+
+    fn inspector_name(&self) -> &'static str {
+        "DebugMovementComponent"
+    }
 }

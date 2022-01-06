@@ -47,6 +47,10 @@ impl Component for RendererComponent {
             }
         }
     }
+
+    fn inspector_name(&self) -> &'static str {
+        "RendererComponent"
+    }
 }
 
 impl fmt::Debug for RendererComponent {

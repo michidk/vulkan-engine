@@ -77,8 +77,9 @@ impl Engine {
 
         // prepare for render
         let image_index = vk.next_frame();
-        vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
         vk.wait_for_fence();
+        vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
+        vk.wait_for_uploads();
 
         vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
             .expect("updating the command buffer");

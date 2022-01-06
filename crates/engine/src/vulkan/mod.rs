@@ -1101,6 +1101,9 @@ impl VulkanManager {
         }
 
         self.descriptor_manager.next_frame();
+    }
+
+    pub(crate) fn wait_for_uploads(&mut self) {
         self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 

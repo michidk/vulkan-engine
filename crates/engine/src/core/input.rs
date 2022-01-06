@@ -45,6 +45,8 @@ pub struct Input {
     state_prev: InputState,
     /// Whether we should keep sending events even when the window is not focused
     events_during_unfocus: bool,
+    /// Whether the cursor is currently captured
+    cursor_captured: bool,
 }
 
 impl Input {
@@ -53,6 +55,7 @@ impl Input {
             state: InputState::default(),
             state_prev: InputState::default(),
             events_during_unfocus: false,
+            cursor_captured: true,
         }
     }
 
@@ -117,7 +120,7 @@ impl Input {
     }
 
     // handles built-in key presses
-    pub(crate) fn handle_builtin(&self, window: &mut Window) {
+    pub(crate) fn handle_builtin(&mut self, window: &mut Window) {
         if self.get_button_down(VirtualKeyCode::LAlt)
             && self.get_button_was_down(VirtualKeyCode::Return)
         {
@@ -128,8 +131,9 @@ impl Input {
             }
         }
 
-        if self.get_button_down(VirtualKeyCode::Escape) {
-            window.set_capture_cursor(!window.get_capture_cursor());
+        if self.get_button_was_down(VirtualKeyCode::Escape) {
+            self.cursor_captured = !self.cursor_captured;
+            window.set_capture_cursor(self.cursor_captured);
         }
     }
 
@@ -139,6 +143,11 @@ impl Input {
         // reset state and assign prev
         self.state_prev = self.state;
         self.state.rollover();
+    }
+
+    /// Returns whether the cursor is currently captured
+    pub fn get_cursor_captured(&self) -> bool {
+        self.cursor_captured
     }
 
     /// Returns whether the button was pressed this frame

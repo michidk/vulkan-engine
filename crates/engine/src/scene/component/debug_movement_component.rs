@@ -36,6 +36,10 @@ impl Component for DebugMovementComponent {
     fn start(&self) {}
 
     fn update(&self, input: &crate::core::input::Input, delta: f32) {
+        if !input.get_cursor_captured() {
+            return;
+        }
+
         let mouse_sensitivity = 0.123f32;
 
         let mut rot_x = self.rotation_x.get();

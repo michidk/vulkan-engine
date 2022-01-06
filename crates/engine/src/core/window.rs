@@ -34,7 +34,7 @@ impl InitialWindowInfo {
         let monitor_pos = monitor.position();
         let monitor_size = monitor.size();
         let window_size = winit_window.outer_size();
-        
+
         if window_size.width > monitor_size.width || window_size.height > monitor_size.height {
             winit_window.set_maximized(true);
         } else {
@@ -166,7 +166,19 @@ pub fn start(engine_init: EngineInit) -> ! {
 
         match event {
             Event::WindowEvent { event, .. } => {
-                engine.gui_state.on_event(&engine.gui_context, &event);
+                match event {
+                    winit::event::WindowEvent::MouseInput { .. }
+                    | winit::event::WindowEvent::MouseWheel { .. }
+                    | winit::event::WindowEvent::CursorMoved { .. }
+                    | winit::event::WindowEvent::KeyboardInput { .. } => {
+                        if !engine.input.borrow().get_cursor_captured() {
+                            engine.gui_state.on_event(&engine.gui_context, &event);
+                        }
+                    }
+                    _ => {
+                        engine.gui_state.on_event(&engine.gui_context, &event);
+                    }
+                }
 
                 match event {
                     winit::event::WindowEvent::CloseRequested => {

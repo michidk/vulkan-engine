@@ -1172,7 +1172,7 @@ impl VulkanManager {
                 let (new_buffer, new_alloc) = self.allocator.create_buffer(4 * num_indices, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER, MemoryLocation::GpuOnly).unwrap();
                 *buffer = new_buffer;
                 *alloc = new_alloc;
-                *cap = num_vertices;
+                *cap = num_indices;
             }
 
             self.uploader.enqueue_buffer_upload(*buffer, 0, &index_buffer);
@@ -1249,6 +1249,20 @@ impl Drop for VulkanManager {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
+            self.device.destroy_descriptor_set_layout(self.desc_layout_ui, None);
+            self.device.destroy_pipeline_layout(self.pipe_layout_ui, None);
+            self.device.destroy_render_pass(self.renderpass_ui, None);
+            self.device.destroy_pipeline(self.pipeline_ui, None);
+
+            // drop ui_texture
+            self.ui_texture = None;
+            for (buffer, alloc, _) in &self.ui_vertex_buffers {
+                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            }
+            for(buffer, alloc, _) in &self.ui_index_buffers {
+                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            }
 
             self.lighting_pipelines.clear();
             self.pp_effects.clear();

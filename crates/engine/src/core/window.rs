@@ -154,10 +154,6 @@ impl Window {
 pub fn start(engine_init: EngineInit) -> ! {
     let mut last_time = Instant::now();
 
-    let mut frame_time = Instant::now();
-    let mut frame_count = 0;
-    let mut fps = 0;
-
     let mut engine = engine_init.engine;
     engine.window.on_start();
     engine_init.eventloop.run(move |event, _, controlflow| {
@@ -194,29 +190,6 @@ pub fn start(engine_init: EngineInit) -> ! {
             Event::MainEventsCleared => {
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
 
-                let raw_input = engine
-                    .gui_state
-                    .take_egui_input(&engine.window.winit_window);
-                let (output, gui_data) = engine.gui_context.run(raw_input, |ctx| {
-                    egui::Window::new("Debug info")
-                        .title_bar(true)
-                        .resizable(false)
-                        .collapsible(false)
-                        .show(ctx, |ui| {
-                            let fps_color = match fps {
-                                0..=30 => Color32::RED,
-                                31..=59 => Color32::YELLOW,
-                                _ => Color32::WHITE,
-                            };
-                            ui.colored_label(fps_color, format!("FPS: {}", fps));
-                        });
-                });
-                engine.gui_state.handle_output(
-                    &engine.window.winit_window,
-                    &engine.gui_context,
-                    output,
-                );
-
                 let now = Instant::now();
                 let delta = (now - last_time).as_secs_f32();
                 last_time = now;
@@ -224,15 +197,8 @@ pub fn start(engine_init: EngineInit) -> ! {
                 engine
                     .gameloop
                     .update(&mut engine.vulkan_manager, &engine.scene, delta);
-                engine.render(gui_data);
+                engine.render();
                 engine.input.borrow_mut().rollover_state();
-
-                frame_count += 1;
-                if frame_time.elapsed().as_secs_f32() >= 1.0 {
-                    fps = frame_count;
-                    frame_count = 0;
-                    frame_time = Instant::now();
-                }
             }
             _ => {}
         }

@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Instant, borrow::Borrow};
 
-use egui::epaint::ClippedShape;
+use egui::{epaint::ClippedShape, CollapsingHeader, Label, Color32};
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
-    scene::Scene,
+    scene::{Scene, entity::Entity},
     vulkan::VulkanManager,
 };
 
@@ -45,6 +45,10 @@ impl EngineInit {
                 window,
                 gui_context,
                 gui_state,
+
+                frame_time: Instant::now(),
+                frame_count: 0,
+                fps: 0,
             },
         })
     }
@@ -63,6 +67,10 @@ pub struct Engine {
     pub window: Window,
     pub gui_context: egui::CtxRef,
     pub gui_state: egui_winit::State,
+
+    frame_time: Instant,
+    frame_count: usize,
+    fps: usize,
 }
 
 impl Engine {
@@ -70,8 +78,52 @@ impl Engine {
         self.gameloop.init();
     }
 
-    pub(crate) fn render(&mut self, gui_shapes: Vec<ClippedShape>) {
-        let gui_meshes = self.gui_context.tessellate(gui_shapes);
+    fn render_entity(ui: &mut egui::Ui, entity: &Entity) {
+        ui.collapsing(format!("{} - (ID {})", entity.name, entity.id), |ui| {
+            let children = entity.children.borrow();
+
+            for child in &*children {
+                Self::render_entity(ui, child);
+            }
+        });
+    }
+
+    pub(crate) fn render(&mut self) {
+        self.frame_count += 1;
+        if self.frame_time.elapsed().as_secs() >= 1 {
+            self.fps = self.frame_count;
+            self.frame_count = 0;
+            self.frame_time = Instant::now();
+        }
+
+        let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
+        let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
+            egui::Window::new("Debug Statistics")
+                .title_bar(true)
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    let fps_color = match self.fps {
+                        0..=29 => Color32::RED,
+                        30..=59 => Color32::YELLOW,
+                        _ => Color32::WHITE,
+                    };
+                    ui.colored_label(fps_color, format!("FPS: {}", self.fps));
+                });
+
+            let root_entity = self.scene.root_entity.borrow();
+            egui::Window::new("Scene graph")
+                .title_bar(true)
+                .collapsible(true)
+                .resizable(true)
+                .default_size([100.0, 500.0])
+                .scroll2([false, true])
+                .show(ctx, |ui| {
+                    Self::render_entity(ui, &root_entity);
+                });
+        });
+        self.gui_state.handle_output(&self.window.winit_window, &self.gui_context, output);
+        let gui_meshes = self.gui_context.tessellate(shapes);
 
         let vk = &mut self.vulkan_manager;
 

@@ -19,6 +19,7 @@ pub struct Entity {
     pub children: RefCell<Vec<Rc<Entity>>>,
     pub components: RefCell<Vec<Rc<dyn Component>>>,
     pub scene: Weak<Scene>,
+    pub id: u64,
 }
 
 impl Entity {
@@ -35,6 +36,7 @@ impl Entity {
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: Rc::downgrade(scene),
+            id: scene.new_entity_id(),
         });
 
         parent.add_child(res.clone());
@@ -55,6 +57,7 @@ impl Entity {
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: Rc::downgrade(scene),
+            id: scene.new_entity_id(),
         });
 
         parent.add_child(res.clone());
@@ -75,6 +78,7 @@ impl Entity {
             children: RefCell::new(Vec::new()),
             components: RefCell::new(Vec::new()),
             scene: Weak::new(),
+            id: u64::MAX,
         }
     }
 

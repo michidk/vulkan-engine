@@ -5,7 +5,7 @@ pub mod material;
 pub mod model;
 pub mod transform;
 
-use std::cell::RefCell;
+use std::cell::{RefCell, Cell};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
@@ -19,8 +19,9 @@ use self::transform::{Transform, TransformData};
 
 pub struct Scene {
     pub light_manager: LightManager,
-    root_entity: RefCell<Rc<Entity>>,
+    pub(crate) root_entity: RefCell<Rc<Entity>>,
     pub(crate) main_camera: RefCell<Weak<CameraComponent>>,
+    id_counter: Cell<u64>,
 }
 
 impl Scene {
@@ -30,10 +31,17 @@ impl Scene {
             light_manager: LightManager::default(),
             root_entity: RefCell::new(Rc::new(Entity::new_root())),
             main_camera: RefCell::new(Weak::new()),
+            id_counter: Cell::new(0),
         });
         root.scene = Rc::downgrade(&res);
         *res.root_entity.borrow_mut() = Rc::new(root);
 
+        res
+    }
+
+    pub(crate) fn new_entity_id(&self) -> u64 {
+        let res = self.id_counter.get();
+        self.id_counter.set(res + 1);
         res
     }
 

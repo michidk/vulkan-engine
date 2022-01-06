@@ -931,9 +931,9 @@ impl VulkanManager {
                     commandbuffer,
                     0,
                     &[vk::Rect2D {
-                        offset: vk::Offset2D { 
-                            x: rect.left() as i32, 
-                            y: rect.top() as i32, 
+                        offset: vk::Offset2D {
+                            x: rect.left() as i32,
+                            y: rect.top() as i32,
                         },
                         extent: vk::Extent2D {
                             width: rect.width() as u32,

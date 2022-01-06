@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc, time::Instant, borrow::Borrow};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use egui::{epaint::ClippedShape, CollapsingHeader, Label, Color32};
+use egui::Color32;
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
-    scene::{Scene, entity::Entity},
+    scene::{entity::Entity, Scene},
     vulkan::VulkanManager,
 };
 
@@ -122,7 +122,8 @@ impl Engine {
                     Self::render_entity(ui, &root_entity);
                 });
         });
-        self.gui_state.handle_output(&self.window.winit_window, &self.gui_context, output);
+        self.gui_state
+            .handle_output(&self.window.winit_window, &self.gui_context, output);
         let gui_meshes = self.gui_context.tessellate(shapes);
 
         let vk = &mut self.vulkan_manager;

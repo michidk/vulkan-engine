@@ -5,7 +5,7 @@ pub mod material;
 pub mod model;
 pub mod transform;
 
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 

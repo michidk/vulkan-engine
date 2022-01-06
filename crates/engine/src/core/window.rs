@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use crate::core::engine::EngineInit;
-use egui::Color32;
 use winit::event::Event;
 
 #[derive(Debug, Copy, Clone, PartialEq)]

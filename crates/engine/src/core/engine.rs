@@ -1,6 +1,13 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
-use egui::{CollapsingHeader, Color32, RichText, ScrollArea};
+use egui::{
+    plot::{Line, Plot, Value, Values},
+    CollapsingHeader, Color32, RichText, ScrollArea,
+};
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
@@ -50,6 +57,9 @@ impl EngineInit {
                 fps_count: 0,
                 fps: 0,
                 last_frame: Instant::now(),
+                frame_time_last_sample: Instant::now(),
+                frame_time_max: 0.0,
+                frame_time_history: Vec::with_capacity(5000),
 
                 ui_vertex_count: 0,
                 ui_index_count: 0,
@@ -79,6 +89,9 @@ pub struct Engine {
     fps_count: usize,
     fps: usize,
     last_frame: Instant,
+    frame_time_last_sample: Instant,
+    frame_time_max: f32,
+    frame_time_history: Vec<Value>,
 
     ui_vertex_count: u32,
     ui_index_count: u32,
@@ -121,8 +134,25 @@ impl Engine {
             self.fps_time = Instant::now();
         }
 
-        let frame_time = self.last_frame.elapsed().as_secs_f64();
+        let frame_time = self.last_frame.elapsed().as_secs_f64() * 1000.0;
         self.last_frame = Instant::now();
+
+        self.frame_time_max = self.frame_time_max.max(frame_time as f32);
+        if self.frame_time_last_sample.elapsed().as_millis() >= 100 {
+            let plot_x = self
+                .frame_time_history
+                .last()
+                .map(|v| v.x + 0.1)
+                .unwrap_or(0.0);
+            self.frame_time_history
+                .push(Value::new(plot_x, self.frame_time_max));
+            if self.frame_time_history.len() > 10 * 10 {
+                self.frame_time_history.remove(0);
+            }
+
+            self.frame_time_last_sample += Duration::from_millis(100);
+            self.frame_time_max = 0.0;
+        }
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
         let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
@@ -137,10 +167,12 @@ impl Engine {
                         _ => Color32::WHITE,
                     };
                     ui.colored_label(fps_color, format!("FPS: {}", self.fps));
-                    ui.colored_label(
-                        fps_color,
-                        format!("Frame time: {:.3} ms", frame_time * 1000.0),
-                    );
+                    ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
+
+                    Plot::new("Frame time Graph").height(70.0).show(ui, |ui| {
+                        let line = Line::new(Values::from_values(self.frame_time_history.clone()));
+                        ui.line(line);
+                    });
 
                     ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
 

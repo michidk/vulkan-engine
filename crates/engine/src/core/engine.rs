@@ -5,7 +5,7 @@ use std::{
 };
 
 use egui::{
-    plot::{Line, Plot, VLine, Value, Values},
+    plot::{Line, Plot, Value, Values},
     CollapsingHeader, Color32, RichText, ScrollArea,
 };
 
@@ -107,6 +107,9 @@ impl Engine {
 
     fn render_component(ui: &mut egui::Ui, component: &dyn Component) {
         ui.label(component.inspector_name());
+        ui.indent("", |ui| {
+            component.render_inspector(ui);
+        });
     }
 
     fn render_entity(ui: &mut egui::Ui, entity: &Entity) {

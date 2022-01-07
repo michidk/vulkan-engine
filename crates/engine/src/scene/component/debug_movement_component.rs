@@ -3,6 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use egui::{Slider, TextEdit};
 use gfx_maths::{Quaternion, Vec3};
 use winit::event::VirtualKeyCode;
 
@@ -13,7 +14,7 @@ use super::Component;
 #[derive(Debug)]
 pub struct DebugMovementComponent {
     entity: Weak<Entity>,
-    movement_speed: f32,
+    movement_speed: Cell<f32>,
     rotation_x: Cell<f32>,
     rotation_y: Cell<f32>,
 }
@@ -25,7 +26,7 @@ impl Component for DebugMovementComponent {
     {
         Rc::new(Self {
             entity: Rc::downgrade(entity),
-            movement_speed: 5.0,
+            movement_speed: 5.0.into(),
             rotation_x: 0.0.into(),
             rotation_y: 0.0.into(),
         })
@@ -81,7 +82,7 @@ impl Component for DebugMovementComponent {
         let mut transform = entity.transform.borrow_mut();
 
         let mut position = transform.position;
-        position += rotation * movement * self.movement_speed * delta;
+        position += rotation * movement * self.movement_speed.get() * delta;
         transform.position = position;
 
         transform.rotation = rotation;
@@ -89,5 +90,23 @@ impl Component for DebugMovementComponent {
 
     fn inspector_name(&self) -> &'static str {
         "DebugMovementComponent"
+    }
+
+    fn render_inspector(&self, ui: &mut egui::Ui) {
+        let mut ms = self.movement_speed.get();
+        ui.add(Slider::new(&mut ms, 0.1..=20.0).text("Movement Speed"));
+        self.movement_speed.set(ms);
+
+        ui.horizontal(|ui| {
+            ui.label("Rotation X");
+            let mut text = self.rotation_x.get().to_degrees().to_string();
+            ui.add_enabled(false, TextEdit::singleline(&mut text));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Rotation Y");
+            let mut text = self.rotation_y.get().to_degrees().to_string();
+            ui.add_enabled(false, TextEdit::singleline(&mut text));
+        });
     }
 }

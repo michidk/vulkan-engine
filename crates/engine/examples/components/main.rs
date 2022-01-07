@@ -5,6 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use egui::Slider;
 /// Renders a brdf example
 use gfx_maths::*;
 use log::error;
@@ -240,6 +241,7 @@ fn setup(engine: &mut Engine) {
 #[derive(Debug)]
 struct RotateComponent {
     entity: Weak<Entity>,
+    rotation_speed: Cell<f32>,
 }
 
 impl Component for RotateComponent {
@@ -249,6 +251,7 @@ impl Component for RotateComponent {
     {
         Rc::new(Self {
             entity: Rc::downgrade(entity),
+            rotation_speed: Cell::new(120.0),
         })
     }
 
@@ -262,7 +265,10 @@ impl Component for RotateComponent {
 
             let mut rotation = transform.rotation;
             rotation = rotation
-                * Quaternion::axis_angle(Vec3::new(0.0, 0.0, 1.0), 120.0f32.to_radians() * delta);
+                * Quaternion::axis_angle(
+                    Vec3::new(0.0, 0.0, 1.0),
+                    self.rotation_speed.get().to_radians() * delta,
+                );
             transform.rotation = rotation;
         }
     }
@@ -270,12 +276,20 @@ impl Component for RotateComponent {
     fn inspector_name(&self) -> &'static str {
         "RotateComponent"
     }
+
+    fn render_inspector(&self, ui: &mut egui::Ui) {
+        let mut rot_speed = self.rotation_speed.get();
+        ui.add(Slider::new(&mut rot_speed, -360.0..=360.0).text("Rotation Speed"));
+        self.rotation_speed.set(rot_speed);
+    }
 }
 
 #[derive(Debug)]
 struct ScaleComponent {
     entity: Weak<Entity>,
     total_time: Cell<f32>,
+    time_scale: Cell<f32>,
+    max_scale: Cell<f32>,
 }
 
 impl Component for ScaleComponent {
@@ -286,6 +300,8 @@ impl Component for ScaleComponent {
         Rc::new(Self {
             entity: Rc::downgrade(entity),
             total_time: 0.0f32.into(),
+            time_scale: Cell::new(0.5),
+            max_scale: Cell::new(2.0),
         })
     }
 
@@ -299,11 +315,24 @@ impl Component for ScaleComponent {
             self.total_time.set(time);
 
             let mut transform = entity.transform.borrow_mut();
-            transform.scale = Vec3::one() * ((time * 0.5).sin() + 1.0);
+            transform.scale = Vec3::one()
+                * ((time * self.time_scale.get()).sin() + 1.0)
+                * 0.5
+                * self.max_scale.get();
         }
     }
 
     fn inspector_name(&self) -> &'static str {
         "ScaleComponent"
+    }
+
+    fn render_inspector(&self, ui: &mut egui::Ui) {
+        let mut time_scale = self.time_scale.get();
+        ui.add(egui::Slider::new(&mut time_scale, 0.0..=5.0).text("Time Scale"));
+        self.time_scale.set(time_scale);
+
+        let mut max_scale = self.max_scale.get();
+        ui.add(egui::Slider::new(&mut max_scale, 0.0..=5.0).text("Max Scale"));
+        self.max_scale.set(max_scale);
     }
 }

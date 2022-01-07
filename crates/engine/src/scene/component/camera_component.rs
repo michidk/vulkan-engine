@@ -1,5 +1,6 @@
 use std::rc::{Rc, Weak};
 
+use egui::TextEdit;
 use gfx_maths::{Mat4, Vec3};
 
 use crate::scene::entity::Entity;
@@ -39,6 +40,26 @@ impl Component for CameraComponent {
 
     fn inspector_name(&self) -> &'static str {
         "CameraComponent"
+    }
+
+    fn render_inspector(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Near");
+            let mut text = self.near.to_string();
+            ui.add_enabled(false, TextEdit::singleline(&mut text));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Far");
+            let mut text = self.far.to_string();
+            ui.add_enabled(false, TextEdit::singleline(&mut text));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Vertical FOV");
+            let mut text = self.fovy.to_string();
+            ui.add_enabled(false, TextEdit::singleline(&mut text));
+        });
     }
 }
 

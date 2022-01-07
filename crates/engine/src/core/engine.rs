@@ -206,6 +206,7 @@ impl Engine {
                         ScrollArea::vertical().show(ui, |ui| {
                             Self::render_entity(ui, &root_entity);
                         });
+                        ui.allocate_space(ui.available_size());
                     });
             }
         });

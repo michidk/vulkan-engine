@@ -5,7 +5,7 @@ use std::{
 };
 
 use egui::{
-    plot::{Line, Plot, Value, Values},
+    plot::{Line, Plot, VLine, Value, Values},
     CollapsingHeader, Color32, RichText, ScrollArea,
 };
 
@@ -169,10 +169,14 @@ impl Engine {
                     ui.colored_label(fps_color, format!("FPS: {}", self.fps));
                     ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
 
-                    Plot::new("Frame time Graph").height(70.0).show(ui, |ui| {
-                        let line = Line::new(Values::from_values(self.frame_time_history.clone()));
-                        ui.line(line);
-                    });
+                    Plot::new("Frame time Graph")
+                        .height(70.0)
+                        .include_y(0.0)
+                        .show(ui, |ui| {
+                            let line =
+                                Line::new(Values::from_values(self.frame_time_history.clone()));
+                            ui.line(line);
+                        });
 
                     ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
 

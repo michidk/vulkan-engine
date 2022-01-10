@@ -24,7 +24,7 @@ use crate::{
     core::engine::EngineInfo,
     scene::{
         component::camera_component::CamData,
-        light::LightManager,
+        light::Light,
         material::Material,
         model::{mesh::Mesh, Model},
         transform::TransformData,
@@ -680,7 +680,7 @@ impl VulkanManager {
         Ok(())
     }
 
-    fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, light_manager: &LightManager) {
+    fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, lights: &[Light]) {
         for lp in &self.lighting_pipelines {
             unsafe {
                 // point lights
@@ -696,7 +696,13 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for pl in &*light_manager.point_lights.borrow() {
+                    for pl in lights.iter().filter_map(|l| {
+                        if let Light::Point(pl) = l {
+                            Some(pl)
+                        } else {
+                            None
+                        }
+                    }) {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -720,7 +726,13 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for dl in &*light_manager.directional_lights.borrow() {
+                    for dl in lights.iter().filter_map(|l| {
+                        if let Light::Directional(dl) = l {
+                            Some(dl)
+                        } else {
+                            None
+                        }
+                    }) {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -1099,7 +1111,7 @@ impl VulkanManager {
             );
         }
 
-        let models = scene.collect_renderables();
+        let (models, lights) = scene.collect_renderables();
 
         let render_map = Self::build_render_order(models.as_slice());
         self.render_gpass(commandbuffer, &render_map)?;
@@ -1118,7 +1130,7 @@ impl VulkanManager {
             );
         }
 
-        self.render_resolve_pass(commandbuffer, &scene.light_manager);
+        self.render_resolve_pass(commandbuffer, &lights);
 
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);
@@ -1138,7 +1150,14 @@ impl VulkanManager {
                 .device_wait_idle()
                 .expect("something went wrong while waiting");
         }
-        self.swapchain.recreate(&self.device, self.physical_device, &*self.allocator, &*self.surface, self.renderpass, self.renderpass_pp)?;
+        self.swapchain.recreate(
+            &self.device,
+            self.physical_device,
+            &*self.allocator,
+            &*self.surface,
+            self.renderpass,
+            self.renderpass_pp,
+        )?;
         Ok(())
     }
 
@@ -1346,7 +1365,8 @@ impl Drop for VulkanManager {
                 .destroy_pipeline_layout(self.pipe_layout_ui, None);
             self.device.destroy_render_pass(self.renderpass_ui, None);
             self.device.destroy_pipeline(self.pipeline_ui, None);
-            self.device.destroy_pipeline(self.pipeline_ui_wireframe, None);
+            self.device
+                .destroy_pipeline(self.pipeline_ui_wireframe, None);
 
             // drop ui_texture
             self.ui_texture = None;

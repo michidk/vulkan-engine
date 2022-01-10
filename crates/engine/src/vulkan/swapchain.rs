@@ -1,7 +1,12 @@
 use ash::vk;
 use gpu_allocator::{vulkan::Allocation, MemoryLocation};
 
-use super::{allocator::Allocator, queue, surface::{self, SurfaceWrapper}, GraphicsResult};
+use super::{
+    allocator::Allocator,
+    queue,
+    surface::{self, SurfaceWrapper},
+    GraphicsResult,
+};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -311,8 +316,15 @@ impl SwapchainWrapper {
             .destroy_swapchain(self.swapchain, None)
     }
 
-    pub(crate) fn recreate(&mut self, device: &ash::Device, physical_device: vk::PhysicalDevice, allocator: &Allocator, surface: &SurfaceWrapper, renderpass: vk::RenderPass,
-        pp_renderpass: vk::RenderPass) -> GraphicsResult<()> {
+    pub(crate) fn recreate(
+        &mut self,
+        device: &ash::Device,
+        physical_device: vk::PhysicalDevice,
+        allocator: &Allocator,
+        surface: &SurfaceWrapper,
+        renderpass: vk::RenderPass,
+        pp_renderpass: vk::RenderPass,
+    ) -> GraphicsResult<()> {
         unsafe {
             device.destroy_framebuffer(self.framebuffer_deferred, None);
             device.destroy_framebuffer(self.framebuffer_pp_a, None);
@@ -330,7 +342,7 @@ impl SwapchainWrapper {
 
             device.destroy_image_view(self.resolve_imageview, None);
             allocator.destroy_image(self.resolve_image, self.resolve_image_alloc.clone());
-        
+
             for iv in &self.imageviews {
                 device.destroy_image_view(*iv, None);
             }
@@ -365,8 +377,11 @@ impl SwapchainWrapper {
             .old_swapchain(self.swapchain)
             .build();
 
-        self.swapchain = unsafe{self.swapchain_loader.create_swapchain(&swapchain_create_info, None)?};
-        self.images = unsafe{self.swapchain_loader.get_swapchain_images(self.swapchain)?};
+        self.swapchain = unsafe {
+            self.swapchain_loader
+                .create_swapchain(&swapchain_create_info, None)?
+        };
+        self.images = unsafe { self.swapchain_loader.get_swapchain_images(self.swapchain)? };
         for image in &self.images {
             let subresource_range = vk::ImageSubresourceRange::builder()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -379,8 +394,7 @@ impl SwapchainWrapper {
                 .view_type(vk::ImageViewType::TYPE_2D)
                 .format(self.surface_format.format)
                 .subresource_range(*subresource_range);
-            let imageview =
-                unsafe { device.create_image_view(&imageview_create_info, None) }?;
+            let imageview = unsafe { device.create_image_view(&imageview_create_info, None) }?;
             self.imageviews.push(imageview);
         }
 
@@ -408,8 +422,7 @@ impl SwapchainWrapper {
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(vk::Format::D24_UNORM_S8_UINT)
             .subresource_range(*subresource_range);
-        let depth_imageview =
-            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        let depth_imageview = unsafe { device.create_image_view(&imageview_create_info, None) }?;
         self.depth_image = depth_image;
         self.depth_image_alloc = depth_image_alloc;
         self.depth_imageview = depth_imageview;
@@ -449,8 +462,7 @@ impl SwapchainWrapper {
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
-        let resolve_imageview =
-            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        let resolve_imageview = unsafe { device.create_image_view(&imageview_create_info, None) }?;
         self.resolve_image = resolve_image;
         self.resolve_image_alloc = resolve_image_alloc;
         self.resolve_imageview = resolve_imageview;
@@ -476,8 +488,7 @@ impl SwapchainWrapper {
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
-        let g0_imageview =
-            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        let g0_imageview = unsafe { device.create_image_view(&imageview_create_info, None) }?;
         self.g0_image = g0_image;
         self.g0_image_alloc = g0_image_alloc;
         self.g0_imageview = g0_imageview;
@@ -500,8 +511,7 @@ impl SwapchainWrapper {
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(vk::Format::R16G16B16A16_SFLOAT)
             .subresource_range(*subresource_range);
-        let g1_imageview =
-            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        let g1_imageview = unsafe { device.create_image_view(&imageview_create_info, None) }?;
         self.g1_image = g1_image;
         self.g1_image_alloc = g1_image_alloc;
         self.g1_imageview = g1_imageview;
@@ -510,5 +520,4 @@ impl SwapchainWrapper {
 
         Ok(())
     }
-
 }

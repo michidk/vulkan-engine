@@ -18,10 +18,10 @@ use vulkan_engine::{
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
-            renderer::RendererComponent, Component,
+            light_component::LightComponent, renderer::RendererComponent, Component,
         },
         entity::Entity,
-        light::{DirectionalLight, PointLight},
+        light::DirectionalLight,
         material::MaterialPipeline,
         model::Model,
         transform::Transform,
@@ -204,38 +204,81 @@ fn setup(engine: &mut Engine) {
         entity_br.attach_to(&entity_tl);
     }
 
-    scene.load();
+    let dirlight1 = scene.new_entity_with_transform(
+        "DirLight1".to_string(),
+        Transform {
+            position: Vec3::zero(),
+            rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), -90.0f32.to_radians()),
+            scale: Vec3::one(),
+        },
+    );
+    dirlight1.new_component::<LightComponent>().light.set(
+        DirectionalLight {
+            direction: Vec4::zero(),
+            illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
+        }
+        .into(),
+    );
+    dirlight1.new_component::<RotateComponent>();
 
-    // setup lights
-    let lights = &scene.light_manager;
-    lights.add_light(DirectionalLight {
-        direction: Vec4::new(0., 1., 0., 0.0),
-        illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
-    });
-    lights.add_light(DirectionalLight {
-        direction: Vec4::new(0., -1., 0., 0.0),
+    /*scene.new_entity_with_transform("DirLight2".to_string(), Transform {
+        position: Vec3::zero(),
+        rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 90.0f32.to_radians()),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(DirectionalLight {
+        direction: Vec4::zero(),
         illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+    }.into());
+
+    scene.new_entity_with_transform("PointLight White 1".to_string(), Transform {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        rotation: Quaternion::identity(),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(PointLight {
+        position: Vec4::zero(),
         luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+    }.into());
+    scene.new_entity_with_transform("PointLight White 2".to_string(), Transform {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        rotation: Quaternion::identity(),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(PointLight {
+        position: Vec4::zero(),
         luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+    }.into());
+    scene.new_entity_with_transform("PointLight White 3".to_string(), Transform {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        rotation: Quaternion::identity(),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(PointLight {
+        position: Vec4::zero(),
         luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec4::new(0.1, -3.0, -3.0, 0.0),
+    }.into());
+    scene.new_entity_with_transform("PointLight White 4".to_string(), Transform {
+        position: Vec3::new(0.1, -3.0, -3.0),
+        rotation: Quaternion::identity(),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(PointLight {
+        position: Vec4::zero(),
         luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    });
-    lights.add_light(PointLight {
-        position: Vec4::new(0.0, 0.0, -3.0, 0.0),
+    }.into());
+
+    scene.new_entity_with_transform("PointLight Red".to_string(), Transform {
+        position: Vec3::new(0.0, 0.0, -3.0),
+        rotation: Quaternion::identity(),
+        scale: Vec3::one(),
+    })
+    .new_component::<LightComponent>().light.set(PointLight {
+        position: Vec4::zero(),
         luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
-    });
+    }.into());*/
+
+    scene.load();
 }
 
 #[derive(Debug)]
@@ -264,11 +307,10 @@ impl Component for RotateComponent {
             let mut transform = entity.transform.borrow_mut();
 
             let mut rotation = transform.rotation;
-            rotation = rotation
-                * Quaternion::axis_angle(
-                    Vec3::new(0.0, 0.0, 1.0),
-                    self.rotation_speed.get().to_radians() * delta,
-                );
+            rotation = Quaternion::axis_angle(
+                Vec3::new(0.0, 0.0, 1.0),
+                self.rotation_speed.get().to_radians() * delta,
+            ) * rotation;
             transform.rotation = rotation;
         }
     }

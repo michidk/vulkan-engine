@@ -13,12 +13,11 @@ use crate::core::input::Input;
 
 use self::component::camera_component::CameraComponent;
 use self::entity::Entity;
-use self::light::LightManager;
+use self::light::Light;
 use self::model::Model;
 use self::transform::{Transform, TransformData};
 
 pub struct Scene {
-    pub light_manager: LightManager,
     pub(crate) root_entity: RefCell<Rc<Entity>>,
     pub(crate) main_camera: RefCell<Weak<CameraComponent>>,
     id_counter: Cell<u64>,
@@ -28,7 +27,6 @@ impl Scene {
     pub(crate) fn new() -> Rc<Self> {
         let mut root = Entity::new_root();
         let res = Rc::new(Self {
-            light_manager: LightManager::default(),
             root_entity: RefCell::new(Rc::new(Entity::new_root())),
             main_camera: RefCell::new(Weak::new()),
             id_counter: Cell::new(0),
@@ -61,12 +59,15 @@ impl Scene {
         self.root_entity.borrow().load();
     }
 
-    pub(crate) fn collect_renderables(&self) -> Vec<(TransformData, Rc<Model>)> {
-        let mut res = Vec::new();
+    pub(crate) fn collect_renderables(&self) -> (Vec<(TransformData, Rc<Model>)>, Vec<Light>) {
+        let mut models = Vec::new();
+        let mut lights = Vec::new();
 
-        self.root_entity.borrow().collect_renderables(&mut res);
+        self.root_entity
+            .borrow()
+            .collect_renderables(&mut models, &mut lights);
 
-        res
+        (models, lights)
     }
 
     pub(crate) fn update(&self, input: &Input, delta: f32) {

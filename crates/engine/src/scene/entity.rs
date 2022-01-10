@@ -7,6 +7,7 @@ use gfx_maths::{Mat4, Quaternion, Vec3, Vec4};
 use crate::core::input::Input;
 
 use super::component::Component;
+use super::light::Light;
 use super::model::Model;
 use super::transform::{Transform, TransformData};
 use super::Scene;
@@ -125,13 +126,17 @@ impl Entity {
         comp
     }
 
-    pub(crate) fn collect_renderables(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
+    pub(crate) fn collect_renderables(
+        &self,
+        models: &mut Vec<(TransformData, Rc<Model>)>,
+        lights: &mut Vec<Light>,
+    ) {
         for comp in &*self.components.borrow() {
-            comp.render(models);
+            comp.render(models, lights);
         }
 
         for child in &*self.children.borrow() {
-            child.collect_renderables(models);
+            child.collect_renderables(models, lights);
         }
     }
 
@@ -190,6 +195,14 @@ impl Entity {
     pub fn get_global_position(&self) -> Vec3 {
         let pos = self.get_local_to_world_matrix() * Vec4::new(0.0, 0.0, 0.0, 1.0);
         Vec3::new(pos.x, pos.y, pos.z)
+    }
+
+    pub fn get_global_rotation(&self) -> Quaternion {
+        if let Some(parent) = self.parent.borrow().upgrade() {
+            self.transform.borrow().rotation * parent.get_global_rotation()
+        } else {
+            self.transform.borrow().rotation
+        }
     }
 
     pub(crate) fn update(&self, input: &Input, delta: f32) {

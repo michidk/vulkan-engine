@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::scene::{entity::Entity, model::Model, transform::TransformData};
+use crate::scene::{entity::Entity, light::Light, model::Model, transform::TransformData};
 
 use super::Component;
 
@@ -32,7 +32,7 @@ impl Component for RendererComponent {
         // println!("Start");
     }
 
-    fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>) {
+    fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>, _lights: &mut Vec<Light>) {
         let entity = self.entity.borrow();
         if let Some(entity) = entity.upgrade() {
             if let Some(model) = &*self.model.borrow() {

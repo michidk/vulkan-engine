@@ -57,6 +57,7 @@ pub struct VulkanManager {
     physical_device: vk::PhysicalDevice,
     #[allow(dead_code)]
     physical_device_properties: vk::PhysicalDeviceProperties,
+    #[allow(dead_code)]
     queue_families: QueueFamilies,
     pub(crate) queues: Queues,
     pub(crate) swapchain: SwapchainWrapper,
@@ -1137,19 +1138,7 @@ impl VulkanManager {
                 .device_wait_idle()
                 .expect("something went wrong while waiting");
         }
-        unsafe {
-            self.swapchain.cleanup(&self.device, &self.allocator);
-        }
-        self.swapchain = SwapchainWrapper::init(
-            &self.instance,
-            self.physical_device,
-            &self.device,
-            &self.surface,
-            &self.queue_families,
-            &self.allocator,
-        )?;
-        self.swapchain
-            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp)?;
+        self.swapchain.recreate(&self.device, self.physical_device, &*self.allocator, &*self.surface, self.renderpass, self.renderpass_pp)?;
         Ok(())
     }
 
@@ -1357,6 +1346,7 @@ impl Drop for VulkanManager {
                 .destroy_pipeline_layout(self.pipe_layout_ui, None);
             self.device.destroy_render_pass(self.renderpass_ui, None);
             self.device.destroy_pipeline(self.pipeline_ui, None);
+            self.device.destroy_pipeline(self.pipeline_ui_wireframe, None);
 
             // drop ui_texture
             self.ui_texture = None;

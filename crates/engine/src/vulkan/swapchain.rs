@@ -1,7 +1,7 @@
 use ash::vk;
 use gpu_allocator::{vulkan::Allocation, MemoryLocation};
 
-use super::{allocator::Allocator, queue, surface, GraphicsResult};
+use super::{allocator::Allocator, queue, surface::{self, SurfaceWrapper}, GraphicsResult};
 
 const PREFERRED_IMAGE_COUNT: u32 = 3;
 
@@ -310,4 +310,205 @@ impl SwapchainWrapper {
         self.swapchain_loader
             .destroy_swapchain(self.swapchain, None)
     }
+
+    pub(crate) fn recreate(&mut self, device: &ash::Device, physical_device: vk::PhysicalDevice, allocator: &Allocator, surface: &SurfaceWrapper, renderpass: vk::RenderPass,
+        pp_renderpass: vk::RenderPass) -> GraphicsResult<()> {
+        unsafe {
+            device.destroy_framebuffer(self.framebuffer_deferred, None);
+            device.destroy_framebuffer(self.framebuffer_pp_a, None);
+            device.destroy_framebuffer(self.framebuffer_pp_b, None);
+
+            device.destroy_image_view(self.depth_imageview, None);
+            device.destroy_image_view(self.depth_imageview_depth_only, None);
+            allocator.destroy_image(self.depth_image, self.depth_image_alloc.clone());
+
+            device.destroy_image_view(self.g0_imageview, None);
+            allocator.destroy_image(self.g0_image, self.g0_image_alloc.clone());
+
+            device.destroy_image_view(self.g1_imageview, None);
+            allocator.destroy_image(self.g1_image, self.g1_image_alloc.clone());
+
+            device.destroy_image_view(self.resolve_imageview, None);
+            allocator.destroy_image(self.resolve_image, self.resolve_image_alloc.clone());
+        
+            for iv in &self.imageviews {
+                device.destroy_image_view(*iv, None);
+            }
+            self.imageviews.clear();
+        }
+
+        let surface_capabilities = surface.get_capabilities(physical_device)?;
+        self.extent = surface_capabilities.current_extent; // TODO: handle 0xFFFF x 0xFFFF extent
+        self.surface_format = surface.choose_format(physical_device)?;
+        let present_mode = surface.choose_present_mode(physical_device)?;
+
+        let image_count = if surface_capabilities.max_image_count > 0 {
+            PREFERRED_IMAGE_COUNT
+                .max(surface_capabilities.min_image_count)
+                .min(surface_capabilities.max_image_count)
+        } else {
+            PREFERRED_IMAGE_COUNT.max(surface_capabilities.min_image_count)
+        };
+
+        let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
+            .surface(surface.surface)
+            .min_image_count(image_count)
+            .image_format(self.surface_format.format)
+            .image_color_space(self.surface_format.color_space)
+            .image_extent(self.extent)
+            .image_array_layers(1)
+            .image_usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::COLOR_ATTACHMENT)
+            .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .pre_transform(surface_capabilities.current_transform)
+            .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+            .present_mode(present_mode)
+            .old_swapchain(self.swapchain)
+            .build();
+
+        self.swapchain = unsafe{self.swapchain_loader.create_swapchain(&swapchain_create_info, None)?};
+        self.images = unsafe{self.swapchain_loader.get_swapchain_images(self.swapchain)?};
+        for image in &self.images {
+            let subresource_range = vk::ImageSubresourceRange::builder()
+                .aspect_mask(vk::ImageAspectFlags::COLOR)
+                .base_mip_level(0)
+                .level_count(1)
+                .base_array_layer(0)
+                .layer_count(1);
+            let imageview_create_info = vk::ImageViewCreateInfo::builder()
+                .image(*image)
+                .view_type(vk::ImageViewType::TYPE_2D)
+                .format(self.surface_format.format)
+                .subresource_range(*subresource_range);
+            let imageview =
+                unsafe { device.create_image_view(&imageview_create_info, None) }?;
+            self.imageviews.push(imageview);
+        }
+
+        let extend_3d = vk::Extent3D {
+            width: self.extent.width,
+            height: self.extent.height,
+            depth: 1,
+        };
+
+        let (depth_image, depth_image_alloc) = allocator.create_image(
+            extend_3d.width,
+            extend_3d.height,
+            vk::Format::D24_UNORM_S8_UINT,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT,
+            MemoryLocation::GpuOnly,
+        )?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(depth_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::D24_UNORM_S8_UINT)
+            .subresource_range(*subresource_range);
+        let depth_imageview =
+            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        self.depth_image = depth_image;
+        self.depth_image_alloc = depth_image_alloc;
+        self.depth_imageview = depth_imageview;
+
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::DEPTH)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(depth_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::D24_UNORM_S8_UINT)
+            .subresource_range(*subresource_range);
+        let depth_imageview_depth_only =
+            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        self.depth_imageview_depth_only = depth_imageview_depth_only;
+
+        let (resolve_image, resolve_image_alloc) = allocator.create_image(
+            extend_3d.width,
+            extend_3d.height,
+            vk::Format::R16G16B16A16_SFLOAT,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::SAMPLED,
+            MemoryLocation::GpuOnly,
+        )?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(resolve_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .subresource_range(*subresource_range);
+        let resolve_imageview =
+            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        self.resolve_image = resolve_image;
+        self.resolve_image_alloc = resolve_image_alloc;
+        self.resolve_imageview = resolve_imageview;
+
+        let (g0_image, g0_image_alloc) = allocator.create_image(
+            extend_3d.width,
+            extend_3d.height,
+            vk::Format::R16G16B16A16_SFLOAT,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | vk::ImageUsageFlags::INPUT_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::SAMPLED,
+            MemoryLocation::GpuOnly,
+        )?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(g0_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .subresource_range(*subresource_range);
+        let g0_imageview =
+            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        self.g0_image = g0_image;
+        self.g0_image_alloc = g0_image_alloc;
+        self.g0_imageview = g0_imageview;
+
+        let (g1_image, g1_image_alloc) = allocator.create_image(
+            extend_3d.width,
+            extend_3d.height,
+            vk::Format::R16G16B16A16_SFLOAT,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT,
+            MemoryLocation::GpuOnly,
+        )?;
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let imageview_create_info = vk::ImageViewCreateInfo::builder()
+            .image(g1_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R16G16B16A16_SFLOAT)
+            .subresource_range(*subresource_range);
+        let g1_imageview =
+            unsafe { device.create_image_view(&imageview_create_info, None) }?;
+        self.g1_image = g1_image;
+        self.g1_image_alloc = g1_image_alloc;
+        self.g1_imageview = g1_imageview;
+
+        self.create_framebuffers(device, renderpass, pp_renderpass)?;
+
+        Ok(())
+    }
+
 }

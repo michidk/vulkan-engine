@@ -5,7 +5,7 @@ use std::{
 };
 
 use egui::{
-    plot::{Line, Plot, Value, Values},
+    plot::{Legend, Line, Plot, Value, Values},
     CollapsingHeader, Color32, RichText, ScrollArea,
 };
 
@@ -59,7 +59,13 @@ impl EngineInit {
                 last_frame: Instant::now(),
                 frame_time_last_sample: Instant::now(),
                 frame_time_max: 0.0,
+                render_time_max: 0.0,
+                ui_time_max: 0.0,
+                last_render_time: 0.0,
+                last_ui_time: 0.0,
                 frame_time_history: Vec::with_capacity(5000),
+                render_time_history: Vec::with_capacity(5000),
+                ui_time_history: Vec::with_capacity(5000),
 
                 ui_vertex_count: 0,
                 ui_index_count: 0,
@@ -91,7 +97,13 @@ pub struct Engine {
     last_frame: Instant,
     frame_time_last_sample: Instant,
     frame_time_max: f32,
+    render_time_max: f32,
+    ui_time_max: f32,
+    last_render_time: f32,
+    last_ui_time: f32,
     frame_time_history: Vec<Value>,
+    render_time_history: Vec<Value>,
+    ui_time_history: Vec<Value>,
 
     ui_vertex_count: u32,
     ui_index_count: u32,
@@ -137,32 +149,55 @@ impl Engine {
             self.fps_time = Instant::now();
         }
 
-        let frame_time = self.last_frame.elapsed().as_secs_f64() * 1000.0;
+        let frame_time = self.last_frame.elapsed().as_secs_f32() * 1000.0;
         self.last_frame = Instant::now();
 
-        self.frame_time_max = self.frame_time_max.max(frame_time as f32);
+        if frame_time > self.frame_time_max {
+            self.frame_time_max = frame_time;
+            self.render_time_max = self.last_render_time;
+            self.ui_time_max = self.last_ui_time;
+        }
+
         if self.frame_time_last_sample.elapsed().as_millis() >= 100 {
             let plot_x = self
                 .frame_time_history
                 .last()
                 .map(|v| v.x + 0.1)
                 .unwrap_or(0.0);
+
             self.frame_time_history
                 .push(Value::new(plot_x, self.frame_time_max));
             if self.frame_time_history.len() > 10 * 10 {
                 self.frame_time_history.remove(0);
             }
 
+            self.render_time_history
+                .push(Value::new(plot_x, self.render_time_max));
+            if self.render_time_history.len() > 10 * 10 {
+                self.render_time_history.remove(0);
+            }
+
+            self.ui_time_history
+                .push(Value::new(plot_x, self.ui_time_max + self.render_time_max));
+            if self.ui_time_history.len() > 10 * 10 {
+                self.ui_time_history.remove(0);
+            }
+
             self.frame_time_last_sample += Duration::from_millis(100);
+
             self.frame_time_max = 0.0;
+            self.render_time_max = 0.0;
+            self.ui_time_max = 0.0;
         }
+
+        let ui_start_time = Instant::now();
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
         let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
             egui::Window::new("Debug Tools")
                 .title_bar(true)
                 .collapsible(false)
-                .resizable(false)
+                .resizable(true)
                 .show(ctx, |ui| {
                     let fps_color = match self.fps {
                         0..=29 => Color32::RED,
@@ -175,9 +210,26 @@ impl Engine {
                     Plot::new("Frame time Graph")
                         .height(70.0)
                         .include_y(0.0)
+                        .legend(Legend::default())
                         .show(ui, |ui| {
                             let line =
-                                Line::new(Values::from_values(self.frame_time_history.clone()));
+                                Line::new(Values::from_values(self.frame_time_history.clone()))
+                                    .name("Frame")
+                                    .fill(0.0)
+                                    .highlight();
+                            ui.line(line);
+
+                            let line =
+                                Line::new(Values::from_values(self.render_time_history.clone()))
+                                    .name("Render")
+                                    .fill(0.0)
+                                    .highlight();
+                            ui.line(line);
+
+                            let line = Line::new(Values::from_values(self.ui_time_history.clone()))
+                                .name("UI")
+                                .fill(0.0)
+                                .highlight();
                             ui.line(line);
                         });
 
@@ -218,6 +270,11 @@ impl Engine {
         self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
         self.ui_mesh_count = gui_meshes.len() as u32;
 
+        let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
+        self.last_ui_time = ui_time;
+
+        let render_start_time = Instant::now();
+
         let vk = &mut self.vulkan_manager;
 
         // prepare for render
@@ -232,6 +289,9 @@ impl Engine {
         // finanlize renderpass
         vk.submit();
         vk.present(image_index);
+
+        let render_time = render_start_time.elapsed().as_secs_f32() * 1000.0;
+        self.last_render_time = render_time;
     }
 }
 

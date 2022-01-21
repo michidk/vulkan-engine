@@ -1,37 +1,38 @@
-.PHONY: run build build-release release check test clippy fmt lint cic clean install
+.PHONY: run build build-release build-shipping release check test clippy fmt lint cic clean install
 
 # run and compile
 run:
 	cargo run --example brdf
 
 build:
-	cargo build --example minimal
-	cargo build --example brdf
+	cargo build --examples
 
 build-release:
-	cargo build --release --example minimal
-	cargo build --release --example brdf
+	cargo build --release --examples
+
+build-shipping:
+	cargo build --profile shipping --examples
 
 ifeq ($(OS),Windows_NT)
-release: prepare shaders build-release
-	xcopy /s /y "assets\*" ".\out\assets\*"
-	xcopy /s /y "target\release\examples\*" "out\"
+package: build-shipping
+	xcopy /s /y "assets\*" ".\out\assets\"
+	xcopy /s /y "target\shipping\examples\*.exe" "out\"
 else
-release: prepare shaders build-release
+package: build-shipping
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
-	cp ./target/release/examples/* ./out/
+	cp ./target/shipping/examples/* ./out/
 endif
 
 # test and lint
 check:
-	cargo check --all --examples
+	cargo check --workspace --all-targets
 
 test:
-	cargo test --all --examples
+	cargo test --workspace --all-targets
 
 clippy:
-	cargo clippy --all --examples -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
 fmt:
 	cargo fmt --all -- --check

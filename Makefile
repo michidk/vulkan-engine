@@ -21,7 +21,7 @@ else
 package: build-shipping
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
-	cp ./target/shipping/examples/* ./out/
+	for f in $(shell ls crates/engine/examples); do cp target/shipping/examples/$$f out; done
 endif
 
 # test and lint

@@ -1322,9 +1322,9 @@ dependencies = [
 
 [[package]]
 name = "spirv-layout"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d16d04c452f4d613b488806876f10c74c7cf2a6d2ecc48c027c02ffb02d88e3"
+checksum = "7149a320d60eb5dc5f5fa2c59f9506a49349d0fff7beb9cbb94d9434c222fdac"
 dependencies = [
  "thiserror",
 ]

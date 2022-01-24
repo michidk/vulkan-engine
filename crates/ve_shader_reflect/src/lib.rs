@@ -148,7 +148,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
             spirv_layout::Type::SampledImage { .. } => SetBindingData::SampledImage {
                 dim: ImageDimension::Two,
             },
-            spirv_layout::Type::Struct { elements } => {
+            spirv_layout::Type::Struct { name, elements } => {
                 let total_size = module.get_type_size(var.type_id).unwrap();
                 let mut members = Vec::new();
 
@@ -166,7 +166,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                     members.push(BlockMember {
                         kind,
                         offset: member.offset.unwrap(),
-                        size: 0, // currently unused
+                        size: module.get_type_size(member.type_id).unwrap(),
                         name: member.name.clone().unwrap(),
                     });
                 }
@@ -174,7 +174,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                 SetBindingData::UniformBuffer {
                     layout: BlockLayout {
                         members,
-                        block_name: "".to_owned(), // currently unused
+                        block_name: name.clone().unwrap_or_else(|| "".to_string()),
                         total_size,
                     },
                 }

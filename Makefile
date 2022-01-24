@@ -15,8 +15,8 @@ build-shipping:
 
 ifeq ($(OS),Windows_NT)
 package: build-shipping
-	xcopy "assets" "out\assets" /i /s /y
-	xcopy "target\shipping\examples\*.exe" "out" /i /s /y
+	powershell Copy-Item -Path "assets" -Destination "out\assets" -Recurse
+	powershell Copy-Item -Path "target\shipping\examples\*" -Destination "out" -Include "*.exe"
 else
 package: build-shipping
 	mkdir -p ./out/assets/

@@ -5,18 +5,18 @@ run:
 	cargo run --example brdf
 
 build:
-	cargo build --examples
+	cargo build -p vulkan_engine --examples
 
 build-release:
-	cargo build --release --examples
+	cargo build --release -p vulkan_engine --examples
 
 build-shipping:
-	cargo build --profile shipping --examples
+	cargo build --profile shipping -p vulkan_engine --examples
 
 ifeq ($(OS),Windows_NT)
 package: build-shipping
-	xcopy /s /y "assets\*" ".\out\assets\"
-	xcopy /s /y "target\shipping\examples\*.exe" "out\"
+	xcopy /s /y "assets\*" ".\out\assets\*"
+	xcopy /s /y "target\shipping\examples\*.exe" "out\*.exe"
 else
 package: build-shipping
 	mkdir -p ./out/assets/

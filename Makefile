@@ -15,8 +15,8 @@ build-shipping:
 
 ifeq ($(OS),Windows_NT)
 package: build-shipping
-	xcopy /s /y "assets\*" ".\out\assets\*"
-	xcopy /s /y "target\shipping\examples\*.exe" "out\*.exe"
+	xcopy "assets" "out\assets" /i /s /y
+	xcopy "target\shipping\examples\*.exe" "out" /i /s /y
 else
 package: build-shipping
 	mkdir -p ./out/assets/

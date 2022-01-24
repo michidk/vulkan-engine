@@ -14,49 +14,43 @@ pub fn test_gpass_simple() {
         })
         .expect("Failed to reflect vertex shader");
 
-        assert_eq!(
-            info_vert,
-            ShaderInfo {
-                set_bindings: vec![SetBinding {
-                    set: 0,
-                    binding: 0,
-                    var_name: String::from("u_FrameData"),
-                    data: SetBindingData::UniformBuffer {
-                        layout: BlockLayout {
-                            block_name: String::from("FrameData"),
-                            total_size: 256,
-                            members: vec![
-                                BlockMember {
-                                    kind: BlockMemberType::FloatMatrix(4),
-                                    offset: 0,
-                                    size: 64,
-                                    name: String::from("projMatrix"),
-                                },
-                                BlockMember {
-                                    kind: BlockMemberType::FloatMatrix(4),
-                                    offset: 64,
-                                    size: 64,
-                                    name: String::from("invProjMatrix"),
-                                },
-                                BlockMember {
-                                    kind: BlockMemberType::FloatMatrix(4),
-                                    offset: 128,
-                                    size: 64,
-                                    name: String::from("viewMatrix"),
-                                },
-                                BlockMember {
-                                    kind: BlockMemberType::FloatMatrix(4),
-                                    offset: 192,
-                                    size: 64,
-                                    name: String::from("invViewMatrix"),
-                                },
-                            ],
-                        }
-                    },
-                }],
-                push_constants: None
-            }
-        );
+        assert!(info_vert.set_bindings.contains(&SetBinding {
+            set: 0,
+            binding: 0,
+            var_name: String::from("u_FrameData"),
+            data: SetBindingData::UniformBuffer {
+                layout: BlockLayout {
+                    block_name: String::from("FrameData"),
+                    total_size: 256,
+                    members: vec![
+                        BlockMember {
+                            kind: BlockMemberType::FloatMatrix(4),
+                            offset: 0,
+                            size: 64,
+                            name: String::from("projMatrix"),
+                        },
+                        BlockMember {
+                            kind: BlockMemberType::FloatMatrix(4),
+                            offset: 64,
+                            size: 64,
+                            name: String::from("invProjMatrix"),
+                        },
+                        BlockMember {
+                            kind: BlockMemberType::FloatMatrix(4),
+                            offset: 128,
+                            size: 64,
+                            name: String::from("viewMatrix"),
+                        },
+                        BlockMember {
+                            kind: BlockMemberType::FloatMatrix(4),
+                            offset: 192,
+                            size: 64,
+                            name: String::from("invViewMatrix"),
+                        },
+                    ],
+                }
+            },
+        }));
     }
 
     {
@@ -66,52 +60,45 @@ pub fn test_gpass_simple() {
         })
         .expect("Failed to reflect fragment shader");
 
-        assert_eq!(
-            info_frag,
-            ShaderInfo {
-                set_bindings: vec![
-                    SetBinding {
-                        set: 1,
-                        binding: 0,
-                        var_name: String::from("u_Material"),
-                        data: SetBindingData::UniformBuffer {
-                            layout: BlockLayout {
-                                block_name: String::from("MaterialData"),
-                                total_size: 28,
-                                members: vec![
-                                    BlockMember {
-                                        kind: BlockMemberType::Float,
-                                        offset: 0,
-                                        size: 4,
-                                        name: String::from("roughness"),
-                                    },
-                                    BlockMember {
-                                        kind: BlockMemberType::Float,
-                                        offset: 4,
-                                        size: 4,
-                                        name: String::from("metallic"),
-                                    },
-                                    BlockMember {
-                                        kind: BlockMemberType::FloatVector(3),
-                                        offset: 16,
-                                        size: 12,
-                                        name: String::from("tint"),
-                                    },
-                                ],
-                            }
+        assert!(info_frag.set_bindings.contains(&SetBinding {
+            set: 1,
+            binding: 1,
+            var_name: String::from("u_AlbedoTex"),
+            data: SetBindingData::SampledImage {
+                dim: ImageDimension::Two,
+            },
+        }));
+
+        assert!(info_frag.set_bindings.contains(&SetBinding {
+            set: 1,
+            binding: 0,
+            var_name: String::from("u_Material"),
+            data: SetBindingData::UniformBuffer {
+                layout: BlockLayout {
+                    block_name: String::from("MaterialData"),
+                    total_size: 28,
+                    members: vec![
+                        BlockMember {
+                            kind: BlockMemberType::Float,
+                            offset: 0,
+                            size: 4,
+                            name: String::from("roughness"),
                         },
-                    },
-                    SetBinding {
-                        set: 1,
-                        binding: 1,
-                        var_name: String::from("u_AlbedoTex"),
-                        data: SetBindingData::SampledImage {
-                            dim: ImageDimension::Two,
+                        BlockMember {
+                            kind: BlockMemberType::Float,
+                            offset: 4,
+                            size: 4,
+                            name: String::from("metallic"),
                         },
-                    }
-                ],
-                push_constants: None
-            }
-        );
+                        BlockMember {
+                            kind: BlockMemberType::FloatVector(3),
+                            offset: 16,
+                            size: 12,
+                            name: String::from("tint"),
+                        },
+                    ],
+                }
+            },
+        }));
     }
 }

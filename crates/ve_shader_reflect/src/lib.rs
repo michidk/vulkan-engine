@@ -136,8 +136,6 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
     let mut set_bindings = Vec::new();
 
     for var in module.get_uniforms() {
-        let set = var.set.unwrap(); // every uniform must have a set and binding per SPIRV Spec
-        let binding = var.binding.unwrap();
         let var_name = var.name.clone().unwrap_or_else(|| "".to_owned());
 
         let data = match module.get_type(var.type_id).unwrap() {
@@ -183,8 +181,8 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
         };
 
         set_bindings.push(SetBinding {
-            set,
-            binding,
+            set: var.set,
+            binding: var.binding,
             data,
             var_name,
         });

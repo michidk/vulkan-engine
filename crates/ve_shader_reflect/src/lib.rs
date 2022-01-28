@@ -9,6 +9,8 @@ pub enum Error {
     IncompatiblePropertyNames(String, String),
     #[error("Incompatible shader properties: {0} and {1}")]
     IncompatibleProperties(String, String),
+    #[error("Shader module has no entry point")]
+    NoEntryPoint,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,7 +137,12 @@ pub fn reflect_shader(spv_code: &[u32]) -> Result<ShaderInfo> {
 fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
     let mut set_bindings = Vec::new();
 
-    for var in module.get_uniforms() {
+    let entry_point = module
+        .get_entry_points()
+        .first()
+        .ok_or(Error::NoEntryPoint)?;
+
+    for var in &entry_point.uniforms {
         let var_name = var.name.clone().unwrap_or_else(|| "".to_owned());
 
         let data = match module.get_type(var.type_id).unwrap() {
@@ -147,7 +154,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                 dim: ImageDimension::Two,
             },
             spirv_layout::Type::Struct { name, elements } => {
-                let total_size = module.get_type_size(var.type_id).unwrap();
+                let total_size = module.get_var_size(var).unwrap();
                 let mut members = Vec::new();
 
                 for member in elements {
@@ -164,7 +171,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                     members.push(BlockMember {
                         kind,
                         offset: member.offset.unwrap(),
-                        size: module.get_type_size(member.type_id).unwrap(),
+                        size: module.get_member_size(member).unwrap(),
                         name: member.name.clone().unwrap(),
                     });
                 }

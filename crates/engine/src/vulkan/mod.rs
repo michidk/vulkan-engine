@@ -96,6 +96,8 @@ pub struct VulkanManager {
     ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_meshes: Vec<(egui::Rect, u64, u64)>,
+
+    ext_memory_budget_supported: bool,
 }
 
 impl VulkanManager {
@@ -109,13 +111,21 @@ impl VulkanManager {
 
         let surface = SurfaceWrapper::init(window, &entry, &instance);
 
-        let (physical_device, physical_device_properties, _physical_device_features) =
-            device::select_physical_device(&instance)?;
+        let (
+            physical_device,
+            physical_device_properties,
+            _physical_device_features,
+            ext_memory_budget_supported,
+        ) = device::select_physical_device(&instance)?;
 
         let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
-        let (logical_device, queues) =
-            queue::init_device_and_queues(&instance, physical_device, &queue_families)?;
+        let (logical_device, queues) = queue::init_device_and_queues(
+            &instance,
+            physical_device,
+            &queue_families,
+            ext_memory_budget_supported,
+        )?;
 
         let logical_device = Rc::new(logical_device);
 
@@ -381,7 +391,29 @@ impl VulkanManager {
             ui_vertex_buffers,
             ui_index_buffers,
             ui_meshes: Vec::new(),
+
+            ext_memory_budget_supported,
         })
+    }
+
+    pub(crate) fn get_budget(
+        &self,
+    ) -> Option<(vk::PhysicalDeviceMemoryBudgetPropertiesEXT, usize)> {
+        if !self.ext_memory_budget_supported {
+            None
+        } else {
+            let mut budget_props = vk::PhysicalDeviceMemoryBudgetPropertiesEXT::builder();
+            let mut props =
+                vk::PhysicalDeviceMemoryProperties2::builder().push_next(&mut budget_props);
+
+            unsafe {
+                self.instance
+                    .get_physical_device_memory_properties2(self.physical_device, &mut props);
+            }
+
+            let heap_count = props.memory_properties.memory_heap_count as usize;
+            Some((*budget_props, heap_count))
+        }
     }
 
     pub fn register_lighting_pipeline(&mut self, pipeline: Rc<LightingPipeline>) {

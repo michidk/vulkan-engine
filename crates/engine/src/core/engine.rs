@@ -6,7 +6,7 @@ use std::{
 
 use egui::{
     plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, RichText, ScrollArea,
+    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea,
 };
 
 use crate::{
@@ -206,6 +206,42 @@ impl Engine {
                     };
                     ui.colored_label(fps_color, format!("FPS: {}", self.fps));
                     ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
+
+                    if let Some((budget, heap_count)) = self.vulkan_manager.get_budget() {
+                        ui.separator();
+
+                        ui.label("Memory");
+
+                        for (i, (available, used)) in budget.heap_budget[..heap_count]
+                            .iter()
+                            .zip(&budget.heap_usage[..heap_count])
+                            .enumerate()
+                        {
+                            let portion = *used as f32 / *available as f32;
+
+                            let budget_mb = (*available as f32) / 1024.0 / 1024.0;
+                            let used_mb = (*used as f32) / 1024.0 / 1024.0;
+
+                            ui.scope(|ui| {
+                                if portion > 0.8 {
+                                    ui.style_mut().visuals.selection.bg_fill = Color32::RED;
+                                } else if portion > 0.6 {
+                                    ui.style_mut().visuals.selection.bg_fill =
+                                        Color32::from_rgb(255, 127, 0);
+                                }
+
+                                ui.add(ProgressBar::new(portion).text(format!(
+                                    "Heap {}: {:.3} MB/{:.3} MB ({:.2}%)",
+                                    i,
+                                    used_mb,
+                                    budget_mb,
+                                    portion * 100.0
+                                )));
+                            });
+                        }
+
+                        ui.separator();
+                    }
 
                     Plot::new("Frame time Graph")
                         .height(70.0)

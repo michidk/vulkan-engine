@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ffi::CStr};
 
 use ash::vk;
 
@@ -12,6 +12,7 @@ pub fn select_physical_device(
     vk::PhysicalDevice,
     vk::PhysicalDeviceProperties,
     vk::PhysicalDeviceFeatures,
+    bool,
 )> {
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
     let mut candidates: BTreeMap<
@@ -20,6 +21,7 @@ pub fn select_physical_device(
             vk::PhysicalDevice,
             vk::PhysicalDeviceProperties,
             vk::PhysicalDeviceFeatures,
+            bool,
         ),
     > = BTreeMap::new();
 
@@ -27,16 +29,25 @@ pub fn select_physical_device(
         let properties = unsafe { instance.get_physical_device_properties(device) };
         let features = unsafe { instance.get_physical_device_features(device) };
 
+        let extensions = unsafe { instance.enumerate_device_extension_properties(device)? };
+
+        let ext_memory_budget_supported = extensions.iter().any(|ext| {
+            let c_str = unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) };
+            c_str.to_str().unwrap() == "VK_EXT_memory_budget"
+        });
+
         #[cfg(debug_assertions)]
         {
-            use std::ffi::CStr;
-
             let name = String::from(
                 unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
                     .to_str()
                     .unwrap(),
             );
             log::info!("GPU detected: {}", name);
+
+            if ext_memory_budget_supported {
+                log::info!("    supports VK_EXT_memory_budget");
+            }
         }
 
         if vk::api_version_major(properties.api_version) != VULKAN_VERSION.0
@@ -60,7 +71,10 @@ pub fn select_physical_device(
             continue;
         }
 
-        candidates.insert(score, (device, properties, features));
+        candidates.insert(
+            score,
+            (device, properties, features, ext_memory_budget_supported),
+        );
     }
 
     if candidates.is_empty() {

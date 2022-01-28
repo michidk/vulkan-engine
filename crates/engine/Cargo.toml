@@ -23,6 +23,8 @@ ve-shader-reflect = { path = "../ve_shader_reflect" }
 ve_format = { path = "../ve_format"}
 egui = "0.16.1"
 egui-winit = "0.16.0"
+serde = { version= "1.0.136", features=["derive"] }
+toml = "0.5.8"
 
 [dev-dependencies]
 

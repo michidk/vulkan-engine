@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    ffi::CStr,
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -8,11 +9,12 @@ use egui::{
     plot::{Legend, Line, Plot, Value, Values},
     CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
     scene::{component::Component, entity::Entity, Scene},
-    vulkan::VulkanManager,
+    vulkan::{self, RendererConfig, VulkanManager},
 };
 
 use super::window::Window;
@@ -28,13 +30,36 @@ pub struct EngineInit {
     pub engine: Engine,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub(crate) struct EngineConfig {
+    pub(crate) renderer: Option<vulkan::RendererConfig>,
+}
+
+pub(crate) fn read_config() -> EngineConfig {
+    if let Ok(content) = std::fs::read_to_string("engine.toml") {
+        let config: EngineConfig = toml::from_str(&content).unwrap_or_default();
+        config
+    } else {
+        EngineConfig::default()
+    }
+}
+
+pub(crate) fn write_config(config: &EngineConfig) {
+    if let Ok(content) = toml::to_string_pretty(config) {
+        let _ = std::fs::write("engine.toml", content);
+    }
+}
+
 impl EngineInit {
     pub fn new(info: EngineInfo) -> Result<Self, Box<dyn std::error::Error>> {
+        let config = read_config();
+
         let scene = Scene::new();
         let eventloop = winit::event_loop::EventLoop::new();
         let window = info.window_info.build(&eventloop)?;
 
-        let vulkan_manager = VulkanManager::new(info, &window.winit_window, 3)?;
+        let vulkan_manager =
+            VulkanManager::new(info, &window.winit_window, 3, config.renderer.as_ref())?;
         let input = Rc::new(RefCell::new(Input::new()));
         let gameloop = GameLoop::new(input.clone());
 
@@ -284,6 +309,31 @@ impl Engine {
                         ));
                         ui.label(format!("Draw calls: {}", self.ui_mesh_count));
                     });
+
+                    ui.separator();
+
+                    ui.label("GPU Override");
+
+                    for (_, props, _) in &self.vulkan_manager.supported_devices {
+                        let name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }
+                            .to_str()
+                            .unwrap();
+                        if ui
+                            .button(format!(
+                                "{} ({:08X}:{:08X})",
+                                name, props.vendor_id, props.device_id
+                            ))
+                            .clicked()
+                        {
+                            log::info!("Overriding config with new device");
+                            let mut config = read_config();
+                            config.renderer = Some(RendererConfig {
+                                gpu_vendor_id: Some(props.vendor_id),
+                                gpu_device_id: Some(props.device_id),
+                            });
+                            write_config(&config);
+                        }
+                    }
                 });
 
             let root_entity = self.scene.root_entity.borrow();

@@ -1,33 +1,22 @@
-use std::{collections::BTreeMap, ffi::CStr};
+use std::ffi::CStr;
 
 use ash::vk;
 
-use super::error::{GraphicsError, GraphicsResult};
+use super::{
+    error::{GraphicsError, GraphicsResult},
+    RendererConfig,
+};
 
 const VULKAN_VERSION: (u32, u32) = (1, 2);
 
-pub fn select_physical_device(
+pub(crate) fn get_candidates(
     instance: &ash::Instance,
-) -> GraphicsResult<(
-    vk::PhysicalDevice,
-    vk::PhysicalDeviceProperties,
-    vk::PhysicalDeviceFeatures,
-    bool,
-)> {
+) -> GraphicsResult<Vec<(vk::PhysicalDevice, vk::PhysicalDeviceProperties, bool)>> {
     let phys_devs = unsafe { instance.enumerate_physical_devices() }?;
-    let mut candidates: BTreeMap<
-        u32,
-        (
-            vk::PhysicalDevice,
-            vk::PhysicalDeviceProperties,
-            vk::PhysicalDeviceFeatures,
-            bool,
-        ),
-    > = BTreeMap::new();
+    let mut candidates = Vec::new();
 
     for device in phys_devs {
         let properties = unsafe { instance.get_physical_device_properties(device) };
-        let features = unsafe { instance.get_physical_device_features(device) };
 
         let extensions = unsafe { instance.enumerate_device_extension_properties(device)? };
 
@@ -43,7 +32,12 @@ pub fn select_physical_device(
                     .to_str()
                     .unwrap(),
             );
-            log::info!("GPU detected: {}", name);
+            log::info!(
+                "GPU detected: {} ({:08X}:{:08X})",
+                name,
+                properties.vendor_id,
+                properties.device_id
+            );
 
             if ext_memory_budget_supported {
                 log::info!("    supports VK_EXT_memory_budget");
@@ -56,30 +50,37 @@ pub fn select_physical_device(
             continue;
         }
 
-        let mut score: u32 = 0;
-
-        // prefere discrete gpu
-        if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
-            score += 1000;
-        }
-
-        // possible texture size affects graphics quality
-        score += properties.limits.max_image_dimension2_d;
-
-        // require geometry shader
-        if features.geometry_shader == vk::FALSE {
-            continue;
-        }
-
-        candidates.insert(
-            score,
-            (device, properties, features, ext_memory_budget_supported),
-        );
+        candidates.push((device, properties, ext_memory_budget_supported));
     }
+
+    Ok(candidates)
+}
+
+pub(crate) fn select_physical_device(
+    instance: &ash::Instance,
+    config: Option<&RendererConfig>,
+) -> GraphicsResult<(vk::PhysicalDevice, vk::PhysicalDeviceProperties, bool)> {
+    let override_ids = config
+        .map(|cfg| cfg.gpu_vendor_id.zip(cfg.gpu_device_id))
+        .unwrap_or(None);
+
+    let candidates = get_candidates(instance)?;
 
     if candidates.is_empty() {
         return Err(GraphicsError::NoSuitableGpu);
     }
 
-    Ok(*candidates.values().last().unwrap())
+    if let Some((vendor, device)) = override_ids {
+        let dev = candidates
+            .iter()
+            .find(|d| d.1.vendor_id == vendor && d.1.device_id == device);
+
+        if let Some(dev) = dev {
+            return Ok(*dev);
+        } else {
+            log::warn!("Override GPU with id {:08X}:{:08X} not found or not suitable, using default device", vendor, device);
+        }
+    }
+
+    Ok(*candidates.first().unwrap())
 }

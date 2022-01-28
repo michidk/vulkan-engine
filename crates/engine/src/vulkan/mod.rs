@@ -19,6 +19,7 @@ use ash::vk::{self, Handle};
 use egui::ClippedMesh;
 use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     core::engine::EngineInfo,
@@ -45,6 +46,12 @@ use self::{
     texture::{Texture2D, TextureFilterMode},
     uploader::Uploader,
 };
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct RendererConfig {
+    pub(crate) gpu_vendor_id: Option<u32>,
+    pub(crate) gpu_device_id: Option<u32>,
+}
 
 pub struct VulkanManager {
     #[allow(dead_code)]
@@ -98,6 +105,7 @@ pub struct VulkanManager {
     ui_meshes: Vec<(egui::Rect, u64, u64)>,
 
     ext_memory_budget_supported: bool,
+    pub(crate) supported_devices: Vec<(vk::PhysicalDevice, vk::PhysicalDeviceProperties, bool)>,
 }
 
 impl VulkanManager {
@@ -105,18 +113,17 @@ impl VulkanManager {
         engine_info: EngineInfo,
         window: &winit::window::Window,
         max_frames_in_flight: u8,
+        config: Option<&RendererConfig>,
     ) -> GraphicsResult<Self> {
         let entry = unsafe { ash::Entry::load() }.map_err(anyhow::Error::from)?;
         let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
         let surface = SurfaceWrapper::init(window, &entry, &instance);
 
-        let (
-            physical_device,
-            physical_device_properties,
-            _physical_device_features,
-            ext_memory_budget_supported,
-        ) = device::select_physical_device(&instance)?;
+        let supported_devices = device::get_candidates(&instance)?;
+
+        let (physical_device, physical_device_properties, ext_memory_budget_supported) =
+            device::select_physical_device(&instance, config)?;
 
         let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
@@ -393,6 +400,7 @@ impl VulkanManager {
             ui_meshes: Vec::new(),
 
             ext_memory_budget_supported,
+            supported_devices,
         })
     }
 

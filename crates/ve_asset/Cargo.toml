@@ -7,7 +7,7 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
-gfx-maths = "0.2.4"
+gfx-maths = "0.2.6"
 ve_format = { path="../ve_format" }
 structopt = "0.3.25"
 thiserror = "1.0.30"

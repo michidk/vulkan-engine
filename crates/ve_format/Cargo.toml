@@ -12,5 +12,5 @@ name = "ve_format"
 [dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
 bincode = "1.3.3"
-gfx-maths = { version = "0.2.4", features = ["serde"] }
+gfx-maths = { version = "0.2.6", features = ["serde"] }
 thiserror = "1.0.30"

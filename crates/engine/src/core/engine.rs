@@ -8,8 +8,9 @@ use std::{
 use ash::vk;
 use egui::{
     plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea,
+    CollapsingHeader, Color32, DragValue, ProgressBar, RichText, ScrollArea,
 };
+use gfx_maths::Quaternion;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -160,6 +161,48 @@ impl Engine {
         ui.collapsing(
             RichText::new(format!("{} - (ID {})", entity.name, entity.id)).strong(),
             |ui| {
+                let mut transform = entity.transform.borrow_mut();
+
+                ui.label("Position");
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut transform.position.x).prefix("X: "));
+                    ui.add(DragValue::new(&mut transform.position.y).prefix("Y: "));
+                    ui.add(DragValue::new(&mut transform.position.z).prefix("Z: "));
+                });
+
+                ui.label("Rotation");
+                ui.horizontal(|ui| {
+                    let mut euler = transform.rotation.to_euler_angles_zyx();
+
+                    if ui
+                        .add(
+                            DragValue::new(&mut euler.x)
+                                .prefix("Pitch: ")
+                                .max_decimals(2),
+                        )
+                        .changed()
+                        || ui
+                            .add(DragValue::new(&mut euler.y).prefix("Yaw: ").max_decimals(2))
+                            .changed()
+                        || ui
+                            .add(
+                                DragValue::new(&mut euler.z)
+                                    .prefix("Roll: ")
+                                    .max_decimals(2),
+                            )
+                            .changed()
+                    {
+                        transform.rotation = Quaternion::from_euler_angles_zyx(&euler);
+                    }
+                });
+
+                ui.label("Scale");
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut transform.scale.x).prefix("X: "));
+                    ui.add(DragValue::new(&mut transform.scale.y).prefix("Y: "));
+                    ui.add(DragValue::new(&mut transform.scale.z).prefix("Z: "));
+                });
+
                 let components = entity.components.borrow();
                 for comp in &*components {
                     Self::render_component(ui, &**comp);

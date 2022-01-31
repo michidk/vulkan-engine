@@ -2,12 +2,13 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     rc::Rc,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, os,
 };
 
+use ash::vk;
 use egui::{
     plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea,
+    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea, Button,
 };
 use serde::{Deserialize, Serialize};
 
@@ -97,6 +98,7 @@ impl EngineInit {
                 ui_mesh_count: 0,
 
                 scene_graph_visible: false,
+                config: read_config(),
             },
         })
     }
@@ -135,6 +137,7 @@ pub struct Engine {
     ui_mesh_count: u32,
 
     scene_graph_visible: bool,
+    config: EngineConfig,
 }
 
 impl Engine {
@@ -191,19 +194,19 @@ impl Engine {
                 .unwrap_or(0.0);
 
             self.frame_time_history
-                .push(Value::new(plot_x, self.frame_time_max));
+                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.frame_time_max }));
             if self.frame_time_history.len() > 10 * 10 {
                 self.frame_time_history.remove(0);
             }
 
             self.render_time_history
-                .push(Value::new(plot_x, self.render_time_max));
+                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.render_time_max }));
             if self.render_time_history.len() > 10 * 10 {
                 self.render_time_history.remove(0);
             }
 
             self.ui_time_history
-                .push(Value::new(plot_x, self.ui_time_max + self.render_time_max));
+                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.ui_time_max + self.render_time_max }));
             if self.ui_time_history.len() > 10 * 10 {
                 self.ui_time_history.remove(0);
             }
@@ -217,13 +220,17 @@ impl Engine {
 
         let ui_start_time = Instant::now();
 
+        let mut gui_context = self.gui_context.clone();
+
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
-        let (output, shapes) = self.gui_context.run(gui_input, |ctx| {
+        let (output, shapes) = gui_context.run(gui_input, |ctx| {
             egui::Window::new("Debug Tools")
                 .title_bar(true)
                 .collapsible(false)
                 .resizable(true)
                 .show(ctx, |ui| {
+                    ui.heading("Frame timing");
+
                     let fps_color = match self.fps {
                         0..=29 => Color32::RED,
                         30..=59 => Color32::YELLOW,
@@ -232,10 +239,35 @@ impl Engine {
                     ui.colored_label(fps_color, format!("FPS: {}", self.fps));
                     ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
 
+                    Plot::new("Frame time Graph")
+                        .height(70.0)
+                        .include_y(0.0)
+                        .legend(Legend::default())
+                        .show(ui, |ui| {
+                            let line =
+                                Line::new(Values::from_values(self.frame_time_history.clone()))
+                                    .name("Frame")
+                                    .fill(0.0)
+                                    .highlight();
+                            ui.line(line);
+
+                            let line =
+                                Line::new(Values::from_values(self.render_time_history.clone()))
+                                    .name("Render")
+                                    .fill(0.0)
+                                    .highlight();
+                            ui.line(line);
+
+                            let line = Line::new(Values::from_values(self.ui_time_history.clone()))
+                                .name("UI")
+                                .fill(0.0)
+                                .highlight();
+                            ui.line(line);
+                        });
+
                     if let Some((budget, heap_count)) = self.vulkan_manager.get_budget() {
                         ui.separator();
-
-                        ui.label("Memory");
+                        ui.heading("Memory usage");
 
                         for (i, (available, used)) in budget.heap_budget[..heap_count]
                             .iter()
@@ -264,42 +296,17 @@ impl Engine {
                                 )));
                             });
                         }
-
-                        ui.separator();
                     }
 
-                    Plot::new("Frame time Graph")
-                        .height(70.0)
-                        .include_y(0.0)
-                        .legend(Legend::default())
-                        .show(ui, |ui| {
-                            let line =
-                                Line::new(Values::from_values(self.frame_time_history.clone()))
-                                    .name("Frame")
-                                    .fill(0.0)
-                                    .highlight();
-                            ui.line(line);
-
-                            let line =
-                                Line::new(Values::from_values(self.render_time_history.clone()))
-                                    .name("Render")
-                                    .fill(0.0)
-                                    .highlight();
-                            ui.line(line);
-
-                            let line = Line::new(Values::from_values(self.ui_time_history.clone()))
-                                .name("UI")
-                                .fill(0.0)
-                                .highlight();
-                            ui.line(line);
-                        });
+                    ui.separator();
+                    ui.heading("Debugging");
 
                     ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
 
-                    ui.checkbox(&mut self.scene_graph_visible, "Scene graph");
+                    ui.checkbox(&mut self.scene_graph_visible, "Show scene graph");
 
                     CollapsingHeader::new("UI Debugging").show(ui, |ui| {
-                        ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Wireframe");
+                        ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Triangles");
 
                         ui.label(format!("Vertices: {}", self.ui_vertex_count));
                         ui.label(format!(
@@ -311,27 +318,62 @@ impl Engine {
                     });
 
                     ui.separator();
+                    ui.heading("GPU Override");
 
-                    ui.label("GPU Override");
+                    ui.label(format!(
+                        "Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                        unsafe{CStr::from_ptr(self.vulkan_manager.physical_device_properties.device_name.as_ptr())}.to_str().unwrap(),
+                        self.vulkan_manager.physical_device_properties.vendor_id,
+                        self.vulkan_manager.physical_device_properties.device_id,
+                        vk::api_version_major(self.vulkan_manager.physical_device_properties.api_version),
+                        vk::api_version_minor(self.vulkan_manager.physical_device_properties.api_version),
+                        vk::api_version_patch(self.vulkan_manager.physical_device_properties.api_version),
+                    ));
 
+                    let device_override = self.config.renderer.as_ref().map(|rc| rc.gpu_vendor_id.zip(rc.gpu_device_id)).unwrap_or_default();
+
+                    if ui.selectable_label(device_override.is_none(), "Default").clicked() {
+                        log::info!("Clearing GPU override");
+                        self.config.renderer = None;
+                        write_config(&self.config);
+
+                        let args = std::env::args().collect::<Vec<_>>();
+                        std::process::Command::new(&args[0])
+                            .args(args)
+                            .spawn()
+                            .unwrap();
+                        std::process::exit(0);
+                    }
                     for (_, props, _) in &self.vulkan_manager.supported_devices {
                         let name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }
                             .to_str()
                             .unwrap();
+
                         if ui
-                            .button(format!(
-                                "{} ({:08X}:{:08X})",
-                                name, props.vendor_id, props.device_id
+                            .selectable_label(device_override.map_or(false, |d| d.0 == props.vendor_id && d.1 == props.device_id), format!(
+                                "{} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                                name,
+                                props.vendor_id,
+                                props.device_id,
+                                vk::api_version_major(props.api_version),
+                                vk::api_version_minor(props.api_version),
+                                vk::api_version_patch(props.api_version),
                             ))
                             .clicked()
                         {
                             log::info!("Overriding config with new device");
-                            let mut config = read_config();
-                            config.renderer = Some(RendererConfig {
+                            self.config.renderer = Some(RendererConfig {
                                 gpu_vendor_id: Some(props.vendor_id),
                                 gpu_device_id: Some(props.device_id),
                             });
-                            write_config(&config);
+                            write_config(&self.config);
+
+                            let args = std::env::args().collect::<Vec<_>>();
+                            std::process::Command::new(&args[0])
+                                .args(args)
+                                .spawn()
+                                .unwrap();
+                            std::process::exit(0);
                         }
                     }
                 });
@@ -348,6 +390,11 @@ impl Engine {
                     });
             }
         });
+
+        // After every frame, an egui::CtxRef refers to an entirely new object, even though an "xxxRef" sounds like it works just like an Arc<...>.
+        // Because of this, we need to reassign self.gui_context to the "new" gui_context.
+        self.gui_context = gui_context;
+
         self.gui_state
             .handle_output(&self.window.winit_window, &self.gui_context, output);
         let gui_meshes = self.gui_context.tessellate(shapes);

@@ -7,7 +7,7 @@ use super::{
     RendererConfig,
 };
 
-const VULKAN_VERSION: (u32, u32) = (1, 2);
+const VULKAN_VERSION: (u32, u32) = (1, 0);
 
 pub(crate) fn get_candidates(
     instance: &ash::Instance,

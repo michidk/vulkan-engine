@@ -119,7 +119,8 @@ impl Uploader {
         }
 
         // no staging buffer with enough capacity found, create a new one
-        let new_size = size.max(DEFAULT_STAGING_BUFFER_SIZE);
+        let new_size = (size + DEFAULT_STAGING_BUFFER_SIZE - 1) / DEFAULT_STAGING_BUFFER_SIZE * DEFAULT_STAGING_BUFFER_SIZE;
+        log::trace!("Creating new staging buffer with size {}", new_size);
         let (buffer, alloc) = self
             .allocator
             .create_buffer(
@@ -136,7 +137,7 @@ impl Uploader {
             mapping,
             pos: 0,
             size: new_size,
-            last_used_frame: 0,
+            last_used_frame: self.frame_counter,
         });
 
         self.staging_buffers.len() - 1
@@ -349,5 +350,16 @@ impl Uploader {
                 .begin_command_buffer(command_buffer, &begin_info)
                 .unwrap();
         }
+
+        // delete staging buffers after not being used for 10 frames
+        self.staging_buffers.retain(|b| {
+            if self.frame_counter - b.last_used_frame >= 10 {
+                self.allocator.destroy_buffer(b.buffer, b.alloc.clone());
+                log::trace!("Deleting staging buffer of size {}, offset={}, last used {} frames ago", b.size, b.pos, self.frame_counter - b.last_used_frame);
+                false
+            } else {
+                true
+            }
+        });
     }
 }

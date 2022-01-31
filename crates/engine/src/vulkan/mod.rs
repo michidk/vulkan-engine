@@ -62,8 +62,7 @@ pub struct VulkanManager {
 
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
-    #[allow(dead_code)]
-    physical_device_properties: vk::PhysicalDeviceProperties,
+    pub(crate) physical_device_properties: vk::PhysicalDeviceProperties,
     #[allow(dead_code)]
     queue_families: QueueFamilies,
     pub(crate) queues: Queues,
@@ -444,7 +443,7 @@ impl VulkanManager {
             .application_version(vk::make_api_version(0, 0, 1, 0))
             .engine_name(&app_name)
             .engine_version(vk::make_api_version(0, 0, 1, 0))
-            .api_version(vk::API_VERSION_1_2);
+            .api_version(vk::API_VERSION_1_1);
 
         let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
         let extension_names_raw = surface_extensions
@@ -1229,6 +1228,8 @@ impl VulkanManager {
     ) {
         let font_image = gui_context.font_image();
         if font_image.version != self.ui_texture_version {
+            log::trace!("UI font texture changed to {}x{}", font_image.width, font_image.height);
+
             self.ui_texture_version = font_image.version;
 
             let num_pixels = font_image.width * font_image.height;

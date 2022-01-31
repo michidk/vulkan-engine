@@ -31,6 +31,9 @@ fn main() {
 }
 
 fn setup(engine: &mut Engine) {
+    engine.register_component::<RotateComponent>("RotateComponent".to_string());
+    engine.register_component::<ScaleComponent>("ScaleComponent".to_string());
+
     let scene = &mut engine.scene;
 
     // pipeline setup

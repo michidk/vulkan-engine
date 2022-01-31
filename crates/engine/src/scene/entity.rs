@@ -118,8 +118,24 @@ impl Entity {
         new_parent.add_child(self.clone());
     }
 
+    pub fn add_new_child(self: &Rc<Entity>, name: String) -> Rc<Entity> {
+        let scene = self.scene.upgrade().unwrap();
+        Self::new(&scene, self, name)
+    }
+
     pub fn new_component<T: 'static + Component>(self: &Rc<Self>) -> Rc<T> {
         let comp = T::create(self);
+
+        self.components.borrow_mut().push(comp.clone());
+
+        comp
+    }
+
+    pub fn new_component_with_factory<Factory: FnOnce(&Rc<Self>) -> Rc<dyn Component>>(
+        self: &Rc<Self>,
+        factory: Factory,
+    ) -> Rc<dyn Component> {
+        let comp = factory(self);
 
         self.components.borrow_mut().push(comp.clone());
 

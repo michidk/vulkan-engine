@@ -8,14 +8,22 @@ use std::{
 use ash::vk;
 use egui::{
     plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, DragValue, ProgressBar, RichText, ScrollArea,
+    CollapsingHeader, Color32, ComboBox, CtxRef, DragValue, ProgressBar, RichText, ScrollArea,
+    SidePanel,
 };
 use gfx_maths::Quaternion;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     core::{gameloop::GameLoop, input::Input, window},
-    scene::{component::Component, entity::Entity, Scene},
+    scene::{
+        component::{
+            camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
+            light_component::LightComponent, renderer::RendererComponent, Component,
+        },
+        entity::Entity,
+        Scene,
+    },
     vulkan::{self, RendererConfig, VulkanManager},
 };
 
@@ -102,14 +110,29 @@ impl EngineInit {
                 #[cfg(feature = "profiler")]
                 profiler_visible: false,
                 config: read_config(),
+
+                component_factories: Vec::new(),
+                selected_entity: None,
+                selected_factory: 0,
             },
         })
     }
 
-    pub fn start(self) -> ! {
+    pub fn start(mut self) -> ! {
+        self.engine
+            .register_component::<RendererComponent>("RendererComponent".to_string());
+        self.engine
+            .register_component::<LightComponent>("LightComponent".to_string());
+        self.engine
+            .register_component::<DebugMovementComponent>("DebugMovementComponent".to_string());
+        self.engine
+            .register_component::<CameraComponent>("CameraComponent".to_string());
+
         window::start(self);
     }
 }
+
+pub type ComponentFactoryFn = fn(&Rc<Entity>) -> Rc<dyn Component>;
 
 pub struct Engine {
     pub info: EngineInfo,
@@ -143,11 +166,19 @@ pub struct Engine {
     #[cfg(feature = "profiler")]
     profiler_visible: bool,
     config: EngineConfig,
+
+    component_factories: Vec<(String, ComponentFactoryFn)>,
+    selected_entity: Option<Rc<Entity>>,
+    selected_factory: usize,
 }
 
 impl Engine {
     pub fn init(&self) {
         self.gameloop.init();
+    }
+
+    pub fn register_component<T: Component + 'static>(&mut self, name: String) {
+        self.component_factories.push((name, |e| T::create(e)));
     }
 
     fn render_component(ui: &mut egui::Ui, component: &dyn Component) {
@@ -157,60 +188,117 @@ impl Engine {
         });
     }
 
-    fn render_entity(ui: &mut egui::Ui, entity: &Entity) {
+    fn render_inspector(
+        ctx: &CtxRef,
+        selected_entity: &mut Option<Rc<Entity>>,
+        selected_factory: &mut usize,
+        factories: &[(String, ComponentFactoryFn)],
+    ) {
+        SidePanel::right("inspector")
+            .resizable(true)
+            .show(ctx, |ui| {
+                ScrollArea::vertical().show(ui, |ui| {
+                    if let Some(entity) = selected_entity {
+                        ui.heading(format!("Entity {} ({}) selected", entity.id, &entity.name));
+
+                        if ui.button("Deselect").clicked() {
+                            *selected_entity = None;
+                            return;
+                        }
+
+                        let mut transform = entity.transform.borrow_mut();
+
+                        ui.label("Position");
+                        ui.horizontal(|ui| {
+                            ui.add(DragValue::new(&mut transform.position.x).prefix("X: "));
+                            ui.add(DragValue::new(&mut transform.position.y).prefix("Y: "));
+                            ui.add(DragValue::new(&mut transform.position.z).prefix("Z: "));
+                        });
+
+                        ui.label("Rotation");
+                        ui.horizontal(|ui| {
+                            let mut euler = transform.rotation.to_euler_angles_zyx();
+
+                            if ui
+                                .add(
+                                    DragValue::new(&mut euler.x)
+                                        .prefix("Pitch: ")
+                                        .max_decimals(2),
+                                )
+                                .changed()
+                                || ui
+                                    .add(
+                                        DragValue::new(&mut euler.y)
+                                            .prefix("Yaw: ")
+                                            .max_decimals(2),
+                                    )
+                                    .changed()
+                                || ui
+                                    .add(
+                                        DragValue::new(&mut euler.z)
+                                            .prefix("Roll: ")
+                                            .max_decimals(2),
+                                    )
+                                    .changed()
+                            {
+                                transform.rotation = Quaternion::from_euler_angles_zyx(&euler);
+                            }
+                        });
+
+                        ui.label("Scale");
+                        ui.horizontal(|ui| {
+                            ui.add(DragValue::new(&mut transform.scale.x).prefix("X: "));
+                            ui.add(DragValue::new(&mut transform.scale.y).prefix("Y: "));
+                            ui.add(DragValue::new(&mut transform.scale.z).prefix("Z: "));
+                        });
+
+                        ui.separator();
+
+                        ui.heading("Components");
+
+                        for comp in &*entity.components.borrow() {
+                            Self::render_component(ui, &**comp);
+                        }
+
+                        ui.horizontal(|ui| {
+                            ComboBox::from_id_source("factory_selection").show_index(
+                                ui,
+                                selected_factory,
+                                factories.len(),
+                                |i| factories[i].0.clone(),
+                            );
+
+                            if ui.button("Add").clicked() {
+                                entity.new_component_with_factory(factories[*selected_factory].1);
+                            }
+                        });
+                    } else {
+                        ui.heading("Inspector");
+                    }
+                });
+                ui.allocate_space(ui.available_size());
+            });
+    }
+
+    fn render_entity(
+        ui: &mut egui::Ui,
+        entity: &Rc<Entity>,
+        selected_entity: &mut Option<Rc<Entity>>,
+    ) {
         ui.collapsing(
             RichText::new(format!("{} - (ID {})", entity.name, entity.id)).strong(),
             |ui| {
-                let mut transform = entity.transform.borrow_mut();
+                if ui.button("Inspect").clicked() {
+                    *selected_entity = Some(entity.clone());
+                }
 
-                ui.label("Position");
-                ui.horizontal(|ui| {
-                    ui.add(DragValue::new(&mut transform.position.x).prefix("X: "));
-                    ui.add(DragValue::new(&mut transform.position.y).prefix("Y: "));
-                    ui.add(DragValue::new(&mut transform.position.z).prefix("Z: "));
-                });
-
-                ui.label("Rotation");
-                ui.horizontal(|ui| {
-                    let mut euler = transform.rotation.to_euler_angles_zyx();
-
-                    if ui
-                        .add(
-                            DragValue::new(&mut euler.x)
-                                .prefix("Pitch: ")
-                                .max_decimals(2),
-                        )
-                        .changed()
-                        || ui
-                            .add(DragValue::new(&mut euler.y).prefix("Yaw: ").max_decimals(2))
-                            .changed()
-                        || ui
-                            .add(
-                                DragValue::new(&mut euler.z)
-                                    .prefix("Roll: ")
-                                    .max_decimals(2),
-                            )
-                            .changed()
-                    {
-                        transform.rotation = Quaternion::from_euler_angles_zyx(&euler);
-                    }
-                });
-
-                ui.label("Scale");
-                ui.horizontal(|ui| {
-                    ui.add(DragValue::new(&mut transform.scale.x).prefix("X: "));
-                    ui.add(DragValue::new(&mut transform.scale.y).prefix("Y: "));
-                    ui.add(DragValue::new(&mut transform.scale.z).prefix("Z: "));
-                });
-
-                let components = entity.components.borrow();
-                for comp in &*components {
-                    Self::render_component(ui, &**comp);
+                if ui.button("Add child").clicked() {
+                    entity.add_new_child("New Entity".to_string());
                 }
 
                 let children = entity.children.borrow();
                 for child in &*children {
-                    Self::render_entity(ui, child);
+                    Self::render_entity(ui, child, selected_entity);
                 }
             },
         );
@@ -512,7 +600,7 @@ impl Engine {
             });
     }
 
-    fn render_scene_graph(&self, ctx: &egui::CtxRef) {
+    fn render_scene_graph(&mut self, ctx: &egui::CtxRef) {
         profile_function!();
 
         let root_entity = self.scene.root_entity.borrow();
@@ -521,7 +609,7 @@ impl Engine {
                 .resizable(true)
                 .show(ctx, |ui| {
                     ScrollArea::vertical().show(ui, |ui| {
-                        Self::render_entity(ui, &root_entity);
+                        Self::render_entity(ui, &root_entity, &mut self.selected_entity);
                     });
                     ui.allocate_space(ui.available_size());
                 });
@@ -540,6 +628,15 @@ impl Engine {
             self.render_debug_tools_window(ctx, frame_time);
 
             self.render_scene_graph(ctx);
+
+            if self.scene_graph_visible {
+                Self::render_inspector(
+                    ctx,
+                    &mut self.selected_entity,
+                    &mut self.selected_factory,
+                    &self.component_factories,
+                );
+            }
 
             #[cfg(feature = "profiler")]
             if self.profiler_visible && !puffin_egui::profiler_window(ctx) {
@@ -573,6 +670,7 @@ impl Engine {
 
 impl Drop for Engine {
     fn drop(&mut self) {
+        self.selected_entity = None;
         self.vulkan_manager.wait_idle();
     }
 }

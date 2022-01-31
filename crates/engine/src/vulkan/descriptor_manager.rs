@@ -106,6 +106,8 @@ impl<const HISTORY_SIZE: usize> DescriptorManager<HISTORY_SIZE> {
     ///
     /// This frees unused DescriptorSets and should be called every frame.
     pub fn next_frame(&mut self) {
+        profile_function!();
+
         self.frame_index = (self.frame_index + 1) % HISTORY_SIZE as u16;
 
         // free old descriptor sets

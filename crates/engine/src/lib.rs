@@ -1,3 +1,5 @@
+#[macro_use]
+pub mod profiler_macros;
 pub mod assets;
 pub mod core;
 pub mod scene;

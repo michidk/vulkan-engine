@@ -459,6 +459,8 @@ impl VulkanManager {
     }
 
     pub(crate) fn next_frame(&mut self) -> u32 {
+        profile_function!();
+
         self.current_frame_index = (self.current_frame_index + 1) % self.max_frames_in_flight;
 
         self.swapchain
@@ -608,6 +610,8 @@ impl VulkanManager {
     }
 
     fn build_render_order(models: &[(TransformData, Rc<Model>)]) -> Vec<(TransformData, &Model)> {
+        profile_function!();
+
         let mut res: Vec<(TransformData, &Model)> = Vec::with_capacity(models.len());
 
         for obj in models {
@@ -639,6 +643,8 @@ impl VulkanManager {
         commandbuffer: vk::CommandBuffer,
         models: &[(TransformData, &Model)],
     ) -> Result<(), vk::Result> {
+        profile_function!();
+
         let mut last_pipeline = vk::Pipeline::null();
         let mut last_mat: *const u8 = null();
         let mut last_mesh: *const Mesh = null();
@@ -720,6 +726,8 @@ impl VulkanManager {
     }
 
     fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, lights: &[Light]) {
+        profile_function!();
+
         for lp in &self.lighting_pipelines {
             unsafe {
                 // point lights
@@ -801,6 +809,7 @@ impl VulkanManager {
     }
 
     fn render_pp(&mut self, commandbuffer: vk::CommandBuffer) -> Result<bool, vk::Result> {
+        profile_function!();
         // resolve image contains finished scene rendering in hdr format
         // for each pp effect:
         //      - transition src image (either resolve_image or g0_image) to SHADER_READONLY_OPTIMAL layout (done by previous pp renderpass and resolve pass)
@@ -1080,15 +1089,20 @@ impl VulkanManager {
         swapchain_image_index: usize,
         scene: Rc<Scene>,
     ) -> Result<(), vk::Result> {
-        let cam_comp = scene
-            .main_camera
-            .borrow()
-            .upgrade()
-            .expect("Scene has to have a CameraComponent");
-        let cam_data = cam_comp.get_cam_data(1920.0 / 1080.0);
-        self.uniform_buffer
-            .set_data(&self.allocator, &cam_data, self.current_frame_index)
-            .unwrap();
+        profile_function!();
+
+        {
+            profile_scope!("Camera uniform upload");
+            let cam_comp = scene
+                .main_camera
+                .borrow()
+                .upgrade()
+                .expect("Scene has to have a CameraComponent");
+            let cam_data = cam_comp.get_cam_data(self.swapchain.extent.width as f32 / self.swapchain.extent.height as f32);
+            self.uniform_buffer
+                .set_data(&self.allocator, &cam_data, self.current_frame_index)
+                .unwrap();
+        }
 
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
@@ -1201,6 +1215,8 @@ impl VulkanManager {
     }
 
     pub(crate) fn wait_for_fence(&mut self) {
+        profile_function!();
+
         unsafe {
             self.device
                 .wait_for_fences(
@@ -1218,6 +1234,7 @@ impl VulkanManager {
     }
 
     pub(crate) fn wait_for_uploads(&mut self) {
+        profile_function!();
         self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 
@@ -1226,6 +1243,8 @@ impl VulkanManager {
         gui_context: egui::CtxRef,
         gui_meshes: Vec<ClippedMesh>,
     ) {
+        profile_function!();
+
         let font_image = gui_context.font_image();
         if font_image.version != self.ui_texture_version {
             log::trace!("UI font texture changed to {}x{}", font_image.width, font_image.height);
@@ -1331,6 +1350,8 @@ impl VulkanManager {
 
     /// submits queued commands
     pub(crate) fn submit(&self) {
+        profile_function!();
+
         let semaphores_available =
             [self.image_acquire_semaphores[self.current_frame_index as usize]];
         let waiting_stages = [vk::PipelineStageFlags::TRANSFER]; // wait for image acquisition before blitting the final image to the swapchain
@@ -1356,6 +1377,8 @@ impl VulkanManager {
 
     /// add present command to queue
     pub(crate) fn present(&mut self, image_index: u32) {
+        profile_function!();
+
         let swapchains = [self.swapchain.swapchain];
         let indices = [image_index];
         let wait_semaphores = [self.render_finished_semaphores[self.current_frame_index as usize]];

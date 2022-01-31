@@ -25,9 +25,6 @@ use vulkan_engine::{
 };
 
 fn main() {
-    // setting up logger
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-
     // initialize engine
     let engine_info = engine::EngineInfo {
         window_info: window::InitialWindowInfo {

@@ -2,13 +2,13 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     rc::Rc,
-    time::{Duration, Instant}, os,
+    time::{Duration, Instant},
 };
 
 use ash::vk;
 use egui::{
     plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea, Button,
+    CollapsingHeader, Color32, ProgressBar, RichText, ScrollArea,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +53,13 @@ pub(crate) fn write_config(config: &EngineConfig) {
 
 impl EngineInit {
     pub fn new(info: EngineInfo) -> Result<Self, Box<dyn std::error::Error>> {
+        // setting up logger
+        #[cfg(debug_assertions)]
+        let default_log_level = "debug";
+        #[cfg(not(debug_assertions))]
+        let default_log_level = "warn";
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_log_level)).init();
+
         let config = read_config();
 
         let scene = Scene::new();
@@ -98,6 +105,8 @@ impl EngineInit {
                 ui_mesh_count: 0,
 
                 scene_graph_visible: false,
+                #[cfg(feature="profiler")]
+                profiler_visible: false,
                 config: read_config(),
             },
         })
@@ -137,6 +146,8 @@ pub struct Engine {
     ui_mesh_count: u32,
 
     scene_graph_visible: bool,
+    #[cfg(feature="profiler")]
+    profiler_visible: bool,
     config: EngineConfig,
 }
 
@@ -170,6 +181,8 @@ impl Engine {
     }
 
     pub(crate) fn render(&mut self) {
+        profile_function!();
+
         self.fps_count += 1;
         if self.fps_time.elapsed().as_secs() >= 1 {
             self.fps = self.fps_count;
@@ -224,11 +237,15 @@ impl Engine {
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
         let (output, shapes) = gui_context.run(gui_input, |ctx| {
+            profile_scope!("UI rendering");
+
             egui::Window::new("Debug Tools")
                 .title_bar(true)
                 .collapsible(false)
                 .resizable(true)
                 .show(ctx, |ui| {
+                    profile_scope!("Debug UI");
+
                     ui.heading("Frame timing");
 
                     let fps_color = match self.fps {
@@ -264,6 +281,12 @@ impl Engine {
                                 .highlight();
                             ui.line(line);
                         });
+                    
+                    #[cfg(feature="profiler")]
+                    if ui.button("Profiler").clicked() {
+                        self.profiler_visible = true;
+                        puffin::set_scopes_on(true);
+                    }
 
                     if let Some((budget, heap_count)) = self.vulkan_manager.get_budget() {
                         ui.separator();
@@ -383,11 +406,20 @@ impl Engine {
                 egui::SidePanel::right("Scene graph")
                     .resizable(true)
                     .show(ctx, |ui| {
+                        profile_scope!("Scene graph");
                         ScrollArea::vertical().show(ui, |ui| {
                             Self::render_entity(ui, &root_entity);
                         });
                         ui.allocate_space(ui.available_size());
                     });
+            }
+
+            #[cfg(feature="profiler")]
+            if self.profiler_visible {
+                if !puffin_egui::profiler_window(ctx) {
+                    self.profiler_visible = false;
+                    puffin::set_scopes_on(false);
+                }
             }
         });
 
@@ -395,13 +427,17 @@ impl Engine {
         // Because of this, we need to reassign self.gui_context to the "new" gui_context.
         self.gui_context = gui_context;
 
-        self.gui_state
-            .handle_output(&self.window.winit_window, &self.gui_context, output);
-        let gui_meshes = self.gui_context.tessellate(shapes);
+        let gui_meshes;
+        {
+            profile_scope!("Ui tesselation");
+            self.gui_state
+                .handle_output(&self.window.winit_window, &self.gui_context, output);
+            gui_meshes = self.gui_context.tessellate(shapes);
 
-        self.ui_vertex_count = gui_meshes.iter().map(|m| m.1.vertices.len() as u32).sum();
-        self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
-        self.ui_mesh_count = gui_meshes.len() as u32;
+            self.ui_vertex_count = gui_meshes.iter().map(|m| m.1.vertices.len() as u32).sum();
+            self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
+            self.ui_mesh_count = gui_meshes.len() as u32;
+        }
 
         let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
         self.last_ui_time = ui_time;
@@ -410,18 +446,21 @@ impl Engine {
 
         let vk = &mut self.vulkan_manager;
 
-        // prepare for render
-        let image_index = vk.next_frame();
-        vk.wait_for_fence();
-        vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
-        vk.wait_for_uploads();
+        {
+            profile_scope!("Vulkan");
+            // prepare for render
+            let image_index = vk.next_frame();
+            vk.wait_for_fence();
+            vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
+            vk.wait_for_uploads();
 
-        vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
-            .expect("updating the command buffer");
+            vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
+                .expect("updating the command buffer");
 
-        // finanlize renderpass
-        vk.submit();
-        vk.present(image_index);
+            // finalize renderpass
+            vk.submit();
+            vk.present(image_index);
+        }
 
         let render_time = render_start_time.elapsed().as_secs_f32() * 1000.0;
         self.last_render_time = render_time;

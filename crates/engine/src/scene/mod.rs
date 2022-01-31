@@ -60,6 +60,8 @@ impl Scene {
     }
 
     pub(crate) fn collect_renderables(&self) -> (Vec<(TransformData, Rc<Model>)>, Vec<Light>) {
+        profile_function!();
+
         let mut models = Vec::new();
         let mut lights = Vec::new();
 
@@ -71,6 +73,7 @@ impl Scene {
     }
 
     pub(crate) fn update(&self, input: &Input, delta: f32) {
+        profile_function!();
         self.root_entity.borrow().update(input, delta);
     }
 

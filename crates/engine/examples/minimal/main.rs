@@ -1,14 +1,10 @@
 /// A minimal example that just initializes the engine but does not display anything
-use std::{process::exit, rc::Rc};
+use std::rc::Rc;
 
 use gfx_maths::*;
-use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
-    core::{
-        engine::{self, Engine, EngineInit},
-        window::{self, Dimensions},
-    },
+    core::engine::Engine,
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
@@ -22,32 +18,7 @@ use vulkan_engine::{
 };
 
 fn main() {
-    // initialize engine
-    let engine_info = engine::EngineInfo {
-        window_info: window::InitialWindowInfo {
-            initial_dimensions: Dimensions {
-                width: 1920,
-                height: 1080,
-            },
-            title: "Vulkan Minimal Example",
-        },
-        app_name: "Vulkan Minimal Example",
-    };
-
-    // setup engine
-    let engine_engine = EngineInit::new(engine_info);
-
-    // start engine
-    match engine_engine {
-        Ok(mut engine_engine) => {
-            setup(&mut engine_engine.engine);
-            engine_engine.start();
-        }
-        Err(err) => {
-            error!("{}", err);
-            exit(1);
-        }
-    }
+    vulkan_engine::run_engine(1920, 1080, "Minimal Example", setup);
 }
 
 fn setup(engine: &mut Engine) {

@@ -53,13 +53,6 @@ pub(crate) fn write_config(config: &EngineConfig) {
 
 impl EngineInit {
     pub fn new(info: EngineInfo) -> Result<Self, Box<dyn std::error::Error>> {
-        // setting up logger
-        #[cfg(debug_assertions)]
-        let default_log_level = "debug";
-        #[cfg(not(debug_assertions))]
-        let default_log_level = "warn";
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_log_level)).init();
-
         let config = read_config();
 
         let scene = Scene::new();
@@ -105,7 +98,7 @@ impl EngineInit {
                 ui_mesh_count: 0,
 
                 scene_graph_visible: false,
-                #[cfg(feature="profiler")]
+                #[cfg(feature = "profiler")]
                 profiler_visible: false,
                 config: read_config(),
             },
@@ -146,7 +139,7 @@ pub struct Engine {
     ui_mesh_count: u32,
 
     scene_graph_visible: bool,
-    #[cfg(feature="profiler")]
+    #[cfg(feature = "profiler")]
     profiler_visible: bool,
     config: EngineConfig,
 }
@@ -206,20 +199,38 @@ impl Engine {
                 .map(|v| v.x + 0.1)
                 .unwrap_or(0.0);
 
-            self.frame_time_history
-                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.frame_time_max }));
+            self.frame_time_history.push(Value::new(
+                plot_x,
+                if plot_x == 0.0 {
+                    0.0
+                } else {
+                    self.frame_time_max
+                },
+            ));
             if self.frame_time_history.len() > 10 * 10 {
                 self.frame_time_history.remove(0);
             }
 
-            self.render_time_history
-                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.render_time_max }));
+            self.render_time_history.push(Value::new(
+                plot_x,
+                if plot_x == 0.0 {
+                    0.0
+                } else {
+                    self.render_time_max
+                },
+            ));
             if self.render_time_history.len() > 10 * 10 {
                 self.render_time_history.remove(0);
             }
 
-            self.ui_time_history
-                .push(Value::new(plot_x, if plot_x == 0.0 { 0.0 } else { self.ui_time_max + self.render_time_max }));
+            self.ui_time_history.push(Value::new(
+                plot_x,
+                if plot_x == 0.0 {
+                    0.0
+                } else {
+                    self.ui_time_max + self.render_time_max
+                },
+            ));
             if self.ui_time_history.len() > 10 * 10 {
                 self.ui_time_history.remove(0);
             }
@@ -281,8 +292,8 @@ impl Engine {
                                 .highlight();
                             ui.line(line);
                         });
-                    
-                    #[cfg(feature="profiler")]
+
+                    #[cfg(feature = "profiler")]
                     if ui.button("Profiler").clicked() {
                         self.profiler_visible = true;
                         puffin::set_scopes_on(true);
@@ -345,17 +356,40 @@ impl Engine {
 
                     ui.label(format!(
                         "Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
-                        unsafe{CStr::from_ptr(self.vulkan_manager.physical_device_properties.device_name.as_ptr())}.to_str().unwrap(),
+                        unsafe {
+                            CStr::from_ptr(
+                                self.vulkan_manager
+                                    .physical_device_properties
+                                    .device_name
+                                    .as_ptr(),
+                            )
+                        }
+                        .to_str()
+                        .unwrap(),
                         self.vulkan_manager.physical_device_properties.vendor_id,
                         self.vulkan_manager.physical_device_properties.device_id,
-                        vk::api_version_major(self.vulkan_manager.physical_device_properties.api_version),
-                        vk::api_version_minor(self.vulkan_manager.physical_device_properties.api_version),
-                        vk::api_version_patch(self.vulkan_manager.physical_device_properties.api_version),
+                        vk::api_version_major(
+                            self.vulkan_manager.physical_device_properties.api_version
+                        ),
+                        vk::api_version_minor(
+                            self.vulkan_manager.physical_device_properties.api_version
+                        ),
+                        vk::api_version_patch(
+                            self.vulkan_manager.physical_device_properties.api_version
+                        ),
                     ));
 
-                    let device_override = self.config.renderer.as_ref().map(|rc| rc.gpu_vendor_id.zip(rc.gpu_device_id)).unwrap_or_default();
+                    let device_override = self
+                        .config
+                        .renderer
+                        .as_ref()
+                        .map(|rc| rc.gpu_vendor_id.zip(rc.gpu_device_id))
+                        .unwrap_or_default();
 
-                    if ui.selectable_label(device_override.is_none(), "Default").clicked() {
+                    if ui
+                        .selectable_label(device_override.is_none(), "Default")
+                        .clicked()
+                    {
                         log::info!("Clearing GPU override");
                         self.config.renderer = None;
                         write_config(&self.config);
@@ -373,15 +407,20 @@ impl Engine {
                             .unwrap();
 
                         if ui
-                            .selectable_label(device_override.map_or(false, |d| d.0 == props.vendor_id && d.1 == props.device_id), format!(
-                                "{} ({:08X}:{:08X}) Vulkan {}.{}.{}",
-                                name,
-                                props.vendor_id,
-                                props.device_id,
-                                vk::api_version_major(props.api_version),
-                                vk::api_version_minor(props.api_version),
-                                vk::api_version_patch(props.api_version),
-                            ))
+                            .selectable_label(
+                                device_override.map_or(false, |d| {
+                                    d.0 == props.vendor_id && d.1 == props.device_id
+                                }),
+                                format!(
+                                    "{} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                                    name,
+                                    props.vendor_id,
+                                    props.device_id,
+                                    vk::api_version_major(props.api_version),
+                                    vk::api_version_minor(props.api_version),
+                                    vk::api_version_patch(props.api_version),
+                                ),
+                            )
                             .clicked()
                         {
                             log::info!("Overriding config with new device");
@@ -414,12 +453,10 @@ impl Engine {
                     });
             }
 
-            #[cfg(feature="profiler")]
-            if self.profiler_visible {
-                if !puffin_egui::profiler_window(ctx) {
-                    self.profiler_visible = false;
-                    puffin::set_scopes_on(false);
-                }
+            #[cfg(feature = "profiler")]
+            if self.profiler_visible && !puffin_egui::profiler_window(ctx) {
+                self.profiler_visible = false;
+                puffin::set_scopes_on(false);
             }
         });
 

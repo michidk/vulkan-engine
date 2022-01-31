@@ -1,20 +1,14 @@
 use std::{
     cell::Cell,
     path::Path,
-    process::exit,
     rc::{Rc, Weak},
 };
 
 use egui::Slider;
 /// Renders a brdf example
 use gfx_maths::*;
-use log::error;
 use vulkan_engine::{
-    core::{
-        engine::{self, Engine, EngineInit},
-        input::Input,
-        window::{self, Dimensions},
-    },
+    core::{engine::Engine, input::Input},
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
@@ -33,32 +27,7 @@ use vulkan_engine::{
 };
 
 fn main() {
-    // initialize engine
-    let engine_info = engine::EngineInfo {
-        window_info: window::InitialWindowInfo {
-            initial_dimensions: Dimensions {
-                width: 1920,
-                height: 1080,
-            },
-            title: "Components Example",
-        },
-        app_name: "Components Example",
-    };
-
-    // setup engine
-    let engine_init = EngineInit::new(engine_info);
-
-    // start engine
-    match engine_init {
-        Ok(mut engine_init) => {
-            setup(&mut engine_init.engine);
-            engine_init.start();
-        }
-        Err(err) => {
-            error!("{}", err);
-            exit(1);
-        }
-    }
+    vulkan_engine::run_engine(1920, 1080, "Components Example", setup);
 }
 
 fn setup(engine: &mut Engine) {

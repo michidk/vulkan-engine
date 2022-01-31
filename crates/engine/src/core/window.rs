@@ -187,7 +187,7 @@ pub fn start(engine_init: EngineInit) -> ! {
             }
             // render
             Event::MainEventsCleared => {
-                #[cfg(feature="profiler")]
+                #[cfg(feature = "profiler")]
                 puffin::GlobalProfiler::lock().new_frame();
 
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);

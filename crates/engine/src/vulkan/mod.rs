@@ -1098,7 +1098,9 @@ impl VulkanManager {
                 .borrow()
                 .upgrade()
                 .expect("Scene has to have a CameraComponent");
-            let cam_data = cam_comp.get_cam_data(self.swapchain.extent.width as f32 / self.swapchain.extent.height as f32);
+            let cam_data = cam_comp.get_cam_data(
+                self.swapchain.extent.width as f32 / self.swapchain.extent.height as f32,
+            );
             self.uniform_buffer
                 .set_data(&self.allocator, &cam_data, self.current_frame_index)
                 .unwrap();
@@ -1247,7 +1249,11 @@ impl VulkanManager {
 
         let font_image = gui_context.font_image();
         if font_image.version != self.ui_texture_version {
-            log::trace!("UI font texture changed to {}x{}", font_image.width, font_image.height);
+            log::trace!(
+                "UI font texture changed to {}x{}",
+                font_image.width,
+                font_image.height
+            );
 
             self.ui_texture_version = font_image.version;
 

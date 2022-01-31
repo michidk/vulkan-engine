@@ -1,7 +1,7 @@
 use std::{cell::Cell, rc::Weak};
 
-use egui::TextEdit;
-use gfx_maths::Vec4;
+use egui::DragValue;
+use gfx_maths::{Vec3, Vec4};
 
 use crate::scene::{
     entity::Entity,
@@ -14,6 +14,9 @@ use super::Component;
 pub struct LightComponent {
     entity: Weak<Entity>,
     pub light: Cell<Light>,
+
+    color: Cell<Vec3>,
+    intensity: Cell<f32>,
 }
 
 impl Component for LightComponent {
@@ -21,12 +24,18 @@ impl Component for LightComponent {
     where
         Self: Sized,
     {
+        let color = Vec3::one();
+        let intensity = 10.0;
+
         std::rc::Rc::new(Self {
             entity: std::rc::Rc::downgrade(entity),
             light: Cell::new(Light::Directional(DirectionalLight {
                 direction: Vec4::new(0., 1., 0., 0.0),
-                illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
+                illuminance: Vec4::new(color.x, color.y, color.z, 0.0) * intensity,
             })),
+
+            color: color.into(),
+            intensity: intensity.into(),
         })
     }
 
@@ -67,18 +76,27 @@ impl Component for LightComponent {
     }
 
     fn render_inspector(&self, ui: &mut egui::Ui) {
-        let light = self.light.get();
+        let mut light = self.light.get();
 
-        if let Light::Directional(dl) = light {
-            ui.label("Direction");
+        let col = self.color.get();
+        let mut col = [col.x, col.y, col.z];
+        let mut int = self.intensity.get();
 
-            let mut text_x = dl.direction.x.to_string();
-            let mut text_y = dl.direction.y.to_string();
-            let mut text_z = dl.direction.z.to_string();
+        ui.label("Color");
+        if ui.color_edit_button_rgb(&mut col).changed()
+            || ui
+                .add(DragValue::new(&mut int).prefix("Intensity: "))
+                .changed()
+        {
+            self.color.set(Vec3::new(col[0], col[1], col[2]));
+            self.intensity.set(int);
 
-            ui.add_enabled(false, TextEdit::singleline(&mut text_x));
-            ui.add_enabled(false, TextEdit::singleline(&mut text_y));
-            ui.add_enabled(false, TextEdit::singleline(&mut text_z));
+            match &mut light {
+                Light::Directional(dl) => {
+                    dl.illuminance = Vec4::new(col[0], col[1], col[2], 0.0) * int
+                }
+                Light::Point(pl) => pl.luminous_flux = Vec4::new(col[0], col[1], col[2], 0.0) * int,
+            }
         }
 
         self.light.set(light);

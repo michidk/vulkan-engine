@@ -1398,14 +1398,14 @@ impl VulkanManager {
                 .swapchain_loader
                 .queue_present(self.queues.graphics_queue, &present_info)
             {
-                Ok(..) => {}
-                Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                Ok(true) | Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                     self.recreate_swapchain().expect("swapchain recreation");
                     // camera.set_aspect(
                     //     vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32,
                     // );
                     // camera.update_buffer(&vk.allocator, &mut vk.uniform_buffer);
                 }
+                Ok(..) => {}
                 _ => {
                     panic!("unhandled queue presentation error");
                 }

@@ -1,6 +1,6 @@
 # Vulkan Engine
 
-![Continuous integration](https://github.com/michidk/vulkan-renderer/workflows/Continuous%20Integration/badge.svg)
+[![Continuous integration](https://img.shields.io/github/workflow/status/michidk/vulkan-engine/Continuous%20Integration?style=for-the-badge&label=CI)](https://github.com/michidk/vulkan-engine/actions)
 
 This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309), and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
 
@@ -11,6 +11,8 @@ The goal is to build a somewhat usable game engine and a demo using it. While we
 ## Features
 
 Currently implemented features are:
+- Scene comprised of Entities and Components
+- Debug UI Layer with Frame stats, Scene Graph, Component Inspectors and Profiler
 - BRDF shading
 - Deferred rendering
 - `.obj` parser
@@ -21,6 +23,10 @@ Currently implemented features are:
 BRDF testing:
 
 ![brdf testing](./.github/images/examples/brdf.png)
+
+Debug UI:
+
+![debug ui](./.github/images/examples/debug-ui.png)
 
 ## Workspace
 

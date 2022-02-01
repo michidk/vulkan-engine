@@ -25,12 +25,8 @@ impl Component for RendererComponent {
         Rc::new(res)
     }
 
-    fn load(&self) {
-        // println!("Load Ref");
-    }
-    fn start(&self) {
-        // println!("Start");
-    }
+    fn load(&self) {}
+    fn start(&self) {}
 
     fn render(&self, models: &mut Vec<(TransformData, Rc<Model>)>, _lights: &mut Vec<Light>) {
         let entity = self.entity.borrow();

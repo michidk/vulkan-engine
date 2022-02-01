@@ -5,7 +5,6 @@ use std::{
 };
 
 use egui::Slider;
-/// Renders a brdf example
 use gfx_maths::*;
 use vulkan_engine::{
     core::{engine::Engine, input::Input},
@@ -189,63 +188,6 @@ fn setup(engine: &mut Engine) {
         .into(),
     );
     dirlight1.new_component::<RotateComponent>();
-
-    /*scene.new_entity_with_transform("DirLight2".to_string(), Transform {
-        position: Vec3::zero(),
-        rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 90.0f32.to_radians()),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(DirectionalLight {
-        direction: Vec4::zero(),
-        illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
-    }.into());
-
-    scene.new_entity_with_transform("PointLight White 1".to_string(), Transform {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        rotation: Quaternion::identity(),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(PointLight {
-        position: Vec4::zero(),
-        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    }.into());
-    scene.new_entity_with_transform("PointLight White 2".to_string(), Transform {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        rotation: Quaternion::identity(),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(PointLight {
-        position: Vec4::zero(),
-        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    }.into());
-    scene.new_entity_with_transform("PointLight White 3".to_string(), Transform {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        rotation: Quaternion::identity(),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(PointLight {
-        position: Vec4::zero(),
-        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    }.into());
-    scene.new_entity_with_transform("PointLight White 4".to_string(), Transform {
-        position: Vec3::new(0.1, -3.0, -3.0),
-        rotation: Quaternion::identity(),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(PointLight {
-        position: Vec4::zero(),
-        luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-    }.into());
-
-    scene.new_entity_with_transform("PointLight Red".to_string(), Transform {
-        position: Vec3::new(0.0, 0.0, -3.0),
-        rotation: Quaternion::identity(),
-        scale: Vec3::one(),
-    })
-    .new_component::<LightComponent>().light.set(PointLight {
-        position: Vec4::zero(),
-        luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
-    }.into());*/
 
     scene.load();
 }

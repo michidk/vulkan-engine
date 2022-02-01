@@ -64,7 +64,7 @@ impl Component for CameraComponent {
 }
 
 #[repr(C)]
-pub(crate) struct CamData {
+pub(crate) struct CameraUniformData {
     pub view_matrix: Mat4,
     pub projection_matrix: Mat4,
     pub inv_view_matrix: Mat4,
@@ -73,10 +73,10 @@ pub(crate) struct CamData {
 }
 
 impl CameraComponent {
-    pub(crate) fn get_cam_data(&self, aspect: f32) -> CamData {
+    pub(crate) fn get_cam_data(&self, aspect: f32) -> CameraUniformData {
         let entity = self.entity.upgrade().unwrap();
 
-        CamData {
+        CameraUniformData {
             view_matrix: entity.get_view_matrix(),
             projection_matrix: Mat4::perspective_vulkan(
                 self.fovy.to_radians(),

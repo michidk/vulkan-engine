@@ -6,7 +6,7 @@ members = [
     "crates/ve_shader_reflect",
 ]
 
-[profile.shipping]
+[profile.production]
 inherits = "release"
 opt-level = 3
 lto = "fat"

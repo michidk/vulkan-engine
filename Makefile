@@ -1,4 +1,4 @@
-.PHONY: run build build-release build-shipping release check test clippy fmt lint cic clean install
+.PHONY: run build build-release build-production release check test clippy fmt lint cic clean install
 
 # run and compile
 run:
@@ -10,18 +10,18 @@ build:
 build-release:
 	cargo build --release -p vulkan_engine --examples
 
-build-shipping:
-	cargo build --profile shipping -p vulkan_engine --examples
+build-production:
+	cargo build --profile production -p vulkan_engine --examples
 
 ifeq ($(OS),Windows_NT)
-package: build-shipping
+package: build-production
 	powershell Copy-Item -Path "assets" -Destination "out\assets" -Recurse
-	powershell Copy-Item -Path "target\shipping\examples\*" -Destination "out" -Include "*.exe"
+	powershell Copy-Item -Path "target\production\examples\*" -Destination "out" -Include "*.exe"
 else
-package: build-shipping
+package: build-production
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
-	for f in $(shell ls crates/engine/examples); do cp target/shipping/examples/$$f out; done
+	for f in $(shell ls crates/engine/examples); do cp target/production/examples/$$f out; done
 endif
 
 # test and lint

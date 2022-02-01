@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     core::engine::EngineInfo,
     scene::{
-        component::camera_component::CamData,
+        component::camera_component::CameraUniformData,
         light::Light,
         material::Material,
         model::{mesh::Mesh, Model},
@@ -70,7 +70,7 @@ pub struct VulkanManager {
     pub renderpass: vk::RenderPass,
     pub(crate) pools: PoolsWrapper,
     pub(crate) commandbuffers: Vec<vk::CommandBuffer>,
-    pub(crate) uniform_buffer: PerFrameUniformBuffer<CamData>,
+    pub(crate) uniform_buffer: PerFrameUniformBuffer<CameraUniformData>,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
     pipeline_layout_gpass: vk::PipelineLayout,
     pub pipeline_layout_resolve_pass: vk::PipelineLayout,
@@ -209,7 +209,7 @@ impl VulkanManager {
         let commandbuffers =
             queue::create_commandbuffers(&logical_device, &pools, max_frames_in_flight as usize)?;
 
-        let uniform_buffer = PerFrameUniformBuffer::<CamData>::new(
+        let uniform_buffer = PerFrameUniformBuffer::<CameraUniformData>::new(
             &physical_device_properties,
             &allocator,
             max_frames_in_flight as u64,

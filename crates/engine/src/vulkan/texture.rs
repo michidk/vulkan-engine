@@ -22,11 +22,11 @@ pub struct Texture2D {
     image: vk::Image,
     alloc: Allocation,
     /// The [`vk::ImageView`] that can be used to refer to this [`Texture2D`].
-    pub view: vk::ImageView,
+    pub(crate) view: vk::ImageView,
     pub width: u32,
     pub height: u32,
     /// The [`vk::Sampler`] that can be used to sample from this [`Texture2D`].
-    pub sampler: vk::Sampler,
+    pub(crate) sampler: vk::Sampler,
 }
 
 impl Texture2D {

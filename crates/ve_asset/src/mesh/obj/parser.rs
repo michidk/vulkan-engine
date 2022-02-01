@@ -9,13 +9,13 @@ use super::{builder::*, meta::ObjMeta};
 #[derive(thiserror::Error, Debug)]
 pub enum ParserError {
     #[error("Failed to parse float.")]
-    ParseFloatError(#[from] num::ParseFloatError),
+    ParseFloat(#[from] num::ParseFloatError),
     #[error("Failed to parse integer.")]
-    ParseIntError(#[from] num::ParseIntError),
+    ParseInt(#[from] num::ParseIntError),
     #[error("Failed to parse model.")]
-    IoError(#[from] io::Error),
+    Io(#[from] io::Error),
     #[error("Failed to parse face.")]
-    ParseFaceError,
+    ParseFace,
 }
 
 // parses wavefront obj (https://en.wikipedia.org/wiki/Wavefront_.obj_file)
@@ -130,7 +130,7 @@ fn parse_face_index(value: &str) -> Result<ObjFaceIndex, ParserError> {
     let triplet = parse_triplet(value)?;
 
     Ok(ObjFaceIndex {
-        vert_i: triplet[0].ok_or(ParserError::ParseFaceError)?,
+        vert_i: triplet[0].ok_or(ParserError::ParseFace)?,
         uv_i: triplet[1],
         normal_i: triplet[2],
     })

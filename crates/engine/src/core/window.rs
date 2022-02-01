@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::core::engine::EngineInit;
 use winit::event::Event;
 
@@ -32,10 +34,14 @@ impl InitialWindowInfo {
         let monitor_size = monitor.size();
         let window_size = winit_window.outer_size();
 
-        winit_window.set_outer_position(winit::dpi::PhysicalPosition {
-            x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
-            y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
-        });
+        if window_size.width > monitor_size.width || window_size.height > monitor_size.height {
+            winit_window.set_maximized(true);
+        } else {
+            winit_window.set_outer_position(winit::dpi::PhysicalPosition {
+                x: monitor_pos.x + ((monitor_size.width as i32 - window_size.width as i32) / 2),
+                y: monitor_pos.y + ((monitor_size.height as i32 - window_size.height as i32) / 2),
+            });
+        }
 
         Ok(Window::new(winit_window))
     }
@@ -105,6 +111,10 @@ impl Window {
         self.mode
     }
 
+    pub fn get_capture_cursor(&self) -> bool {
+        self.capture_cursor
+    }
+
     /// Set the visibility of the mouse cursor and wether it should be captured (when window is focused)
     pub fn set_capture_cursor(&mut self, capture: bool) {
         self.capture_cursor = capture;
@@ -141,30 +151,52 @@ impl Window {
 }
 
 pub fn start(engine_init: EngineInit) -> ! {
+    let mut last_time = Instant::now();
+
     let mut engine = engine_init.engine;
     engine.window.on_start();
     engine_init.eventloop.run(move |event, _, controlflow| {
         *controlflow = winit::event_loop::ControlFlow::Poll;
         engine.input.borrow_mut().update(&event, &engine);
+
         match event {
-            // close
-            Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => *controlflow = winit::event_loop::ControlFlow::Exit,
-            // focus
-            Event::WindowEvent {
-                event: winit::event::WindowEvent::Focused(state),
-                ..
-            } => {
-                engine.window.on_focus(state);
+            Event::WindowEvent { event, .. } => {
+                match event {
+                    winit::event::WindowEvent::MouseInput { .. }
+                    | winit::event::WindowEvent::MouseWheel { .. }
+                    | winit::event::WindowEvent::CursorMoved { .. }
+                    | winit::event::WindowEvent::KeyboardInput { .. } => {
+                        if !engine.input.borrow().get_cursor_captured() {
+                            engine.gui_state.on_event(&engine.gui_context, &event);
+                        }
+                    }
+                    _ => {
+                        engine.gui_state.on_event(&engine.gui_context, &event);
+                    }
+                }
+
+                match event {
+                    winit::event::WindowEvent::CloseRequested => {
+                        *controlflow = winit::event_loop::ControlFlow::Exit
+                    }
+                    winit::event::WindowEvent::Focused(state) => {
+                        engine.window.on_focus(state);
+                    }
+                    _ => {}
+                }
             }
             // render
             Event::MainEventsCleared => {
+                #[cfg(feature = "profiler")]
+                puffin::GlobalProfiler::lock().new_frame();
+
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
-                engine
-                    .gameloop
-                    .update(&mut engine.vulkan_manager, &engine.scene);
+
+                let now = Instant::now();
+                let delta = (now - last_time).as_secs_f32();
+                last_time = now;
+
+                engine.gameloop.update(&engine.scene, delta);
                 engine.render();
                 engine.input.borrow_mut().rollover_state();
             }

@@ -1,12 +1,10 @@
-#![feature(path_file_prefix)]
-
 use std::env;
 use std::fs;
 use std::process::Command;
 
 fn main() {
     // Tell Cargo that if the given file changes, to rerun this build script.
-    println!("cargo:rerun-if-changed=shaders/");
+    println!("cargo:rerun-if-changed=../../shaders/");
 
     let engine_dir = env::current_dir().unwrap(); // .
     let project_dir = engine_dir.parent().unwrap().parent().unwrap(); // ../../
@@ -42,7 +40,7 @@ fn compile_shader(
 ) -> std::process::Output {
     let output_path = target_dir.join(format!(
         "{}-{}.spv",
-        &source_path.file_prefix().unwrap().to_str().unwrap(),
+        &source_path.file_stem().unwrap().to_str().unwrap(),
         shader_type
     ));
 
@@ -55,7 +53,9 @@ fn compile_shader(
         .arg(format!("-o{}", output_path.to_string_lossy()))
         .output()
         .expect("failed to compile shaders using glslc");
-        
-    println!("Shader Compiler Output: {:?}", output);
+
+    println!("Shader Compiler Output: {:#?}", output);
+    assert!(output.status.success());
+
     output
 }

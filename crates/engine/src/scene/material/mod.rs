@@ -444,29 +444,29 @@ impl Material {
     }
 
     /// Returns the vk::PipelineLayout associated with this Material
-    pub fn get_pipeline_layout(&self) -> vk::PipelineLayout {
+    pub(crate) fn get_pipeline_layout(&self) -> vk::PipelineLayout {
         self.pipeline.pipeline_layout
     }
 
     /// Returns the vk::Pipeline that has to be used with this Material
-    pub fn get_pipeline(&self) -> vk::Pipeline {
+    pub(crate) fn get_pipeline(&self) -> vk::Pipeline {
         self.pipeline.pipeline
     }
 
-    pub fn get_wireframe_pipeline(&self) -> vk::Pipeline {
+    pub(crate) fn get_wireframe_pipeline(&self) -> vk::Pipeline {
         self.pipeline.pipeline_wireframe
     }
 
     /// Returns the vk::DescriptorSetLayout of set #1 of this Material's Pipeline.
     ///
     /// Set #1 should contain all MaterialProperties
-    pub fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
+    pub(crate) fn get_descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.pipeline.descriptor_set_layout
     }
 
     /// Returns the DescriptorData entries that can be used to get a valid DescriptorSet
     /// from the [DescriptorManager](crate::vulkan::descriptor_manager::DescriptorManager).
-    pub fn get_descriptor_data(&self) -> Vec<DescriptorData> {
+    pub(crate) fn get_descriptor_data(&self) -> Vec<DescriptorData> {
         self.resources.borrow().clone()
     }
 }

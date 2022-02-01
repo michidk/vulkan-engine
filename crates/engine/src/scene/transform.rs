@@ -1,5 +1,6 @@
 use gfx_maths::*;
 
+#[derive(Debug)]
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Quaternion,
@@ -7,14 +8,20 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn get_transform_data(&self) -> TransformData {
-        let model_matrix = Mat4::local_to_world(self.position, self.rotation, self.scale);
-        let inv_model_matrix = Mat4::world_to_local(self.position, self.rotation, self.scale);
+    pub(crate) fn get_model_matrix(&self) -> Mat4 {
+        Mat4::local_to_world(self.position, self.rotation, self.scale)
+    }
 
-        TransformData {
-            model_matrix,
-            inv_model_matrix,
-        }
+    pub(crate) fn get_inverse_model_matrix(&self) -> Mat4 {
+        Mat4::world_to_local(self.position, self.rotation, self.scale)
+    }
+
+    pub(crate) fn get_view_matrix(&self) -> Mat4 {
+        Mat4::rotate(-self.rotation) * Mat4::translate(-self.position)
+    }
+
+    pub(crate) fn get_inverse_view_matrix(&self) -> Mat4 {
+        Mat4::translate(self.position) * Mat4::rotate(self.rotation)
     }
 }
 

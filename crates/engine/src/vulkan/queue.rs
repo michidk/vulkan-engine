@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use ash::{extensions::khr, vk};
 
 use super::{
@@ -93,8 +95,14 @@ pub fn init_device_and_queues(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
+    ext_memory_budget: bool,
 ) -> GraphicsResult<(ash::Device, Queues)> {
-    let device_extension_names_raw = [khr::Swapchain::name().as_ptr()];
+    let ext_memory_budget_name = CString::new("VK_EXT_memory_budget").unwrap();
+
+    let device_extension_names_raw = [
+        khr::Swapchain::name().as_ptr(),
+        ext_memory_budget_name.as_ptr(),
+    ];
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
     // required for wireframe fill mode
     let features = vk::PhysicalDeviceFeatures::builder().fill_mode_non_solid(true); // TODO: check if feature is supported before force-enabling it
@@ -107,7 +115,11 @@ pub fn init_device_and_queues(
 
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_info)
-        .enabled_extension_names(&device_extension_names_raw)
+        .enabled_extension_names(if ext_memory_budget {
+            &device_extension_names_raw
+        } else {
+            &device_extension_names_raw[0..=0]
+        })
         .enabled_features(&features);
 
     let logical_device: ash::Device =

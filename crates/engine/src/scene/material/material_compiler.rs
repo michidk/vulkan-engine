@@ -5,7 +5,7 @@ use crate::vulkan::{
     allocator::Allocator, descriptor_manager::DescriptorData, error::GraphicsResult,
 };
 
-pub fn compile_descriptor_set_layout(
+pub(crate) fn compile_descriptor_set_layout(
     device: &ash::Device,
     resources: &[DescriptorData],
 ) -> Result<vk::DescriptorSetLayout, vk::Result> {
@@ -40,7 +40,7 @@ pub fn compile_descriptor_set_layout(
     Ok(set_layout)
 }
 
-pub fn compile_pipeline_layout(
+pub(crate) fn compile_pipeline_layout(
     device: &ash::Device,
     layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout, vk::Result> {
@@ -57,7 +57,7 @@ pub fn compile_pipeline_layout(
     unsafe { device.create_pipeline_layout(&layout_info, None) }
 }
 
-pub fn compile_resources(
+pub(crate) fn compile_resources(
     data: &[DescriptorData],
     allocator: &Allocator,
 ) -> GraphicsResult<(Vec<DescriptorData>, Vec<Allocation>)> {

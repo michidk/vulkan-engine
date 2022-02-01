@@ -1,16 +1,15 @@
 /// A minimal example that just initializes the engine but does not display anything
-use std::process::exit;
+use std::rc::Rc;
 
 use gfx_maths::*;
-use log::error;
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
-    core::{
-        camera::Camera,
-        engine::{self, Engine, EngineInit},
-        window::{self, Dimensions},
-    },
+    core::engine::Engine,
     scene::{
+        component::{
+            camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
+            renderer::RendererComponent,
+        },
         material::MaterialPipeline,
         model::{mesh::Mesh, Model},
         transform::Transform,
@@ -19,45 +18,7 @@ use vulkan_engine::{
 };
 
 fn main() {
-    // setting up logger
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-
-    // initialize engine
-    let engine_info = engine::EngineInfo {
-        window_info: window::InitialWindowInfo {
-            initial_dimensions: Dimensions {
-                width: 1920,
-                height: 1080,
-            },
-            title: "Vulkan Minimal Example",
-        },
-        app_name: "Vulkan Minimal Example",
-    };
-
-    // setup camera
-    let camera = Camera::builder()
-        //.fovy(30.0.deg())
-        .position(Vec3::new(0.0, 0.0, -5.0))
-        .aspect(
-            engine_info.window_info.initial_dimensions.width as f32
-                / engine_info.window_info.initial_dimensions.height as f32,
-        )
-        .build();
-
-    // setup engine
-    let engine_engine = EngineInit::new(engine_info, camera);
-
-    // start engine
-    match engine_engine {
-        Ok(mut engine_engine) => {
-            setup(&mut engine_engine.engine);
-            engine_engine.start();
-        }
-        Err(err) => {
-            error!("{}", err);
-            exit(1);
-        }
-    }
+    vulkan_engine::run_engine(1920, 1080, "Minimal Example", setup);
 }
 
 fn setup(engine: &mut Engine) {
@@ -122,13 +83,32 @@ fn setup(engine: &mut Engine) {
     )
     .unwrap();
 
-    scene.add(Model {
+    let model = Model {
         material: material0,
         mesh,
-        transform: Transform {
+    };
+
+    let entity = scene.new_entity_with_transform(
+        "Quad".to_owned(),
+        Transform {
             position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 1.0),
+            rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.0f32.to_radians()),
             scale: Vec3::new(1.0, 1.0, 1.0),
         },
-    });
+    );
+    let comp = entity.new_component::<RendererComponent>();
+    *comp.model.borrow_mut() = Some(Rc::new(model));
+
+    let main_cam = scene.new_entity_with_transform(
+        "Main Camera".to_owned(),
+        Transform {
+            position: Vec3::new(0.0, 0.0, -5.0),
+            rotation: Quaternion::identity(),
+            scale: Vec3::one(),
+        },
+    );
+    main_cam.new_component::<CameraComponent>();
+    main_cam.new_component::<DebugMovementComponent>();
+
+    scene.load();
 }

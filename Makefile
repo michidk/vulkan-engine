@@ -1,40 +1,41 @@
-.PHONY: run build build-release release check test clippy fmt lint cic clean install
+.PHONY: run build build-release build-production release check test clippy fmt lint cic clean install
 
 # run and compile
 run:
-	cargo +nightly run --example brdf
+	cargo run --example brdf
 
 build:
-	cargo +nightly build --example minimal
-	cargo +nightly build --example brdf
+	cargo build -p vulkan_engine --examples
 
 build-release:
-	cargo +nightly build --release --example minimal
-	cargo +nightly build --release --example brdf
+	cargo build --release -p vulkan_engine --examples
+
+build-production:
+	cargo build --profile production -p vulkan_engine --examples
 
 ifeq ($(OS),Windows_NT)
-release: prepare shaders build-release
-	xcopy /s /y "assets\*" ".\out\assets\*"
-	xcopy /s /y "target\release\examples\*" "out\"
+package: build-production
+	powershell Copy-Item -Path "assets" -Destination "out\assets" -Recurse
+	powershell Copy-Item -Path "target\production\examples\*" -Destination "out" -Include "*.exe"
 else
-release: prepare shaders build-release
+package: build-production
 	mkdir -p ./out/assets/
 	cp -R ./assets/* ./out/assets/
-	cp ./target/release/examples/* ./out/
+	for f in $(shell ls crates/engine/examples); do cp target/production/examples/$$f out; done
 endif
 
 # test and lint
 check:
-	cargo +nightly check --all --examples
+	cargo check --workspace --all-targets
 
 test:
-	cargo +nightly test --all --examples
+	cargo test --workspace --all-targets
 
 clippy:
-	cargo +nightly clippy --all --examples -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
 fmt:
-	cargo +nightly fmt --all -- --check
+	cargo fmt --all -- --check
 
 lint: fmt clippy
 

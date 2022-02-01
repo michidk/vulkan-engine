@@ -13,21 +13,21 @@ jobs:
         run: |
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
-          sudo apt update
-          sudo apt install vulkan-sdk
+          sudo apt-get update
+          sudo apt-get install -y vulkan-sdk
       - name: Run test
         run: glslc -h
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --examples
+          args: --workspace --all-targets
 
   test:
     name: Test Suite
@@ -35,23 +35,23 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install Vulkan SDK
+      - name: Install Vulkan SDK and libxcb
         run: |
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
           sudo apt update
-          sudo apt install vulkan-sdk
-      - name: Install nightly toolchain
+          sudo apt install vulkan-sdk libxcb-shape0-dev libxcb-xfixes0-dev
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --examples
+          args: --workspace --all-targets
 
   lints:
     name: Lints
@@ -65,11 +65,11 @@ jobs:
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
           sudo apt update
           sudo apt install vulkan-sdk
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
           components: rustfmt, clippy
       - name: Run cargo fmt
@@ -81,7 +81,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all --examples -- -D warnings
+          args: --workspace --all-targets -- -D warnings
 
   build-linux:
     name: Linux Build
@@ -89,20 +89,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Install Vulkan SDK
+      - name: Install Vulkan SDK and libxcb
         run: |
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
           sudo apt update
-          sudo apt install -y vulkan-sdk
+          sudo apt install -y vulkan-sdk libxcb-shape0-dev libxcb-xfixes0-dev
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           target: x86_64-unknown-linux-gnu
           override: true
-      - name: Build
-        run: make build
+      - name: Build package
+        run: make package
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
@@ -124,10 +124,11 @@ jobs:
       - name: Setup toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
-          target: x86_64-pc-windows-gnu
-      - name: Build
-        run: make build
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+          override: true
+      - name: Build package
+        run: make package
       - name: Upload
         uses: actions/upload-artifact@v2
         with:

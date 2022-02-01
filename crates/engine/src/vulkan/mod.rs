@@ -1,41 +1,41 @@
-pub mod allocator;
+pub(crate) mod allocator;
 pub(crate) mod buffer;
-mod debug;
-pub mod descriptor_manager;
+pub(crate) mod descriptor_manager;
 mod device;
 pub mod error;
 pub mod lighting_pipeline;
-pub mod pipeline;
+pub(crate) mod pipeline;
 pub mod pp_effect;
 mod queue;
 mod renderpass;
 mod surface;
 mod swapchain;
 pub mod texture;
-pub mod uploader;
+pub(crate) mod uploader;
 
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
-use ash::{
-    extensions::ext,
-    vk::{self, Handle},
-};
+use ash::vk::{self, Handle};
+use egui::ClippedMesh;
+use gfx_maths::Mat4;
+use gpu_allocator::MemoryLocation;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::camera::{self, CamData},
     core::engine::EngineInfo,
     scene::{
-        light::LightManager,
+        component::camera_component::CameraUniformData,
+        light::Light,
         material::Material,
         model::{mesh::Mesh, Model},
+        transform::TransformData,
         Scene,
     },
 };
 
 use self::{
     allocator::Allocator,
-    buffer::{PerFrameUniformBuffer, VulkanBuffer},
-    debug::DebugMessenger,
+    buffer::{MutableBuffer, PerFrameUniformBuffer, VulkanBuffer},
     descriptor_manager::{DescriptorData, DescriptorManager},
     error::GraphicsResult,
     lighting_pipeline::LightingPipeline,
@@ -43,8 +43,15 @@ use self::{
     queue::{PoolsWrapper, QueueFamilies, Queues},
     surface::SurfaceWrapper,
     swapchain::SwapchainWrapper,
+    texture::{Texture2D, TextureFilterMode},
     uploader::Uploader,
 };
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct RendererConfig {
+    pub(crate) gpu_vendor_id: Option<u32>,
+    pub(crate) gpu_device_id: Option<u32>,
+}
 
 pub struct VulkanManager {
     #[allow(dead_code)]
@@ -53,24 +60,23 @@ pub struct VulkanManager {
     pub allocator: std::mem::ManuallyDrop<Rc<Allocator>>,
     pub device: Rc<ash::Device>,
 
-    debug: std::mem::ManuallyDrop<DebugMessenger>,
     surface: std::mem::ManuallyDrop<SurfaceWrapper>,
     physical_device: vk::PhysicalDevice,
+    pub(crate) physical_device_properties: vk::PhysicalDeviceProperties,
     #[allow(dead_code)]
-    physical_device_properties: vk::PhysicalDeviceProperties,
     queue_families: QueueFamilies,
-    pub queues: Queues,
-    pub swapchain: SwapchainWrapper,
+    pub(crate) queues: Queues,
+    pub(crate) swapchain: SwapchainWrapper,
     pub renderpass: vk::RenderPass,
-    pub pools: PoolsWrapper,
-    pub commandbuffers: Vec<vk::CommandBuffer>,
-    pub uniform_buffer: PerFrameUniformBuffer<camera::CamData>,
+    pub(crate) pools: PoolsWrapper,
+    pub(crate) commandbuffers: Vec<vk::CommandBuffer>,
+    pub(crate) uniform_buffer: PerFrameUniformBuffer<CameraUniformData>,
     pub desc_layout_frame_data: vk::DescriptorSetLayout,
     pipeline_layout_gpass: vk::PipelineLayout,
     pub pipeline_layout_resolve_pass: vk::PipelineLayout,
-    pub descriptor_manager: DescriptorManager<8>,
+    pub(crate) descriptor_manager: DescriptorManager<8>,
     max_frames_in_flight: u8,
-    pub current_frame_index: u8,
+    pub(crate) current_frame_index: u8,
     image_acquire_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     frame_resource_fences: Vec<vk::Fence>,
@@ -81,28 +87,51 @@ pub struct VulkanManager {
     pub renderpass_pp: vk::RenderPass,
     pp_effects: Vec<Rc<PPEffect>>,
     pub uploader: std::mem::ManuallyDrop<Uploader>,
-    pub enable_wireframe: bool,
+    pub(crate) enable_wireframe: bool,
+    pub(crate) enable_ui_wireframe: bool,
+
+    desc_layout_ui: vk::DescriptorSetLayout,
+    pipe_layout_ui: vk::PipelineLayout,
+    renderpass_ui: vk::RenderPass,
+    pipeline_ui: vk::Pipeline,
+    pipeline_ui_wireframe: vk::Pipeline,
+
+    ui_texture_version: u64,
+    ui_texture: Option<Rc<Texture2D>>,
+
+    ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
+    ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
+    ui_meshes: Vec<(egui::Rect, u64, u64)>,
+
+    ext_memory_budget_supported: bool,
+    pub(crate) supported_devices: Vec<(vk::PhysicalDevice, vk::PhysicalDeviceProperties, bool)>,
 }
 
 impl VulkanManager {
-    pub fn new(
+    pub(crate) fn new(
         engine_info: EngineInfo,
         window: &winit::window::Window,
         max_frames_in_flight: u8,
+        config: Option<&RendererConfig>,
     ) -> GraphicsResult<Self> {
-        let entry = unsafe { ash::Entry::new() }.map_err(anyhow::Error::from)?;
+        let entry = unsafe { ash::Entry::load() }.map_err(anyhow::Error::from)?;
         let instance = VulkanManager::init_instance(engine_info, &entry, window)?;
 
-        let debug = DebugMessenger::init(&entry, &instance)?;
         let surface = SurfaceWrapper::init(window, &entry, &instance);
 
-        let (physical_device, physical_device_properties, _physical_device_features) =
-            device::select_physical_device(&instance)?;
+        let supported_devices = device::get_candidates(&instance)?;
+
+        let (physical_device, physical_device_properties, ext_memory_budget_supported) =
+            device::select_physical_device(&instance, config)?;
 
         let queue_families = QueueFamilies::init(&instance, physical_device, &surface)?;
 
-        let (logical_device, queues) =
-            queue::init_device_and_queues(&instance, physical_device, &queue_families)?;
+        let (logical_device, queues) = queue::init_device_and_queues(
+            &instance,
+            physical_device,
+            &queue_families,
+            ext_memory_budget_supported,
+        )?;
 
         let logical_device = Rc::new(logical_device);
 
@@ -158,13 +187,29 @@ impl VulkanManager {
             vk::Format::D24_UNORM_S8_UINT,
             &logical_device,
         )?;
+
+        let sampler_linear_info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .min_lod(0.0)
+            .max_lod(vk::LOD_CLAMP_NONE)
+            .build();
+        let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
+
+        let (desc_layout_ui, pipe_layout_ui, renderpass_ui, pipeline_ui, pipeline_ui_wireframe) =
+            pipeline::create_ui_pipeline(&logical_device, sampler_linear);
+
         swapchain.create_framebuffers(&logical_device, renderpass, renderpass_pp)?;
         let pools = PoolsWrapper::init(&logical_device, &queue_families)?;
 
         let commandbuffers =
             queue::create_commandbuffers(&logical_device, &pools, max_frames_in_flight as usize)?;
 
-        let uniform_buffer = PerFrameUniformBuffer::<CamData>::new(
+        let uniform_buffer = PerFrameUniformBuffer::<CameraUniformData>::new(
             &physical_device_properties,
             &allocator,
             max_frames_in_flight as u64,
@@ -254,18 +299,6 @@ impl VulkanManager {
             frame_resource_fences.push(unsafe { logical_device.create_fence(&fence_info, None)? });
         }
 
-        let sampler_linear_info = vk::SamplerCreateInfo::builder()
-            .mag_filter(vk::Filter::LINEAR)
-            .min_filter(vk::Filter::LINEAR)
-            .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
-            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .min_lod(0.0)
-            .max_lod(vk::LOD_CLAMP_NONE)
-            .build();
-        let sampler_linear = unsafe { logical_device.create_sampler(&sampler_linear_info, None)? };
-
         let desc_layout_pp_samplers = [sampler_linear];
         let desc_layout_pp_bindings = [vk::DescriptorSetLayoutBinding::builder()
             .binding(0)
@@ -294,10 +327,33 @@ impl VulkanManager {
             queue_families.graphics_q_index,
         );
 
+        let mut ui_vertex_buffers = Vec::with_capacity(max_frames_in_flight as usize);
+        for _ in 0..max_frames_in_flight {
+            let (buffer, alloc) = allocator
+                .create_buffer(
+                    20 * 1000,
+                    vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                    MemoryLocation::GpuOnly,
+                )
+                .unwrap();
+            ui_vertex_buffers.push((buffer, alloc, 1000));
+        }
+
+        let mut ui_index_buffers = Vec::with_capacity(max_frames_in_flight as usize);
+        for _ in 0..max_frames_in_flight {
+            let (buffer, alloc) = allocator
+                .create_buffer(
+                    4 * 1000,
+                    vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+                    MemoryLocation::GpuOnly,
+                )
+                .unwrap();
+            ui_index_buffers.push((buffer, alloc, 1000));
+        }
+
         Ok(Self {
             entry,
             instance,
-            debug: std::mem::ManuallyDrop::new(debug),
             surface: std::mem::ManuallyDrop::new(surface),
             physical_device,
             physical_device_properties,
@@ -327,7 +383,44 @@ impl VulkanManager {
             pp_effects: Vec::new(),
             uploader: std::mem::ManuallyDrop::new(uploader),
             enable_wireframe: false,
+            enable_ui_wireframe: false,
+
+            desc_layout_ui,
+            pipe_layout_ui,
+            renderpass_ui,
+            pipeline_ui,
+            pipeline_ui_wireframe,
+
+            ui_texture_version: u64::MAX,
+            ui_texture: None,
+
+            ui_vertex_buffers,
+            ui_index_buffers,
+            ui_meshes: Vec::new(),
+
+            ext_memory_budget_supported,
+            supported_devices,
         })
+    }
+
+    pub(crate) fn get_budget(
+        &self,
+    ) -> Option<(vk::PhysicalDeviceMemoryBudgetPropertiesEXT, usize)> {
+        if !self.ext_memory_budget_supported {
+            None
+        } else {
+            let mut budget_props = vk::PhysicalDeviceMemoryBudgetPropertiesEXT::builder();
+            let mut props =
+                vk::PhysicalDeviceMemoryProperties2::builder().push_next(&mut budget_props);
+
+            unsafe {
+                self.instance
+                    .get_physical_device_memory_properties2(self.physical_device, &mut props);
+            }
+
+            let heap_count = props.memory_properties.memory_heap_count as usize;
+            Some((*budget_props, heap_count))
+        }
     }
 
     pub fn register_lighting_pipeline(&mut self, pipeline: Rc<LightingPipeline>) {
@@ -336,10 +429,6 @@ impl VulkanManager {
 
     pub fn register_pp_effect(&mut self, pp_effect: Rc<PPEffect>) {
         self.pp_effects.push(pp_effect);
-    }
-
-    pub fn get_current_frame_index(&self) -> u8 {
-        self.current_frame_index
     }
 
     fn init_instance(
@@ -354,36 +443,24 @@ impl VulkanManager {
             .application_version(vk::make_api_version(0, 0, 1, 0))
             .engine_name(&app_name)
             .engine_version(vk::make_api_version(0, 0, 1, 0))
-            .api_version(vk::make_api_version(1, 2, 0, 0));
+            .api_version(vk::API_VERSION_1_2);
 
         let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
-        let mut extension_names_raw = surface_extensions
+        let extension_names_raw = surface_extensions
             .iter()
             .map(|ext| ext.as_ptr())
             .collect::<Vec<_>>();
-        extension_names_raw.push(ext::DebugUtils::name().as_ptr()); // still wanna use the debug extensions
 
-        let mut instance_create_info = vk::InstanceCreateInfo::builder()
+        let instance_create_info = vk::InstanceCreateInfo::builder()
             .application_info(&app_info)
             .enabled_extension_names(&extension_names_raw);
-
-        // handle validation layers
-        let startup_debug_severity = debug::startup_debug_severity();
-        let startup_debug_type = debug::startup_debug_type();
-        let debug_create_info =
-            &mut debug::get_debug_create_info(startup_debug_severity, startup_debug_type);
-
-        let layer_names = debug::get_layer_names();
-        if debug::ENABLE_VALIDATION_LAYERS && debug::has_validation_layers_support(entry) {
-            instance_create_info = instance_create_info
-                .push_next(debug_create_info)
-                .enabled_layer_names(&layer_names);
-        }
 
         Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
 
-    pub fn next_frame(&mut self) -> u32 {
+    pub(crate) fn next_frame(&mut self) -> u32 {
+        profile_function!();
+
         self.current_frame_index = (self.current_frame_index + 1) % self.max_frames_in_flight;
 
         self.swapchain
@@ -532,28 +609,30 @@ impl VulkanManager {
         }
     }
 
-    fn build_render_order(models: &[Model]) -> Vec<&Model> {
-        let mut res: Vec<&Model> = Vec::with_capacity(models.len());
+    fn build_render_order(models: &[(TransformData, Rc<Model>)]) -> Vec<(TransformData, &Model)> {
+        profile_function!();
+
+        let mut res: Vec<(TransformData, &Model)> = Vec::with_capacity(models.len());
 
         for obj in models {
             let mut index = 0;
             for cmp in &res {
                 // order: pipeline -> material -> mesh
-                if cmp.material.get_pipeline().as_raw() > obj.material.get_pipeline().as_raw() {
+                if cmp.1.material.get_pipeline().as_raw() > obj.1.material.get_pipeline().as_raw() {
                     break;
                 }
-                if cmp.material.as_ref() as *const Material as *const u8
-                    > obj.material.as_ref() as *const Material as *const u8
+                if cmp.1.material.as_ref() as *const Material as *const u8
+                    > obj.1.material.as_ref() as *const Material as *const u8
                 {
                     break;
                 }
-                if cmp.mesh.as_ref() as *const Mesh > obj.mesh.as_ref() as *const Mesh {
+                if cmp.1.mesh.as_ref() as *const Mesh > obj.1.mesh.as_ref() as *const Mesh {
                     break;
                 }
 
                 index += 1;
             }
-            res.insert(index, obj);
+            res.insert(index, (obj.0, obj.1.as_ref()));
         }
 
         res
@@ -562,17 +641,19 @@ impl VulkanManager {
     fn render_gpass(
         &mut self,
         commandbuffer: vk::CommandBuffer,
-        models: &[&Model],
+        models: &[(TransformData, &Model)],
     ) -> Result<(), vk::Result> {
+        profile_function!();
+
         let mut last_pipeline = vk::Pipeline::null();
         let mut last_mat: *const u8 = null();
         let mut last_mesh: *const Mesh = null();
         for obj in models {
             unsafe {
                 let pipeline = if self.enable_wireframe {
-                    obj.material.get_wireframe_pipeline()
+                    obj.1.material.get_wireframe_pipeline()
                 } else {
-                    obj.material.get_pipeline()
+                    obj.1.material.get_pipeline()
                 };
 
                 if last_pipeline != pipeline {
@@ -587,20 +668,20 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    last_pipeline = obj.material.get_pipeline();
+                    last_pipeline = obj.1.material.get_pipeline();
                     last_mat = null();
                 }
 
-                let mat = obj.material.as_ref() as *const Material as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
+                let mat = obj.1.material.as_ref() as *const Material as *const u8; // see https://doc.rust-lang.org/std/ptr/fn.eq.html
                 if mat != last_mat {
                     let mat_desc_set = self.descriptor_manager.get_descriptor_set(
-                        obj.material.get_descriptor_set_layout(),
-                        &obj.material.get_descriptor_data(),
+                        obj.1.material.get_descriptor_set_layout(),
+                        &obj.1.material.get_descriptor_data(),
                     )?;
                     self.device.cmd_bind_descriptor_sets(
                         commandbuffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        obj.material.get_pipeline_layout(),
+                        obj.1.material.get_pipeline_layout(),
                         1,
                         &[mat_desc_set],
                         &[],
@@ -609,17 +690,17 @@ impl VulkanManager {
                     last_mat = mat;
                 }
 
-                let mesh = obj.mesh.as_ref() as *const Mesh;
+                let mesh = obj.1.mesh.as_ref() as *const Mesh;
                 if mesh != last_mesh {
                     self.device.cmd_bind_vertex_buffers(
                         commandbuffer,
                         0,
-                        &[obj.mesh.vertex_buffer],
+                        &[obj.1.mesh.vertex_buffer],
                         &[0],
                     );
                     self.device.cmd_bind_index_buffer(
                         commandbuffer,
-                        obj.mesh.index_buffer,
+                        obj.1.mesh.index_buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
@@ -627,15 +708,14 @@ impl VulkanManager {
                     last_mesh = mesh;
                 }
 
-                let transform_data = obj.transform.get_transform_data();
                 self.push_constants(
                     commandbuffer,
-                    obj.material.get_pipeline_layout(),
+                    obj.1.material.get_pipeline_layout(),
                     vk::ShaderStageFlags::VERTEX,
-                    &transform_data,
+                    &obj.0,
                 );
 
-                for sm in &obj.mesh.submeshes {
+                for sm in &obj.1.mesh.submeshes {
                     self.device
                         .cmd_draw_indexed(commandbuffer, sm.1, 1, sm.0, 0, 0);
                 }
@@ -645,7 +725,9 @@ impl VulkanManager {
         Ok(())
     }
 
-    fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, light_manager: &LightManager) {
+    fn render_resolve_pass(&self, commandbuffer: vk::CommandBuffer, lights: &[Light]) {
+        profile_function!();
+
         for lp in &self.lighting_pipelines {
             unsafe {
                 // point lights
@@ -661,7 +743,13 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for pl in &light_manager.point_lights {
+                    for pl in lights.iter().filter_map(|l| {
+                        if let Light::Point(pl) = l {
+                            Some(pl)
+                        } else {
+                            None
+                        }
+                    }) {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -685,7 +773,13 @@ impl VulkanManager {
                         self.swapchain.extent.height as f32,
                     );
 
-                    for dl in &light_manager.directional_lights {
+                    for dl in lights.iter().filter_map(|l| {
+                        if let Light::Directional(dl) = l {
+                            Some(dl)
+                        } else {
+                            None
+                        }
+                    }) {
                         self.push_constants(
                             commandbuffer,
                             self.pipeline_layout_resolve_pass,
@@ -714,11 +808,8 @@ impl VulkanManager {
         }
     }
 
-    fn render_pp(
-        &mut self,
-        commandbuffer: vk::CommandBuffer,
-        swapchain_image_index: usize,
-    ) -> Result<(), vk::Result> {
+    fn render_pp(&mut self, commandbuffer: vk::CommandBuffer) -> Result<bool, vk::Result> {
+        profile_function!();
         // resolve image contains finished scene rendering in hdr format
         // for each pp effect:
         //      - transition src image (either resolve_image or g0_image) to SHADER_READONLY_OPTIMAL layout (done by previous pp renderpass and resolve pass)
@@ -726,10 +817,7 @@ impl VulkanManager {
         //      - begin pp renderpass with correct framebuffer
         //      - bind pipeline and correct descriptor set
         //      - draw fullscreen quad
-        // transition swapchain image to TRANSFER_DST_OPTIMAL
-        // transition final dst image (either resolve_image or g0_image) to TRANSFER_SRC_OPTIMAL
-        // ImageBlit to swapchain
-        // Transition swapchain image to PRESENT_SRC_KHR
+        // transition final dst image (either resolve_image or g0_image) to COLOR_ATTACHMENT_OPTIMAL
 
         let mut direction = false;
 
@@ -792,6 +880,153 @@ impl VulkanManager {
             direction = !direction;
         }
 
+        // transition final destination image to COLOR_ATTACHMENT_OPTIMAL
+        self.transition_images(
+            commandbuffer,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            &[ImageTransition {
+                image: if direction {
+                    self.swapchain.g0_image
+                } else {
+                    self.swapchain.resolve_image
+                },
+                from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                to: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                dst_access: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                    | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            }],
+        );
+
+        Ok(direction)
+    }
+
+    fn render_ui(
+        &mut self,
+        commandbuffer: vk::CommandBuffer,
+        direction: bool,
+        swapchain_image_index: usize,
+    ) -> Result<(), vk::Result> {
+        // begin the ui renderpass
+        self.begin_renderpass(
+            commandbuffer,
+            self.renderpass_ui,
+            if direction {
+                self.swapchain.framebuffer_pp_a
+            } else {
+                self.swapchain.framebuffer_pp_b
+            },
+            &[],
+        );
+
+        // bind the ui pipeline
+        unsafe {
+            self.device.cmd_bind_pipeline(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                if self.enable_ui_wireframe {
+                    self.pipeline_ui_wireframe
+                } else {
+                    self.pipeline_ui
+                },
+            );
+            self.device.cmd_set_viewport(
+                commandbuffer,
+                0,
+                &[vk::Viewport {
+                    x: 0.0,
+                    y: self.swapchain.extent.height as f32,
+                    width: self.swapchain.extent.width as f32,
+                    height: -(self.swapchain.extent.height as f32),
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }],
+            );
+        }
+
+        // bind the descriptor set containing the font texture
+        unsafe {
+            let set = self.descriptor_manager.get_descriptor_set(
+                self.desc_layout_ui,
+                &[DescriptorData::ImageSampler {
+                    image: self.ui_texture.as_ref().unwrap().view,
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    sampler: self.sampler_linear,
+                }],
+            )?;
+
+            self.device.cmd_bind_descriptor_sets(
+                commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipe_layout_ui,
+                0,
+                &[set],
+                &[],
+            );
+
+            let proj_matrix = Mat4::orthographic_vulkan(
+                0.0,
+                self.swapchain.extent.width as f32,
+                self.swapchain.extent.height as f32,
+                0.0,
+                -1.0,
+                1.0,
+            );
+            self.push_constants(
+                commandbuffer,
+                self.pipe_layout_ui,
+                vk::ShaderStageFlags::VERTEX,
+                &proj_matrix,
+            );
+
+            let vertex_buffer = self.ui_vertex_buffers[self.current_frame_index as usize].0;
+            let index_buffer = self.ui_index_buffers[self.current_frame_index as usize].0;
+
+            self.device
+                .cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer], &[0]);
+            self.device.cmd_bind_index_buffer(
+                commandbuffer,
+                index_buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
+        }
+
+        // render every mesh
+        for (rect, start_index, index_count) in &self.ui_meshes {
+            unsafe {
+                self.device.cmd_set_scissor(
+                    commandbuffer,
+                    0,
+                    &[vk::Rect2D {
+                        offset: vk::Offset2D {
+                            x: rect.left() as i32,
+                            y: rect.top() as i32,
+                        },
+                        extent: vk::Extent2D {
+                            width: rect.width() as u32,
+                            height: rect.height() as u32,
+                        },
+                    }],
+                );
+
+                self.device.cmd_draw_indexed(
+                    commandbuffer,
+                    *index_count as u32,
+                    1,
+                    *start_index as u32,
+                    0,
+                    0,
+                );
+            }
+        }
+
+        // end the ui renderpass
+        unsafe {
+            self.device.cmd_end_render_pass(commandbuffer);
+        }
+
         // transition swapchain image to TRANSFER_DST_OPTIMAL and final pp image to TRANSFER_SRC_OPTIMAL
         self.transition_images(
             commandbuffer,
@@ -811,7 +1046,7 @@ impl VulkanManager {
                     } else {
                         self.swapchain.resolve_image
                     },
-                    from: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    from: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                     to: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                     wait_access: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
                     dst_access: vk::AccessFlags::TRANSFER_READ,
@@ -842,18 +1077,35 @@ impl VulkanManager {
                 from: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 to: vk::ImageLayout::PRESENT_SRC_KHR,
                 wait_access: vk::AccessFlags::TRANSFER_WRITE,
-                dst_access: vk::AccessFlags::empty(), // can be empty because vkQueuePresentKHR waits for a semaphore, which automatically makes all memory writes visible
+                dst_access: vk::AccessFlags::empty(),
             }],
         );
 
         Ok(())
     }
 
-    pub fn update_commandbuffer(
+    pub(crate) fn update_commandbuffer(
         &mut self,
         swapchain_image_index: usize,
-        scene: &Scene,
+        scene: Rc<Scene>,
     ) -> Result<(), vk::Result> {
+        profile_function!();
+
+        {
+            profile_scope!("Camera uniform upload");
+            let cam_comp = scene
+                .main_camera
+                .borrow()
+                .upgrade()
+                .expect("Scene has to have a CameraComponent");
+            let cam_data = cam_comp.get_cam_data(
+                self.swapchain.extent.width as f32 / self.swapchain.extent.height as f32,
+            );
+            self.uniform_buffer
+                .set_data(&self.allocator, &cam_data, self.current_frame_index)
+                .unwrap();
+        }
+
         let commandbuffer = self.commandbuffers[self.current_frame_index as usize];
         let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
         unsafe {
@@ -914,7 +1166,9 @@ impl VulkanManager {
             );
         }
 
-        let render_map = Self::build_render_order(&scene.models);
+        let (models, lights) = scene.collect_renderables();
+
+        let render_map = Self::build_render_order(models.as_slice());
         self.render_gpass(commandbuffer, &render_map)?;
 
         unsafe {
@@ -931,12 +1185,13 @@ impl VulkanManager {
             );
         }
 
-        self.render_resolve_pass(commandbuffer, &scene.light_manager);
+        self.render_resolve_pass(commandbuffer, &lights);
 
         unsafe {
             self.device.cmd_end_render_pass(commandbuffer);
 
-            self.render_pp(commandbuffer, swapchain_image_index)?;
+            let direction = self.render_pp(commandbuffer)?;
+            self.render_ui(commandbuffer, direction, swapchain_image_index)?;
 
             self.device.end_command_buffer(commandbuffer)?;
         }
@@ -944,29 +1199,26 @@ impl VulkanManager {
         Ok(())
     }
 
-    pub fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             self.device
                 .device_wait_idle()
                 .expect("something went wrong while waiting");
         }
-        unsafe {
-            self.swapchain.cleanup(&self.device, &self.allocator);
-        }
-        self.swapchain = SwapchainWrapper::init(
-            &self.instance,
-            self.physical_device,
+        self.swapchain.recreate(
             &self.device,
-            &self.surface,
-            &self.queue_families,
-            &self.allocator,
+            self.physical_device,
+            &*self.allocator,
+            &*self.surface,
+            self.renderpass,
+            self.renderpass_pp,
         )?;
-        self.swapchain
-            .create_framebuffers(&self.device, self.renderpass, self.renderpass_pp)?;
         Ok(())
     }
 
-    pub fn wait_for_fence(&mut self) {
+    pub(crate) fn wait_for_fence(&mut self) {
+        profile_function!();
+
         unsafe {
             self.device
                 .wait_for_fences(
@@ -981,11 +1233,131 @@ impl VulkanManager {
         }
 
         self.descriptor_manager.next_frame();
+    }
+
+    pub(crate) fn wait_for_uploads(&mut self) {
+        profile_function!();
         self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 
+    pub(crate) fn upload_ui_data(
+        &mut self,
+        gui_context: egui::CtxRef,
+        gui_meshes: Vec<ClippedMesh>,
+    ) {
+        profile_function!();
+
+        let font_image = gui_context.font_image();
+        if font_image.version != self.ui_texture_version {
+            log::trace!(
+                "UI font texture changed to {}x{}",
+                font_image.width,
+                font_image.height
+            );
+
+            self.ui_texture_version = font_image.version;
+
+            let num_pixels = font_image.width * font_image.height;
+            let mut pixels = vec![0; num_pixels * 4];
+            for i in 0..num_pixels {
+                let alpha = font_image.pixels[i];
+                pixels[i * 4] = 0xFFu8;
+                pixels[i * 4 + 1] = 0xFFu8;
+                pixels[i * 4 + 2] = 0xFFu8;
+                pixels[i * 4 + 3] = alpha;
+            }
+
+            self.ui_texture = Some(
+                Texture2D::new(
+                    font_image.width as u32,
+                    font_image.height as u32,
+                    &pixels,
+                    TextureFilterMode::Linear,
+                    (*self.allocator).clone(),
+                    &mut (*self.uploader),
+                    self.device.clone(),
+                )
+                .unwrap(),
+            );
+        }
+
+        self.ui_meshes.clear();
+
+        let num_vertices: u64 = gui_meshes.iter().map(|m| m.1.vertices.len()).sum::<usize>() as u64;
+        let mut vertex_buffer = Vec::with_capacity(num_vertices as usize);
+
+        let num_indices: u64 = gui_meshes.iter().map(|m| m.1.indices.len()).sum::<usize>() as u64;
+        let mut index_buffer = Vec::with_capacity(num_indices as usize);
+
+        for m in gui_meshes {
+            let vertex_offset = vertex_buffer.len();
+
+            let start_index = index_buffer.len() as u64;
+
+            for v in m.1.vertices {
+                vertex_buffer.push(v);
+            }
+
+            for i in m.1.indices {
+                index_buffer.push(i + vertex_offset as u32);
+            }
+
+            let index_count = index_buffer.len() as u64 - start_index;
+
+            self.ui_meshes.push((m.0, start_index, index_count));
+        }
+
+        {
+            let (buffer, alloc, cap) =
+                &mut self.ui_vertex_buffers[self.current_frame_index as usize];
+            if *cap < num_vertices {
+                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+
+                let (new_buffer, new_alloc) = self
+                    .allocator
+                    .create_buffer(
+                        20 * num_vertices,
+                        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                        MemoryLocation::GpuOnly,
+                    )
+                    .unwrap();
+                *buffer = new_buffer;
+                *alloc = new_alloc;
+                *cap = num_vertices;
+            }
+
+            self.uploader
+                .enqueue_buffer_upload(*buffer, 0, &vertex_buffer);
+        }
+
+        {
+            let (buffer, alloc, cap) =
+                &mut self.ui_index_buffers[self.current_frame_index as usize];
+            if *cap < num_indices {
+                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+
+                let (new_buffer, new_alloc) = self
+                    .allocator
+                    .create_buffer(
+                        4 * num_indices,
+                        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+                        MemoryLocation::GpuOnly,
+                    )
+                    .unwrap();
+                *buffer = new_buffer;
+                *alloc = new_alloc;
+                *cap = num_indices;
+            }
+
+            self.uploader
+                .enqueue_buffer_upload(*buffer, 0, &index_buffer);
+        }
+    }
+
     /// submits queued commands
-    pub fn submit(&self) {
+    pub(crate) fn submit(&self) {
+        profile_function!();
+
         let semaphores_available =
             [self.image_acquire_semaphores[self.current_frame_index as usize]];
         let waiting_stages = [vk::PipelineStageFlags::TRANSFER]; // wait for image acquisition before blitting the final image to the swapchain
@@ -1010,7 +1382,9 @@ impl VulkanManager {
     }
 
     /// add present command to queue
-    pub fn present(&mut self, image_index: u32) {
+    pub(crate) fn present(&mut self, image_index: u32) {
+        profile_function!();
+
         let swapchains = [self.swapchain.swapchain];
         let indices = [image_index];
         let wait_semaphores = [self.render_finished_semaphores[self.current_frame_index as usize]];
@@ -1024,14 +1398,14 @@ impl VulkanManager {
                 .swapchain_loader
                 .queue_present(self.queues.graphics_queue, &present_info)
             {
-                Ok(..) => {}
-                Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                Ok(true) | Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                     self.recreate_swapchain().expect("swapchain recreation");
                     // camera.set_aspect(
                     //     vk.swapchain.extent.width as f32 / vk.swapchain.extent.height as f32,
                     // );
                     // camera.update_buffer(&vk.allocator, &mut vk.uniform_buffer);
                 }
+                Ok(..) => {}
                 _ => {
                     panic!("unhandled queue presentation error");
                 }
@@ -1039,7 +1413,7 @@ impl VulkanManager {
         };
     }
 
-    pub fn wait_idle(&self) {
+    pub(crate) fn wait_idle(&self) {
         unsafe {
             self.device
                 .device_wait_idle()
@@ -1054,6 +1428,24 @@ impl Drop for VulkanManager {
             self.device
                 .device_wait_idle()
                 .expect("something wrong while waiting");
+
+            self.device
+                .destroy_descriptor_set_layout(self.desc_layout_ui, None);
+            self.device
+                .destroy_pipeline_layout(self.pipe_layout_ui, None);
+            self.device.destroy_render_pass(self.renderpass_ui, None);
+            self.device.destroy_pipeline(self.pipeline_ui, None);
+            self.device
+                .destroy_pipeline(self.pipeline_ui_wireframe, None);
+
+            // drop ui_texture
+            self.ui_texture = None;
+            for (buffer, alloc, _) in &self.ui_vertex_buffers {
+                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            }
+            for (buffer, alloc, _) in &self.ui_index_buffers {
+                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            }
 
             self.lighting_pipelines.clear();
             self.pp_effects.clear();
@@ -1101,7 +1493,6 @@ impl Drop for VulkanManager {
             self.device.destroy_device(None);
             // --segfault
             std::mem::ManuallyDrop::drop(&mut self.surface);
-            std::mem::ManuallyDrop::drop(&mut self.debug);
             self.instance.destroy_instance(None)
         };
     }

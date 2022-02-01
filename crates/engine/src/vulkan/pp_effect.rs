@@ -7,7 +7,7 @@ use super::pipeline;
 /// This struct holds the necessary information about a single post processing effect.
 pub struct PPEffect {
     /// The [`vk::Pipeline`] used by this post processing effect.
-    pub pipeline: vk::Pipeline,
+    pub(crate) pipeline: vk::Pipeline,
     device: Rc<ash::Device>,
 }
 

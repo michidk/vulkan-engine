@@ -7,11 +7,11 @@ use ve_format::mesh::{Face, MeshData, Vertex};
 use crate::vulkan::{allocator::Allocator, error::GraphicsResult, uploader::Uploader};
 pub struct Mesh {
     allocator: Rc<Allocator>,
-    pub vertex_buffer: vk::Buffer,
-    pub vertex_buffer_alloc: Allocation,
-    pub index_buffer: vk::Buffer,
-    pub index_buffer_alloc: Allocation,
-    pub submeshes: Vec<(u32, u32)>,
+    pub(crate) vertex_buffer: vk::Buffer,
+    pub(crate) vertex_buffer_alloc: Allocation,
+    pub(crate) index_buffer: vk::Buffer,
+    pub(crate) index_buffer_alloc: Allocation,
+    pub(crate) submeshes: Vec<(u32, u32)>,
 }
 
 impl Drop for Mesh {

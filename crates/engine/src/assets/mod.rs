@@ -1,1 +1,1 @@
-pub mod shader;
+pub(crate) mod shader;

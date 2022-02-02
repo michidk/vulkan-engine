@@ -1,6 +1,7 @@
 use std::{cell::Cell, rc::Weak};
 
 use egui::DragValue;
+use engine_derive::InternalComponent;
 use gfx_maths::{Vec3, Vec4};
 
 use crate::scene::{
@@ -8,9 +9,10 @@ use crate::scene::{
     light::{DirectionalLight, Light},
 };
 
-use super::Component;
+use super::{Component, ComponentInspector};
 
-#[derive(Debug)]
+#[derive(Debug, InternalComponent)]
+#[custom_inspector]
 pub struct LightComponent {
     entity: Weak<Entity>,
     pub light: Cell<Light>,
@@ -37,10 +39,6 @@ impl Component for LightComponent {
             color: color.into(),
             intensity: intensity.into(),
         })
-    }
-
-    fn inspector_name(&self) -> &'static str {
-        "LightComponent"
     }
 
     fn load(&self) {}
@@ -74,7 +72,9 @@ impl Component for LightComponent {
     ) {
         lights.push(self.light.get());
     }
+}
 
+impl ComponentInspector for LightComponent {
     fn render_inspector(&self, ui: &mut egui::Ui) {
         let mut light = self.light.get();
 

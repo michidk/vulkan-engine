@@ -14,6 +14,8 @@ pub mod scene;
 pub mod utils;
 pub mod vulkan;
 
+pub use engine_derive::Component;
+
 pub mod prelude {
     pub use crate::assets;
     pub use crate::core;

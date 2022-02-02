@@ -4,14 +4,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use egui::Slider;
 use gfx_maths::*;
 use vulkan_engine::{
     core::{engine::Engine, input::Input},
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
-            light_component::LightComponent, renderer::RendererComponent, Component,
+            light_component::LightComponent, renderer::RendererComponent, Component, Slider,
         },
         entity::Entity,
         light::DirectionalLight,
@@ -19,6 +18,7 @@ use vulkan_engine::{
         model::Model,
         transform::Transform,
     },
+    Component,
 };
 use vulkan_engine::{
     scene::model::mesh::Mesh,
@@ -192,9 +192,10 @@ fn setup(engine: &mut Engine) {
     scene.load();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Component)]
 struct RotateComponent {
     entity: Weak<Entity>,
+    #[inspector(Slider{label: "Rotation Speed: ", min: -360.0, max: 360.0})]
     rotation_speed: Cell<f32>,
 }
 
@@ -225,23 +226,15 @@ impl Component for RotateComponent {
             transform.rotation = rotation;
         }
     }
-
-    fn inspector_name(&self) -> &'static str {
-        "RotateComponent"
-    }
-
-    fn render_inspector(&self, ui: &mut egui::Ui) {
-        let mut rot_speed = self.rotation_speed.get();
-        ui.add(Slider::new(&mut rot_speed, -360.0..=360.0).text("Rotation Speed"));
-        self.rotation_speed.set(rot_speed);
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Component)]
 struct ScaleComponent {
     entity: Weak<Entity>,
     total_time: Cell<f32>,
+    #[inspector(Slider{label: "Time Scale: ", min: 0.0, max: 20.0})]
     time_scale: Cell<f32>,
+    #[inspector(Slider{label: "Max Scale: ", min: 0.0, max: 10.0})]
     max_scale: Cell<f32>,
 }
 
@@ -273,19 +266,5 @@ impl Component for ScaleComponent {
                 * 0.5
                 * self.max_scale.get();
         }
-    }
-
-    fn inspector_name(&self) -> &'static str {
-        "ScaleComponent"
-    }
-
-    fn render_inspector(&self, ui: &mut egui::Ui) {
-        let mut time_scale = self.time_scale.get();
-        ui.add(egui::Slider::new(&mut time_scale, 0.0..=5.0).text("Time Scale"));
-        self.time_scale.set(time_scale);
-
-        let mut max_scale = self.max_scale.get();
-        ui.add(egui::Slider::new(&mut max_scale, 0.0..=5.0).text("Max Scale"));
-        self.max_scale.set(max_scale);
     }
 }

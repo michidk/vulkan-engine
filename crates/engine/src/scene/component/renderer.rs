@@ -4,10 +4,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use engine_derive::InternalComponent;
+
 use crate::scene::{entity::Entity, light::Light, model::Model, transform::TransformData};
 
 use super::Component;
 
+#[derive(InternalComponent)]
 pub struct RendererComponent {
     entity: RefCell<Weak<Entity>>,
     pub model: RefCell<Option<Rc<Model>>>,
@@ -42,10 +45,6 @@ impl Component for RendererComponent {
                 models.push((transform_data, model.clone()));
             }
         }
-    }
-
-    fn inspector_name(&self) -> &'static str {
-        "RendererComponent"
     }
 }
 

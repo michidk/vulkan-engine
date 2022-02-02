@@ -1,17 +1,21 @@
 use std::rc::{Rc, Weak};
 
-use egui::TextEdit;
+use engine_derive::InternalComponent;
 use gfx_maths::{Mat4, Vec3};
 
+use crate::scene::component::InfoBox;
 use crate::scene::entity::Entity;
 
 use super::Component;
 
-#[derive(Debug)]
+#[derive(Debug, InternalComponent)]
 pub struct CameraComponent {
     entity: Weak<Entity>,
+    #[inspector(InfoBox{label: "Near: "})]
     near: f32,
+    #[inspector(InfoBox{label: "Far: "})]
     far: f32,
+    #[inspector(InfoBox{label: "Vertical FOV"})]
     fovy: f32,
 }
 
@@ -37,30 +41,6 @@ impl Component for CameraComponent {
     fn load(&self) {}
 
     fn start(&self) {}
-
-    fn inspector_name(&self) -> &'static str {
-        "CameraComponent"
-    }
-
-    fn render_inspector(&self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("Near");
-            let mut text = self.near.to_string();
-            ui.add_enabled(false, TextEdit::singleline(&mut text));
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("Far");
-            let mut text = self.far.to_string();
-            ui.add_enabled(false, TextEdit::singleline(&mut text));
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("Vertical FOV");
-            let mut text = self.fovy.to_string();
-            ui.add_enabled(false, TextEdit::singleline(&mut text));
-        });
-    }
 }
 
 #[repr(C)]

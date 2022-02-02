@@ -182,7 +182,7 @@ impl Engine {
     }
 
     fn render_component(ui: &mut egui::Ui, component: &dyn Component) {
-        ui.label(component.inspector_name());
+        ui.label(component.component_name());
         ui.indent("", |ui| {
             component.render_inspector(ui);
         });

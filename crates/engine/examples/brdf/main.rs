@@ -68,6 +68,7 @@ fn setup(engine: &mut Engine) {
         mesh_data_sphere_smooth,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
+        false,
     )
     .unwrap();
 

@@ -1,9 +1,9 @@
-use std::{path::Path, rc::Rc};
+use std::rc::Rc;
 
 /// Renders a terrain example
 use gfx_maths::*;
-use noise::{OpenSimplex, NoiseFn};
-use ve_format::mesh::{MeshData, Vertex, Submesh, Face};
+use noise::{NoiseFn, OpenSimplex};
+use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
     core::engine::Engine,
     scene::{
@@ -27,10 +27,9 @@ fn main() {
 }
 
 fn build_terrain() -> MeshData {
-
     let size = 128;
     let height_scale = 10.0;
-    let scale = 0.25;
+    let scale = 0.125;
 
     let mut vertices = Vec::new();
     let mut faces = Vec::new();
@@ -68,9 +67,7 @@ fn build_terrain() -> MeshData {
 
     MeshData {
         vertices,
-        submeshes: vec![
-            Submesh { faces },
-        ],
+        submeshes: vec![Submesh { faces }],
     }
 }
 
@@ -114,8 +111,8 @@ fn setup(engine: &mut Engine) {
     brdf_material0
         .set_vec4("albedo", Vec4::new(0.0, 0.5, 0.0, 1.0))
         .unwrap();
-    brdf_material0.set_float("metallic", 0.25).unwrap();
-    brdf_material0.set_float("roughness", 0.25).unwrap();
+    brdf_material0.set_float("metallic", 0.0).unwrap();
+    brdf_material0.set_float("roughness", 0.95).unwrap();
 
     let mesh_data = build_terrain();
 
@@ -123,6 +120,7 @@ fn setup(engine: &mut Engine) {
         mesh_data,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
+        true,
     )
     .expect("Error baking mesh!");
 
@@ -172,12 +170,11 @@ fn setup(engine: &mut Engine) {
             .into(),
         );
 
-
     scene
         .new_entity_with_transform(
             "Point Light".to_string(),
             Transform {
-                position: Vec3::new(50.0, 10.0, 50.0),e
+                position: Vec3::new(50.0, 10.0, 50.0),
                 rotation: Quaternion::identity(),
                 scale: Vec3::one(),
             },

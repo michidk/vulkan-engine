@@ -25,10 +25,41 @@ impl Drop for Mesh {
 
 impl Mesh {
     pub fn bake(
-        mesh_data: MeshData,
+        mut mesh_data: MeshData,
         allocator: Rc<Allocator>,
         uploader: &mut Uploader,
+        calculate_normals: bool,
     ) -> GraphicsResult<Rc<Mesh>> {
+        if calculate_normals {
+            for submesh in &mesh_data.submeshes {
+                for face in &submesh.faces {
+                    let a = mesh_data.vertices[face.indices[0] as usize];
+                    let b = mesh_data.vertices[face.indices[1] as usize];
+                    let c = mesh_data.vertices[face.indices[2] as usize];
+
+                    let ab = b.position - a.position;
+                    let ac = c.position - a.position;
+
+                    let normal = ac.cross(ab).normalized();
+
+                    mesh_data.vertices[face.indices[0] as usize].normal += normal;
+                    mesh_data.vertices[face.indices[0] as usize]
+                        .normal
+                        .normalize();
+
+                    mesh_data.vertices[face.indices[1] as usize].normal += normal;
+                    mesh_data.vertices[face.indices[1] as usize]
+                        .normal
+                        .normalize();
+
+                    mesh_data.vertices[face.indices[2] as usize].normal += normal;
+                    mesh_data.vertices[face.indices[2] as usize]
+                        .normal
+                        .normalize();
+                }
+            }
+        }
+
         let vertex_buffer_size = mesh_data.vertices.len() * size_of::<Vertex>();
         let (vertex_buffer, vertex_buffer_alloc) = allocator.create_buffer(
             vertex_buffer_size as u64,

@@ -74,6 +74,7 @@ fn setup(engine: &mut Engine) {
         mesh_data,
         (*engine.vulkan_manager.allocator).clone(),
         &mut engine.vulkan_manager.uploader,
+        false,
     )
     .expect("Error baking mesh!");
 

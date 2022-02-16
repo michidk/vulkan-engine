@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use super::input::Input;
-use crate::scene::Scene;
+use crate::old::scene::Scene;
 
 pub(crate) struct GameLoop {
     input: Rc<RefCell<Input>>,

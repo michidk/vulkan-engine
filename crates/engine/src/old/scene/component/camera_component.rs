@@ -3,7 +3,7 @@ use std::rc::{Rc, Weak};
 use egui::TextEdit;
 use gfx_maths::{Mat4, Vec3};
 
-use crate::scene::entity::Entity;
+use crate::old::scene::entity::Entity;
 
 use super::Component;
 

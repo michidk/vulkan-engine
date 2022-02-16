@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::scene::{entity::Entity, light::Light, model::Model, transform::TransformData};
+use crate::old::scene::{entity::Entity, light::Light, model::Model, transform::TransformData};
 
 use super::Component;
 

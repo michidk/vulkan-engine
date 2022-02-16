@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::core::engine::EngineInit;
+use crate::old::core::engine::EngineInit;
 use winit::event::Event;
 
 #[derive(Debug, Copy, Clone, PartialEq)]

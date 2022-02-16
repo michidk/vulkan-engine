@@ -5,7 +5,7 @@ pub mod renderer;
 
 use std::{fmt::Debug, rc::Rc};
 
-use crate::core::input::Input;
+use crate::old::core::input::Input;
 
 use super::{entity::Entity, light::Light, model::Model, transform::TransformData};
 

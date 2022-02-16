@@ -3,7 +3,7 @@ use std::{cell::Cell, rc::Weak};
 use egui::DragValue;
 use gfx_maths::{Vec3, Vec4};
 
-use crate::scene::{
+use crate::old::scene::{
     entity::Entity,
     light::{DirectionalLight, Light},
 };
@@ -20,7 +20,7 @@ pub struct LightComponent {
 }
 
 impl Component for LightComponent {
-    fn create(entity: &std::rc::Rc<crate::scene::entity::Entity>) -> std::rc::Rc<Self>
+    fn create(entity: &std::rc::Rc<crate::old::scene::entity::Entity>) -> std::rc::Rc<Self>
     where
         Self: Sized,
     {
@@ -47,7 +47,7 @@ impl Component for LightComponent {
 
     fn start(&self) {}
 
-    fn update(&self, _input: &crate::core::input::Input, _delta: f32) {
+    fn update(&self, _input: &crate::old::core::input::Input, _delta: f32) {
         if let Some(entity) = self.entity.upgrade() {
             match self.light.get() {
                 Light::Directional(mut dl) => {
@@ -67,8 +67,8 @@ impl Component for LightComponent {
     fn render(
         &self,
         _models: &mut Vec<(
-            crate::scene::transform::TransformData,
-            std::rc::Rc<crate::scene::model::Model>,
+            crate::old::scene::transform::TransformData,
+            std::rc::Rc<crate::old::scene::model::Model>,
         )>,
         lights: &mut Vec<Light>,
     ) {

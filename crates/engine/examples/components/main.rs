@@ -6,7 +6,7 @@ use std::{
 
 use egui::Slider;
 use gfx_maths::*;
-use vulkan_engine::{
+use vulkan_engine::old::{
     core::{engine::Engine, input::Input},
     scene::{
         component::{
@@ -20,13 +20,13 @@ use vulkan_engine::{
         transform::Transform,
     },
 };
-use vulkan_engine::{
+use vulkan_engine::old::{
     scene::model::mesh::Mesh,
     vulkan::{lighting_pipeline::LightingPipeline, pp_effect::PPEffect},
 };
 
 fn main() {
-    vulkan_engine::run_engine(1920, 1080, "Components Example", setup);
+    vulkan_engine::old::run_engine(1920, 1080, "Components Example", setup);
 }
 
 fn setup(engine: &mut Engine) {

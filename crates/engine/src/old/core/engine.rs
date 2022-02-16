@@ -14,7 +14,7 @@ use egui::{
 use gfx_maths::Quaternion;
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::old::{
     core::{gameloop::GameLoop, input::Input, window},
     scene::{
         component::{

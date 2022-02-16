@@ -9,7 +9,7 @@ use std::cell::{Cell, RefCell};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
-use crate::core::input::Input;
+use crate::old::core::input::Input;
 
 use self::component::camera_component::CameraComponent;
 use self::entity::Entity;

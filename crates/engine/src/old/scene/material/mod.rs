@@ -3,7 +3,7 @@ use gfx_maths::*;
 use gpu_allocator::vulkan::Allocation;
 use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc};
 
-use crate::vulkan::{
+use crate::old::vulkan::{
     allocator::Allocator,
     descriptor_manager::DescriptorData,
     error::{GraphicsError, GraphicsResult},

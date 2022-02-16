@@ -1,7 +1,7 @@
 use ash::vk;
 use gpu_allocator::{vulkan::Allocation, MemoryLocation};
 
-use crate::vulkan::{
+use crate::old::vulkan::{
     allocator::Allocator, descriptor_manager::DescriptorData, error::GraphicsResult,
 };
 

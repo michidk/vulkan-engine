@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 
 use gfx_maths::{Mat4, Quaternion, Vec3, Vec4};
 
-use crate::core::input::Input;
+use crate::old::core::input::Input;
 
 use super::component::Component;
 use super::light::Light;

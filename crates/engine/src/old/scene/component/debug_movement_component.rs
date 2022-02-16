@@ -7,7 +7,7 @@ use egui::{Slider, TextEdit};
 use gfx_maths::{Quaternion, Vec3};
 use winit::event::VirtualKeyCode;
 
-use crate::scene::entity::Entity;
+use crate::old::scene::entity::Entity;
 
 use super::Component;
 
@@ -36,7 +36,7 @@ impl Component for DebugMovementComponent {
 
     fn start(&self) {}
 
-    fn update(&self, input: &crate::core::input::Input, delta: f32) {
+    fn update(&self, input: &crate::old::core::input::Input, delta: f32) {
         if !input.get_cursor_captured() {
             return;
         }

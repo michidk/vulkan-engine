@@ -4,7 +4,7 @@ use ash::vk;
 use gpu_allocator::{vulkan::Allocation, MemoryLocation};
 use ve_format::mesh::{Face, MeshData, Vertex};
 
-use crate::vulkan::{allocator::Allocator, error::GraphicsResult, uploader::Uploader};
+use crate::old::vulkan::{allocator::Allocator, error::GraphicsResult, uploader::Uploader};
 pub struct Mesh {
     allocator: Rc<Allocator>,
     pub(crate) vertex_buffer: vk::Buffer,

@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::assets::shader;
+use crate::old::assets::shader;
 
 /// Loads a vertex and fragment shader from the filesystem and creates a [`vk::ShaderModule`] for each.
 pub(crate) fn create_shader_modules(

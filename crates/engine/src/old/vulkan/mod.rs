@@ -21,7 +21,7 @@ use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::old::{
     core::engine::EngineInfo,
     scene::{
         component::camera_component::CameraUniformData,

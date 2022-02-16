@@ -49,6 +49,17 @@ impl Context {
     }
 }
 
+impl Drop for Context {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().expect("vkDeviceWaitIdle()");
+
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
+        }
+    }
+}
+
 impl Context {
     fn surface_extension_candidates() -> Vec<&'static CStr> {
         #[cfg(windows)]

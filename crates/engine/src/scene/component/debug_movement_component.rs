@@ -3,7 +3,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use egui::{Slider, TextEdit};
 use gfx_maths::{Quaternion, Vec3};
 use winit::event::VirtualKeyCode;
 
@@ -92,21 +91,9 @@ impl Component for DebugMovementComponent {
         "DebugMovementComponent"
     }
 
-    fn render_inspector(&self, ui: &mut egui::Ui) {
+    fn render_inspector(&self, ui: &imgui::Ui) {
         let mut ms = self.movement_speed.get();
-        ui.add(Slider::new(&mut ms, 0.1..=20.0).text("Movement Speed"));
+        ui.slider("Movement Speed", 0.1, 20.0, &mut ms);
         self.movement_speed.set(ms);
-
-        ui.horizontal(|ui| {
-            ui.label("Rotation X");
-            let mut text = self.rotation_x.get().to_degrees().to_string();
-            ui.add_enabled(false, TextEdit::singleline(&mut text));
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("Rotation Y");
-            let mut text = self.rotation_y.get().to_degrees().to_string();
-            ui.add_enabled(false, TextEdit::singleline(&mut text));
-        });
     }
 }

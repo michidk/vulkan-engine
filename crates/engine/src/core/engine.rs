@@ -1,17 +1,14 @@
 use std::{
     cell::RefCell,
-    ffi::CStr,
+    ffi::{CStr, CString},
     rc::Rc,
     time::{Duration, Instant},
 };
 
 use ash::vk;
-use egui::{
-    plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, ComboBox, CtxRef, DragValue, ProgressBar, RichText, ScrollArea,
-    SidePanel,
-};
-use gfx_maths::Quaternion;
+
+use gfx_maths::{Quaternion, Vec3};
+use imgui::{Condition, TreeNodeFlags};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -73,8 +70,11 @@ impl EngineInit {
         let input = Rc::new(RefCell::new(Input::new()));
         let gameloop = GameLoop::new(input.clone());
 
-        let gui_context = egui::CtxRef::default();
-        let gui_state = egui_winit::State::new(&window.winit_window);
+        let mut imgui = imgui::Context::create();
+        let imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+
+        imgui.fonts().build_rgba32_texture();
+        imgui.io_mut().config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
 
         Ok(Self {
             eventloop,
@@ -85,35 +85,40 @@ impl EngineInit {
                 scene,
                 vulkan_manager,
                 window,
-                gui_context,
-                gui_state,
+                imgui, 
+                imgui_platform, 
 
-                fps_time: Instant::now(),
-                fps_count: 0,
-                fps: 0,
-                last_frame: Instant::now(),
-                frame_time_last_sample: Instant::now(),
-                frame_time_max: 0.0,
-                render_time_max: 0.0,
-                ui_time_max: 0.0,
-                last_render_time: 0.0,
-                last_ui_time: 0.0,
-                frame_time_history: Vec::with_capacity(5000),
-                render_time_history: Vec::with_capacity(5000),
-                ui_time_history: Vec::with_capacity(5000),
+                ui: EngineUi { 
+                    ui_vertex_count: 0, 
+                    ui_index_count: 0, 
+                    ui_mesh_count: 0, 
+                    #[cfg(feature = "profiler")]
+                    profiler_visible: false,
+                    scene_graph_visible: false,
+                    inspector_visible: false,
+                    selected_entity: None,
+                    selected_factory: 0,
+                },
 
-                ui_vertex_count: 0,
-                ui_index_count: 0,
-                ui_mesh_count: 0,
+                frame_time_info: FrameTimeInfo {
+                    fps_time: Instant::now(),
+                    fps_count: 0,
+                    fps: 0,
+                    last_frame: Instant::now(),
+                    frame_time_last_sample: Instant::now(),
+                    frame_time_max: 0.0,
+                    render_time_max: 0.0,
+                    ui_time_max: 0.0,
+                    last_render_time: 0.0,
+                    last_ui_time: 0.0,
+                    frame_time_history: Vec::with_capacity(5000),
+                    render_time_history: Vec::with_capacity(5000),
+                    ui_time_history: Vec::with_capacity(5000),
+                },
 
-                scene_graph_visible: false,
-                #[cfg(feature = "profiler")]
-                profiler_visible: false,
                 config: read_config(),
 
                 component_factories: Vec::new(),
-                selected_entity: None,
-                selected_factory: 0,
             },
         })
     }
@@ -141,9 +146,19 @@ pub struct Engine {
     pub scene: Rc<Scene>,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
-    pub gui_context: egui::CtxRef,
-    pub gui_state: egui_winit::State,
+    pub(crate) imgui: imgui::Context,
+    pub(crate) imgui_platform: imgui_winit_support::WinitPlatform,
 
+    frame_time_info: FrameTimeInfo,
+
+    pub(crate) ui: EngineUi,
+
+    config: EngineConfig,
+
+    component_factories: Vec<(String, ComponentFactoryFn)>,
+}
+
+pub(crate) struct FrameTimeInfo {
     fps_time: Instant,
     fps_count: usize,
     fps: usize,
@@ -154,20 +169,21 @@ pub struct Engine {
     ui_time_max: f32,
     last_render_time: f32,
     last_ui_time: f32,
-    frame_time_history: Vec<Value>,
-    render_time_history: Vec<Value>,
-    ui_time_history: Vec<Value>,
+    frame_time_history: Vec<f32>,
+    render_time_history: Vec<f32>,
+    ui_time_history: Vec<f32>,
+}
 
+pub(crate) struct EngineUi {
     ui_vertex_count: u32,
     ui_index_count: u32,
     ui_mesh_count: u32,
 
-    scene_graph_visible: bool,
     #[cfg(feature = "profiler")]
     profiler_visible: bool,
-    config: EngineConfig,
+    scene_graph_visible: bool,
+    inspector_visible: bool,
 
-    component_factories: Vec<(String, ComponentFactoryFn)>,
     selected_entity: Option<Rc<Entity>>,
     selected_factory: usize,
 }
@@ -181,286 +197,175 @@ impl Engine {
         self.component_factories.push((name, |e| T::create(e)));
     }
 
-    fn render_component(ui: &mut egui::Ui, component: &dyn Component) {
-        ui.label(component.inspector_name());
-        ui.indent("", |ui| {
+    fn render_component(ui: &imgui::Ui, component: &dyn Component) {
+        if ui.collapsing_header(component.inspector_name(), TreeNodeFlags::DEFAULT_OPEN) {
             component.render_inspector(ui);
-        });
+        }
     }
 
     fn render_inspector(
-        ctx: &CtxRef,
+        ui: &imgui::Ui,
         selected_entity: &mut Option<Rc<Entity>>,
         selected_factory: &mut usize,
         factories: &[(String, ComponentFactoryFn)],
     ) {
-        SidePanel::right("inspector")
-            .resizable(true)
-            .show(ctx, |ui| {
-                ScrollArea::vertical().show(ui, |ui| {
-                    if let Some(entity) = selected_entity {
-                        ui.heading(format!("Entity {} ({}) selected", entity.id, &entity.name));
+        ui.window("Inspector")
+            .build(|| {
+                if let Some(entity) = selected_entity {
+                    ui.text(format!("Entity {} ({})", entity.id, &entity.name));
 
-                        if ui.button("Deselect").clicked() {
-                            *selected_entity = None;
-                            return;
-                        }
+                    let mut transform = entity.transform.borrow_mut();
 
-                        let mut transform = entity.transform.borrow_mut();
+                    let mut pos = [transform.position.x, transform.position.y, transform.position.z];
+                    if ui.input_float3("Position", &mut pos).build() {
+                        transform.position = Vec3::new(pos[0], pos[1], pos[2]);
+                    }   
 
-                        ui.label("Position");
-                        ui.horizontal(|ui| {
-                            ui.add(DragValue::new(&mut transform.position.x).prefix("X: "));
-                            ui.add(DragValue::new(&mut transform.position.y).prefix("Y: "));
-                            ui.add(DragValue::new(&mut transform.position.z).prefix("Z: "));
-                        });
-
-                        ui.label("Rotation");
-                        ui.horizontal(|ui| {
-                            let mut euler = transform.rotation.to_euler_angles_zyx();
-
-                            if ui
-                                .add(
-                                    DragValue::new(&mut euler.x)
-                                        .prefix("Pitch: ")
-                                        .max_decimals(2),
-                                )
-                                .changed()
-                                || ui
-                                    .add(
-                                        DragValue::new(&mut euler.y)
-                                            .prefix("Yaw: ")
-                                            .max_decimals(2),
-                                    )
-                                    .changed()
-                                || ui
-                                    .add(
-                                        DragValue::new(&mut euler.z)
-                                            .prefix("Roll: ")
-                                            .max_decimals(2),
-                                    )
-                                    .changed()
-                            {
-                                transform.rotation = Quaternion::from_euler_angles_zyx(&euler);
-                            }
-                        });
-
-                        ui.label("Scale");
-                        ui.horizontal(|ui| {
-                            ui.add(DragValue::new(&mut transform.scale.x).prefix("X: "));
-                            ui.add(DragValue::new(&mut transform.scale.y).prefix("Y: "));
-                            ui.add(DragValue::new(&mut transform.scale.z).prefix("Z: "));
-                        });
-
-                        ui.separator();
-
-                        ui.heading("Components");
-
-                        for comp in &*entity.components.borrow() {
-                            Self::render_component(ui, &**comp);
-                        }
-
-                        ui.horizontal(|ui| {
-                            ComboBox::from_id_source("factory_selection").show_index(
-                                ui,
-                                selected_factory,
-                                factories.len(),
-                                |i| factories[i].0.clone(),
-                            );
-
-                            if ui.button("Add").clicked() {
-                                entity.new_component_with_factory(factories[*selected_factory].1);
-                            }
-                        });
-                    } else {
-                        ui.heading("Inspector");
+                    let euler = transform.rotation.to_euler_angles_zyx();
+                    let mut rot = [euler.x, euler.y, euler.z];
+                    if ui.input_float3("Rotation", &mut rot).build() {
+                        transform.rotation = Quaternion::from_euler_angles_zyx(&Vec3::new(rot[0], rot[1], rot[2]));
                     }
-                });
-                ui.allocate_space(ui.available_size());
+
+                    let mut scale = [transform.scale.x, transform.scale.y, transform.scale.z];
+                    if ui.input_float3("Scale", &mut scale).build() {
+                        transform.scale = Vec3::new(scale[0], scale[1], scale[2]);
+                    }
+
+                    ui.separator();
+
+                    ui.text("Components");
+
+                    for comp in &*entity.components.borrow() {
+                        Self::render_component(ui, &**comp);
+                    }
+
+                    if ui.button("Add Component") {
+                        ui.open_popup("Add Component");
+                    }
+
+                    ui.popup("Add Component", || {
+                        for (name, factory) in factories {
+                            if ui.button(name) {
+                                entity.new_component_with_factory(factory);
+                                ui.close_current_popup();
+                            }
+                        }
+                    });
+                    
+                } else {
+                    ui.text("Inspector");
+                }
             });
     }
 
     fn render_entity(
-        ui: &mut egui::Ui,
+        ui: &imgui::Ui,
         entity: &Rc<Entity>,
         selected_entity: &mut Option<Rc<Entity>>,
     ) {
-        ui.collapsing(
-            RichText::new(format!("{} - (ID {})", entity.name, entity.id)).strong(),
-            |ui| {
-                if ui.button("Inspect").clicked() {
-                    *selected_entity = Some(entity.clone());
-                }
+        let node = ui.tree_node_config(format!("{} - (ID {})", entity.name, entity.id))
+            .open_on_arrow(true)
+            .selected(selected_entity.as_ref().map_or(false, |se| se.id == entity.id))
+            .push();
 
-                if ui.button("Add child").clicked() {
-                    entity.add_new_child("New Entity".to_string());
-                }
+        if ui.is_item_clicked() && !ui.is_item_toggled_open() {
+            *selected_entity = Some(entity.clone());
+        }
+        
+        if let Some(node) = node {
+            if ui.button("Add child") {
+                entity.add_new_child("New Entity".to_string());
+            }
 
-                let children = entity.children.borrow();
-                for child in &*children {
-                    Self::render_entity(ui, child, selected_entity);
-                }
-            },
-        );
+            let children = entity.children.borrow();
+            for child in &*children {
+                Self::render_entity(ui, child, selected_entity);
+            }
+
+            node.pop();
+        }
     }
 
     pub(crate) fn render(&mut self) {
         profile_function!();
 
-        let frame_time = self.update_frame_stats();
+        let frame_time = Self::update_frame_stats(&mut self.frame_time_info);
 
-        let gui_meshes = self.render_debug_ui(frame_time);
-
-        self.render_3d(gui_meshes);
+        self.render_debug_ui(frame_time);
     }
 
-    fn update_frame_stats(&mut self) -> f32 {
-        self.fps_count += 1;
-        if self.fps_time.elapsed().as_secs() >= 1 {
-            self.fps = self.fps_count;
-            self.fps_count = 0;
-            self.fps_time = Instant::now();
+    fn update_frame_stats(frame_time_info: &mut FrameTimeInfo) -> f32 {
+        frame_time_info.fps_count += 1;
+        if frame_time_info.fps_time.elapsed().as_secs() >= 1 {
+            frame_time_info.fps = frame_time_info.fps_count;
+            frame_time_info.fps_count = 0;
+            frame_time_info.fps_time = Instant::now();
         }
 
-        let frame_time = self.last_frame.elapsed().as_secs_f32() * 1000.0;
-        self.last_frame = Instant::now();
+        let frame_time = frame_time_info.last_frame.elapsed().as_secs_f32() * 1000.0;
+        frame_time_info.last_frame = Instant::now();
 
-        if frame_time > self.frame_time_max {
-            self.frame_time_max = frame_time;
-            self.render_time_max = self.last_render_time;
-            self.ui_time_max = self.last_ui_time;
+        if frame_time > frame_time_info.frame_time_max {
+            frame_time_info.frame_time_max = frame_time;
+            frame_time_info.render_time_max = frame_time_info.last_render_time;
+            frame_time_info.ui_time_max = frame_time_info.last_ui_time;
         }
 
-        if self.frame_time_last_sample.elapsed().as_millis() >= 100 {
-            let plot_x = self
-                .frame_time_history
-                .last()
-                .map(|v| v.x + 0.1)
-                .unwrap_or(0.0);
-
-            self.frame_time_history.push(Value::new(
-                plot_x,
-                if plot_x == 0.0 {
-                    0.0
-                } else {
-                    self.frame_time_max
-                },
-            ));
-            if self.frame_time_history.len() > 10 * 10 {
-                self.frame_time_history.remove(0);
+        if frame_time_info.frame_time_last_sample.elapsed().as_millis() >= 100 {
+            frame_time_info.frame_time_history.push(frame_time_info.frame_time_max);
+            if frame_time_info.frame_time_history.len() > 10 * 10 {
+                frame_time_info.frame_time_history.remove(0);
             }
 
-            self.render_time_history.push(Value::new(
-                plot_x,
-                if plot_x == 0.0 {
-                    0.0
-                } else {
-                    self.render_time_max
-                },
-            ));
-            if self.render_time_history.len() > 10 * 10 {
-                self.render_time_history.remove(0);
+            frame_time_info.render_time_history.push(frame_time_info.render_time_max);
+            if frame_time_info.render_time_history.len() > 10 * 10 {
+                frame_time_info.render_time_history.remove(0);
             }
 
-            self.ui_time_history.push(Value::new(
-                plot_x,
-                if plot_x == 0.0 {
-                    0.0
-                } else {
-                    self.ui_time_max + self.render_time_max
-                },
-            ));
-            if self.ui_time_history.len() > 10 * 10 {
-                self.ui_time_history.remove(0);
+            frame_time_info.ui_time_history.push(frame_time_info.ui_time_max + frame_time_info.render_time_max);
+            if frame_time_info.ui_time_history.len() > 10 * 10 {
+                frame_time_info.ui_time_history.remove(0);
             }
 
-            self.frame_time_last_sample += Duration::from_millis(100);
+            frame_time_info.frame_time_last_sample += Duration::from_millis(100);
 
-            self.frame_time_max = 0.0;
-            self.render_time_max = 0.0;
-            self.ui_time_max = 0.0;
+            frame_time_info.frame_time_max = 0.0;
+            frame_time_info.render_time_max = 0.0;
+            frame_time_info.ui_time_max = 0.0;
         }
 
         frame_time
     }
 
-    fn render_3d(&mut self, gui_meshes: Vec<egui::ClippedMesh>) {
+    fn render_debug_tools_window(ui: &imgui::Ui, engine_ui: &mut EngineUi, frame_time_info: &FrameTimeInfo, frame_time: f32, vulkan_manager: &mut VulkanManager) {
         profile_function!();
 
-        let render_start_time = Instant::now();
+        ui.window("Debug Tools")
+            .build(|| {
+                ui.text("Frame timing");
 
-        let vk = &mut self.vulkan_manager;
-
-        {
-            // prepare for render
-            let image_index = vk.next_frame();
-            vk.wait_for_fence();
-            vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
-            vk.wait_for_uploads();
-
-            vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
-                .expect("updating the command buffer");
-
-            // finalize renderpass
-            vk.submit();
-            vk.present(image_index);
-        }
-
-        let render_time = render_start_time.elapsed().as_secs_f32() * 1000.0;
-        self.last_render_time = render_time;
-    }
-
-    fn render_debug_tools_window(&mut self, ctx: &egui::CtxRef, frame_time: f32) {
-        profile_function!();
-
-        egui::Window::new("Debug Tools")
-            .title_bar(true)
-            .collapsible(false)
-            .resizable(true)
-            .show(ctx, |ui| {
-                ui.heading("Frame timing");
-
-                let fps_color = match self.fps {
-                    0..=29 => Color32::RED,
-                    30..=59 => Color32::YELLOW,
-                    _ => Color32::WHITE,
+                let fps_color = match frame_time_info.fps {
+                    0..=29 => [1.0, 0.0, 0.0, 1.0],
+                    30..=59 => [1.0, 1.0, 0.0, 1.0],
+                    _ => [1.0, 1.0, 1.0, 1.0],
                 };
-                ui.colored_label(fps_color, format!("FPS: {}", self.fps));
-                ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
 
-                Plot::new("Frame time Graph")
-                    .height(70.0)
-                    .include_y(0.0)
-                    .legend(Legend::default())
-                    .show(ui, |ui| {
-                        let line = Line::new(Values::from_values(self.frame_time_history.clone()))
-                            .name("Frame")
-                            .fill(0.0)
-                            .highlight();
-                        ui.line(line);
+                ui.text_colored(fps_color, format!("FPS: {}", frame_time_info.fps));
+                ui.text_colored(fps_color, format!("Frame time: {:.3} ms", frame_time));
 
-                        let line = Line::new(Values::from_values(self.render_time_history.clone()))
-                            .name("Render")
-                            .fill(0.0)
-                            .highlight();
-                        ui.line(line);
-
-                        let line = Line::new(Values::from_values(self.ui_time_history.clone()))
-                            .name("UI")
-                            .fill(0.0)
-                            .highlight();
-                        ui.line(line);
-                    });
+                ui.plot_lines("Frame time Graph", &frame_time_info.frame_time_history)
+                    .build();
 
                 #[cfg(feature = "profiler")]
-                if ui.button("Profiler").clicked() {
-                    self.profiler_visible = true;
+                if ui.button("Profiler") {
+                    engine_ui.profiler_visible = true;
                     puffin::set_scopes_on(true);
                 }
 
-                if let Some((budget, heap_count)) = self.vulkan_manager.get_budget() {
+                if let Some((budget, heap_count)) = vulkan_manager.get_budget() {
                     ui.separator();
-                    ui.heading("Memory usage");
+                    ui.text("Memory usage");
 
                     for (i, (available, used)) in budget.heap_budget[..heap_count]
                         .iter()
@@ -472,52 +377,32 @@ impl Engine {
                         let budget_mb = (*available as f32) / 1024.0 / 1024.0;
                         let used_mb = (*used as f32) / 1024.0 / 1024.0;
 
-                        ui.scope(|ui| {
-                            if portion > 0.8 {
-                                ui.style_mut().visuals.selection.bg_fill = Color32::RED;
-                            } else if portion > 0.6 {
-                                ui.style_mut().visuals.selection.bg_fill =
-                                    Color32::from_rgb(255, 127, 0);
-                            }
-
-                            ui.add(ProgressBar::new(portion).text(format!(
-                                "Heap {}: {:.3} MB/{:.3} MB ({:.2}%)",
-                                i,
-                                used_mb,
-                                budget_mb,
-                                portion * 100.0
-                            )));
-                        });
+                        imgui::ProgressBar::new(portion)
+                            .overlay_text(format!("Heap {}: {:.3} MB/{:.3} MB ({:.2}%)", i, used_mb, budget_mb, portion * 100.0))
+                            .build(ui);
                     }
                 }
 
                 ui.separator();
-                ui.heading("Debugging");
 
-                ui.checkbox(&mut self.vulkan_manager.enable_wireframe, "Wireframe");
+                ui.text("Debugging");
 
-                ui.checkbox(&mut self.scene_graph_visible, "Show scene graph");
+                ui.checkbox("Wireframe", &mut vulkan_manager.enable_wireframe);
+                ui.checkbox("Show scene graph", &mut engine_ui.scene_graph_visible);
 
-                CollapsingHeader::new("UI Debugging").show(ui, |ui| {
-                    ui.checkbox(&mut self.vulkan_manager.enable_ui_wireframe, "UI Triangles");
-
-                    ui.label(format!("Vertices: {}", self.ui_vertex_count));
-                    ui.label(format!(
-                        "Indices: {} ({} triangles)",
-                        self.ui_index_count,
-                        self.ui_index_count / 3
-                    ));
-                    ui.label(format!("Draw calls: {}", self.ui_mesh_count));
-                });
+                ui.collapsing_header("UI Debugging", imgui::TreeNodeFlags::FRAMED);
+                ui.checkbox("UI Triangles", &mut vulkan_manager.enable_ui_wireframe);
+                ui.text(format!("Vertices: {}", engine_ui.ui_vertex_count));
+                ui.text(format!("Indices: {} ({} triangles)", engine_ui.ui_index_count, engine_ui.ui_index_count / 3));
+                ui.text(format!("Draw calls: {}", engine_ui.ui_mesh_count));
 
                 ui.separator();
-                ui.heading("GPU Override");
 
-                ui.label(format!(
-                    "Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                ui.text("GPU Override");
+                ui.text(format!("Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
                     unsafe {
                         CStr::from_ptr(
-                            self.vulkan_manager
+                            vulkan_manager
                                 .physical_device_properties
                                 .device_name
                                 .as_ptr(),
@@ -525,152 +410,132 @@ impl Engine {
                     }
                     .to_str()
                     .unwrap(),
-                    self.vulkan_manager.physical_device_properties.vendor_id,
-                    self.vulkan_manager.physical_device_properties.device_id,
+                    vulkan_manager.physical_device_properties.vendor_id,
+                    vulkan_manager.physical_device_properties.device_id,
                     vk::api_version_major(
-                        self.vulkan_manager.physical_device_properties.api_version
+                        vulkan_manager.physical_device_properties.api_version
                     ),
                     vk::api_version_minor(
-                        self.vulkan_manager.physical_device_properties.api_version
+                        vulkan_manager.physical_device_properties.api_version
                     ),
                     vk::api_version_patch(
-                        self.vulkan_manager.physical_device_properties.api_version
+                        vulkan_manager.physical_device_properties.api_version
                     ),
                 ));
-
-                let device_override = self
-                    .config
-                    .renderer
-                    .as_ref()
-                    .map(|rc| rc.gpu_vendor_id.zip(rc.gpu_device_id))
-                    .unwrap_or_default();
-
-                if ui
-                    .selectable_label(device_override.is_none(), "Default")
-                    .clicked()
-                {
-                    log::info!("Clearing GPU override");
-                    self.config.renderer = None;
-                    write_config(&self.config);
-
-                    let args = std::env::args().collect::<Vec<_>>();
-                    std::process::Command::new(&args[0])
-                        .args(args)
-                        .spawn()
-                        .unwrap();
-                    std::process::exit(0);
-                }
-                for (_, props, _) in &self.vulkan_manager.supported_devices {
-                    let name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }
-                        .to_str()
-                        .unwrap();
-
-                    let clicked = ui
-                        .selectable_label(
-                            device_override.map_or(false, |d| {
-                                d.0 == props.vendor_id && d.1 == props.device_id
-                            }),
-                            format!(
-                                "{} ({:08X}:{:08X}) Vulkan {}.{}.{}",
-                                name,
-                                props.vendor_id,
-                                props.device_id,
-                                vk::api_version_major(props.api_version),
-                                vk::api_version_minor(props.api_version),
-                                vk::api_version_patch(props.api_version),
-                            ),
-                        )
-                        .clicked();
-                    if clicked {
-                        log::info!("Overriding config with new device");
-                        self.config.renderer = Some(RendererConfig {
-                            gpu_vendor_id: Some(props.vendor_id),
-                            gpu_device_id: Some(props.device_id),
-                        });
-                        write_config(&self.config);
-
-                        let args = std::env::args().collect::<Vec<_>>();
-                        std::process::Command::new(&args[0])
-                            .args(args)
-                            .spawn()
-                            .unwrap();
-                        std::process::exit(0);
-                    }
-                }
             });
     }
 
-    fn render_scene_graph(&mut self, ctx: &egui::CtxRef) {
+    fn render_scene_graph(ui: &imgui::Ui, scene: &Scene, selected_entity: &mut Option<Rc<Entity>>) {
         profile_function!();
 
-        let root_entity = self.scene.root_entity.borrow();
-        if self.scene_graph_visible {
-            egui::SidePanel::right("Scene graph")
-                .resizable(true)
-                .show(ctx, |ui| {
-                    ScrollArea::vertical().show(ui, |ui| {
-                        Self::render_entity(ui, &root_entity, &mut self.selected_entity);
-                    });
-                    ui.allocate_space(ui.available_size());
-                });
-        }
+        let root_entity = scene.root_entity.borrow();
+
+        ui.window("Scene graph")
+            .build(|| {
+                Self::render_entity(ui, &root_entity, selected_entity);
+            });
     }
 
-    fn render_debug_ui(&mut self, frame_time: f32) -> Vec<egui::ClippedMesh> {
+    fn render_debug_ui(&mut self, frame_time: f32) {
         profile_function!();
 
         let ui_start_time = Instant::now();
 
-        let mut gui_context = self.gui_context.clone();
+        let ui = self.imgui.frame();
 
-        let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
-        let (output, shapes) = gui_context.run(gui_input, |ctx| {
-            self.render_debug_tools_window(ctx, frame_time);
-
-            self.render_scene_graph(ctx);
-
-            if self.scene_graph_visible {
-                Self::render_inspector(
-                    ctx,
-                    &mut self.selected_entity,
-                    &mut self.selected_factory,
-                    &self.component_factories,
-                );
-            }
-
-            #[cfg(feature = "profiler")]
-            if self.profiler_visible && !puffin_egui::profiler_window(ctx) {
-                self.profiler_visible = false;
-                puffin::set_scopes_on(false);
-            }
-        });
-
-        // After every frame, an egui::CtxRef refers to an entirely new object, even though an "xxxRef" sounds like it works just like an Arc<...>.
-        // Because of this, we need to reassign self.gui_context to the "new" gui_context.
-        self.gui_context = gui_context;
-
-        let gui_meshes;
         {
-            profile_scope!("Ui tesselation");
-            self.gui_state
-                .handle_output(&self.window.winit_window, &self.gui_context, output);
-            gui_meshes = self.gui_context.tessellate(shapes);
+            ui.main_menu_bar(|| {
+                ui.menu("View", || {
+                    ui.menu_item_config("Scene Graph").build_with_ref(&mut self.ui.scene_graph_visible);
+                    ui.menu_item_config("Inspector").build_with_ref(&mut self.ui.inspector_visible);
+                });
+            });
 
-            self.ui_vertex_count = gui_meshes.iter().map(|m| m.1.vertices.len() as u32).sum();
-            self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
-            self.ui_mesh_count = gui_meshes.len() as u32;
+            let wnd = ui.window("Root Window")
+                .position([0.0, 20.0], Condition::Always)
+                .size([ui.io().display_size[0], ui.io().display_size[1] - 2.0], Condition::Always)
+                .no_decoration()
+                .movable(false)
+                .bring_to_front_on_focus(false)
+                .nav_focus(false)
+                .draw_background(false)
+                .begin();
+            if let Some(wnd) = wnd {
+                unsafe {
+                    let name = CString::new("Root Docking Space").unwrap();
+                    let id = imgui_sys::igGetIDStr(name.as_ptr());
+                    imgui_sys::igDockSpace(id, imgui_sys::ImVec2 { x: 0.0, y: 0.0 }, imgui_sys::ImGuiDockNodeFlags_PassthruCentralNode as i32, std::ptr::null());
+                }
+
+                Self::render_debug_tools_window(ui, &mut self.ui, &self.frame_time_info, frame_time, &mut self.vulkan_manager);
+
+                if self.ui.scene_graph_visible {
+                    Self::render_scene_graph(&ui, &self.scene, &mut self.ui.selected_entity);
+                }
+
+                if self.ui.inspector_visible {
+                    Self::render_inspector(
+                        &ui,
+                        &mut self.ui.selected_entity,
+                        &mut self.ui.selected_factory,
+                        &self.component_factories,
+                    );
+                }
+
+                // #[cfg(feature = "profiler")]
+                // if self.profiler_visible && !puffin_imgui:: {
+                //     self.profiler_visible = false;
+                //     puffin::set_scopes_on(false);
+                // }
+
+                wnd.end();
+            }
         }
 
-        let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
-        self.last_ui_time = ui_time;
+        self.imgui_platform.prepare_render(&ui, &self.window.winit_window);
 
-        gui_meshes
+        let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
+        self.frame_time_info.last_ui_time = ui_time;
+
+        let render_start_time = Instant::now();
+
+        let vk = &mut self.vulkan_manager;
+
+        {
+            // prepare for render
+            let image_index = vk.next_frame();
+            vk.wait_for_fence();
+
+            vk.upload_font(&mut self.imgui);
+
+            let draw_data;
+            {
+                profile_scope!("Ui tesselation");
+                draw_data = self.imgui.render();
+            }
+
+            self.ui.ui_vertex_count = draw_data.total_vtx_count as u32;
+            self.ui.ui_index_count = draw_data.total_idx_count as u32;
+            self.ui.ui_mesh_count = draw_data.draw_lists_count() as u32;
+            vk.upload_ui_data(draw_data);
+            vk.wait_for_uploads();
+
+            vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
+                .expect("updating the command buffer");
+
+            // finalize renderpass
+            vk.submit();
+            vk.present(image_index);
+        }
+
+        let render_time = render_start_time.elapsed().as_secs_f32() * 1000.0;
+        self.frame_time_info.last_render_time = render_time;
     }
 }
 
 impl Drop for Engine {
     fn drop(&mut self) {
-        self.selected_entity = None;
+        self.ui.selected_entity = None;
         self.vulkan_manager.wait_idle();
     }
 }

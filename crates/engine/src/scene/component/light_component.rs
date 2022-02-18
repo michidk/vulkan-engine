@@ -1,6 +1,5 @@
 use std::{cell::Cell, rc::Weak};
 
-use egui::DragValue;
 use gfx_maths::{Vec3, Vec4};
 
 use crate::scene::{
@@ -75,18 +74,16 @@ impl Component for LightComponent {
         lights.push(self.light.get());
     }
 
-    fn render_inspector(&self, ui: &mut egui::Ui) {
+    fn render_inspector(&self, ui: &imgui::Ui) {
         let mut light = self.light.get();
 
         let col = self.color.get();
         let mut col = [col.x, col.y, col.z];
         let mut int = self.intensity.get();
 
-        ui.label("Color");
-        if ui.color_edit_button_rgb(&mut col).changed()
-            || ui
-                .add(DragValue::new(&mut int).prefix("Intensity: "))
-                .changed()
+        let color_id = ui.push_id_ptr(self);
+        if imgui::ColorEdit3::new("Color", &mut col).build(ui)
+            || imgui::Drag::new("Intensity").build(ui, &mut int) 
         {
             self.color.set(Vec3::new(col[0], col[1], col[2]));
             self.intensity.set(int);
@@ -98,6 +95,7 @@ impl Component for LightComponent {
                 Light::Point(pl) => pl.luminous_flux = Vec4::new(col[0], col[1], col[2], 0.0) * int,
             }
         }
+        color_id.end();
 
         self.light.set(light);
     }

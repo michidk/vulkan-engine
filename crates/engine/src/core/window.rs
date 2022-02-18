@@ -159,28 +159,28 @@ pub fn start(engine_init: EngineInit) -> ! {
         *controlflow = winit::event_loop::ControlFlow::Poll;
         engine.input.borrow_mut().update(&event, &engine);
 
-        match event {
-            Event::WindowEvent { event, .. } => {
-                match event {
+        match &event {
+            Event::WindowEvent { event: wnd_event, .. } => {
+                match wnd_event {
                     winit::event::WindowEvent::MouseInput { .. }
                     | winit::event::WindowEvent::MouseWheel { .. }
                     | winit::event::WindowEvent::CursorMoved { .. }
                     | winit::event::WindowEvent::KeyboardInput { .. } => {
                         if !engine.input.borrow().get_cursor_captured() {
-                            engine.gui_state.on_event(&engine.gui_context, &event);
+                            engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
                         }
                     }
                     _ => {
-                        engine.gui_state.on_event(&engine.gui_context, &event);
+                        engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
                     }
                 }
 
-                match event {
+                match wnd_event {
                     winit::event::WindowEvent::CloseRequested => {
                         *controlflow = winit::event_loop::ControlFlow::Exit
                     }
                     winit::event::WindowEvent::Focused(state) => {
-                        engine.window.on_focus(state);
+                        engine.window.on_focus(*state);
                     }
                     _ => {}
                 }
@@ -193,14 +193,19 @@ pub fn start(engine_init: EngineInit) -> ! {
                 engine.input.borrow_mut().handle_builtin(&mut engine.window);
 
                 let now = Instant::now();
-                let delta = (now - last_time).as_secs_f32();
+                let delta = now - last_time;
                 last_time = now;
 
-                engine.gameloop.update(&engine.scene, delta);
+                engine.imgui.io_mut().update_delta_time(delta);
+                engine.imgui_platform.prepare_frame(engine.imgui.io_mut(), &engine.window.winit_window);
+
+                engine.gameloop.update(&engine.scene, delta.as_secs_f32());
                 engine.render();
                 engine.input.borrow_mut().rollover_state();
             }
-            _ => {}
+            _ => {
+                engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
+            }
         }
     });
 }

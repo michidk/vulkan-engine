@@ -4,7 +4,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use egui::Slider;
 use gfx_maths::*;
 use vulkan_engine::{
     core::{engine::Engine, input::Input},
@@ -230,9 +229,9 @@ impl Component for RotateComponent {
         "RotateComponent"
     }
 
-    fn render_inspector(&self, ui: &mut egui::Ui) {
+    fn render_inspector(&self, ui: &imgui::Ui) {
         let mut rot_speed = self.rotation_speed.get();
-        ui.add(Slider::new(&mut rot_speed, -360.0..=360.0).text("Rotation Speed"));
+        ui.slider("Rotation Speed", -360.0, 360.0, &mut rot_speed);
         self.rotation_speed.set(rot_speed);
     }
 }
@@ -279,13 +278,13 @@ impl Component for ScaleComponent {
         "ScaleComponent"
     }
 
-    fn render_inspector(&self, ui: &mut egui::Ui) {
+    fn render_inspector(&self, ui: &imgui::Ui) {
         let mut time_scale = self.time_scale.get();
-        ui.add(egui::Slider::new(&mut time_scale, 0.0..=5.0).text("Time Scale"));
+        ui.slider("Time Scale", 0.0, 5.0, &mut time_scale);
         self.time_scale.set(time_scale);
 
         let mut max_scale = self.max_scale.get();
-        ui.add(egui::Slider::new(&mut max_scale, 0.0..=5.0).text("Max Scale"));
+        ui.slider("Max Scale", 0.0, 5.0, &mut max_scale);
         self.max_scale.set(max_scale);
     }
 }

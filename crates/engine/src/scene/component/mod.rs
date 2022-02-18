@@ -15,7 +15,7 @@ pub trait Component: Debug {
         Self: Sized;
 
     fn inspector_name(&self) -> &'static str;
-    fn render_inspector(&self, _ui: &mut egui::Ui) {}
+    fn render_inspector(&self, _ui: &imgui::Ui) {}
 
     fn load(&self);
     fn start(&self);

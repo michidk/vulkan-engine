@@ -16,8 +16,7 @@ pub(crate) mod uploader;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::vk::{self, Handle};
-use egui::ClippedMesh;
-use gfx_maths::Mat4;
+use gfx_maths::{Mat4, Vec3};
 use gpu_allocator::MemoryLocation;
 use serde::{Deserialize, Serialize};
 
@@ -101,7 +100,7 @@ pub struct VulkanManager {
 
     ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
-    ui_meshes: Vec<(egui::Rect, u64, u64)>,
+    ui_meshes: Vec<(imgui::DrawCmdParams, u64, u64)>,
 
     ext_memory_budget_supported: bool,
     pub(crate) supported_devices: Vec<(vk::PhysicalDevice, vk::PhysicalDeviceProperties, bool)>,
@@ -994,19 +993,19 @@ impl VulkanManager {
         }
 
         // render every mesh
-        for (rect, start_index, index_count) in &self.ui_meshes {
+        for (params, start_index, index_count) in &self.ui_meshes {
             unsafe {
                 self.device.cmd_set_scissor(
                     commandbuffer,
                     0,
                     &[vk::Rect2D {
                         offset: vk::Offset2D {
-                            x: rect.left() as i32,
-                            y: rect.top() as i32,
+                            x: params.clip_rect[0] as i32,
+                            y: params.clip_rect[1] as i32,
                         },
                         extent: vk::Extent2D {
-                            width: rect.width() as u32,
-                            height: rect.height() as u32,
+                            width: (params.clip_rect[2] - params.clip_rect[0]) as u32,
+                            height: (params.clip_rect[3] - params.clip_rect[1]) as u32,
                         },
                     }],
                 );
@@ -1016,7 +1015,7 @@ impl VulkanManager {
                     *index_count as u32,
                     1,
                     *start_index as u32,
-                    0,
+                    params.vtx_offset as i32,
                     0,
                 );
             }
@@ -1240,38 +1239,23 @@ impl VulkanManager {
         self.uploader.submit_uploads(self.queues.graphics_queue);
     }
 
-    pub(crate) fn upload_ui_data(
-        &mut self,
-        gui_context: egui::CtxRef,
-        gui_meshes: Vec<ClippedMesh>,
-    ) {
-        profile_function!();
+    pub(crate) fn upload_font(&mut self, ctx: &mut imgui::Context) {
+        if self.ui_texture_version == u64::MAX {
+            let font_image = ctx.fonts().build_rgba32_texture();
 
-        let font_image = gui_context.font_image();
-        if font_image.version != self.ui_texture_version {
             log::trace!(
                 "UI font texture changed to {}x{}",
                 font_image.width,
                 font_image.height
             );
 
-            self.ui_texture_version = font_image.version;
-
-            let num_pixels = font_image.width * font_image.height;
-            let mut pixels = vec![0; num_pixels * 4];
-            for i in 0..num_pixels {
-                let alpha = font_image.pixels[i];
-                pixels[i * 4] = 0xFFu8;
-                pixels[i * 4 + 1] = 0xFFu8;
-                pixels[i * 4 + 2] = 0xFFu8;
-                pixels[i * 4 + 3] = alpha;
-            }
+            self.ui_texture_version = 0;
 
             self.ui_texture = Some(
                 Texture2D::new(
-                    font_image.width as u32,
-                    font_image.height as u32,
-                    &pixels,
+                    font_image.width,
+                    font_image.height,
+                    font_image.data,
                     TextureFilterMode::Linear,
                     (*self.allocator).clone(),
                     &mut (*self.uploader),
@@ -1280,50 +1264,58 @@ impl VulkanManager {
                 .unwrap(),
             );
         }
+    }
+
+    pub(crate) fn upload_ui_data(
+        &mut self,
+        draw_data: &imgui::DrawData,
+    ) {
+        profile_function!();
+
+        let mut vertex_buffer = Vec::with_capacity(draw_data.total_vtx_count as usize);
+        let mut index_buffer = Vec::with_capacity(draw_data.total_idx_count as usize);
 
         self.ui_meshes.clear();
 
-        let num_vertices: u64 = gui_meshes.iter().map(|m| m.1.vertices.len()).sum::<usize>() as u64;
-        let mut vertex_buffer = Vec::with_capacity(num_vertices as usize);
-
-        let num_indices: u64 = gui_meshes.iter().map(|m| m.1.indices.len()).sum::<usize>() as u64;
-        let mut index_buffer = Vec::with_capacity(num_indices as usize);
-
-        for m in gui_meshes {
+        for m in draw_data.draw_lists() {
             let vertex_offset = vertex_buffer.len();
-
             let start_index = index_buffer.len() as u64;
 
-            for v in m.1.vertices {
-                vertex_buffer.push(v);
+            for v in m.vtx_buffer() {
+                vertex_buffer.push(*v);
             }
 
-            for i in m.1.indices {
-                index_buffer.push(i + vertex_offset as u32);
+            for i in m.idx_buffer() {
+                index_buffer.push((*i) as u32 + vertex_offset as u32);
             }
 
-            let index_count = index_buffer.len() as u64 - start_index;
-
-            self.ui_meshes.push((m.0, start_index, index_count));
+            for cmd in m.commands() {
+                match cmd {
+                    imgui::DrawCmd::Elements { count, cmd_params } => {
+                        self.ui_meshes.push((cmd_params, start_index + cmd_params.idx_offset as u64, count as u64));
+                    },
+                    _ => {},
+                }
+            }
         }
 
         {
             let (buffer, alloc, cap) =
                 &mut self.ui_vertex_buffers[self.current_frame_index as usize];
-            if *cap < num_vertices {
+            if *cap < draw_data.total_vtx_count as u64 {
                 self.allocator.destroy_buffer(*buffer, (*alloc).clone());
 
                 let (new_buffer, new_alloc) = self
                     .allocator
                     .create_buffer(
-                        20 * num_vertices,
+                        20 * draw_data.total_vtx_count as u64,
                         vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
                         MemoryLocation::GpuOnly,
                     )
                     .unwrap();
                 *buffer = new_buffer;
                 *alloc = new_alloc;
-                *cap = num_vertices;
+                *cap = draw_data.total_vtx_count as u64;
             }
 
             self.uploader
@@ -1333,20 +1325,20 @@ impl VulkanManager {
         {
             let (buffer, alloc, cap) =
                 &mut self.ui_index_buffers[self.current_frame_index as usize];
-            if *cap < num_indices {
+            if *cap < draw_data.total_idx_count as u64 {
                 self.allocator.destroy_buffer(*buffer, (*alloc).clone());
 
                 let (new_buffer, new_alloc) = self
                     .allocator
                     .create_buffer(
-                        4 * num_indices,
+                        4 * draw_data.total_idx_count as u64,
                         vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
                         MemoryLocation::GpuOnly,
                     )
                     .unwrap();
                 *buffer = new_buffer;
                 *alloc = new_alloc;
-                *cap = num_indices;
+                *cap = draw_data.total_idx_count as u64;
             }
 
             self.uploader

@@ -71,7 +71,8 @@ impl EngineInit {
         let gameloop = GameLoop::new(input.clone());
 
         let mut imgui = imgui::Context::create();
-        let imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        imgui_platform.attach_window(imgui.io_mut(), &window.winit_window, imgui_winit_support::HiDpiMode::Default);
 
         imgui.fonts().build_rgba32_texture();
         imgui.io_mut().config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
@@ -441,7 +442,7 @@ impl Engine {
 
         let ui_start_time = Instant::now();
 
-        let ui = self.imgui.frame();
+        let ui = self.imgui.new_frame();
 
         {
             ui.main_menu_bar(|| {

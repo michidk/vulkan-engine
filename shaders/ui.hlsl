@@ -37,8 +37,6 @@ FragOut frag(V2F fIn) {
     FragOut fOut;
 
     float4 texColor = u_Texture.Sample(s, fIn.uv);
-    texColor = float4(texColor.rgb * texColor.a, texColor.a);
-
     float4 finalColor = texColor * fIn.color;
 
     fOut.color = finalColor;

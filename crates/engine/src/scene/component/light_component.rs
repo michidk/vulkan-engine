@@ -82,9 +82,7 @@ impl Component for LightComponent {
         let mut int = self.intensity.get();
 
         let color_id = ui.push_id_ptr(self);
-        if imgui::ColorEdit3::new("Color", &mut col).build(ui)
-            || imgui::Drag::new("Intensity").build(ui, &mut int) 
-        {
+        if ui.color_edit3("Color", &mut col) || imgui::Drag::new("Intensity").build(ui, &mut int) {
             self.color.set(Vec3::new(col[0], col[1], col[2]));
             self.intensity.set(int);
 

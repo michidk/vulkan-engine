@@ -16,7 +16,7 @@ pub(crate) mod uploader;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::vk::{self, Handle};
-use gfx_maths::{Mat4, Vec3};
+use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +46,7 @@ use self::{
     uploader::Uploader,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
 pub(crate) struct RendererConfig {
     pub(crate) gpu_vendor_id: Option<u32>,
     pub(crate) gpu_device_id: Option<u32>,
@@ -1266,10 +1266,7 @@ impl VulkanManager {
         }
     }
 
-    pub(crate) fn upload_ui_data(
-        &mut self,
-        draw_data: &imgui::DrawData,
-    ) {
+    pub(crate) fn upload_ui_data(&mut self, draw_data: &imgui::DrawData) {
         profile_function!();
 
         let mut vertex_buffer = Vec::with_capacity(draw_data.total_vtx_count as usize);
@@ -1290,11 +1287,12 @@ impl VulkanManager {
             }
 
             for cmd in m.commands() {
-                match cmd {
-                    imgui::DrawCmd::Elements { count, cmd_params } => {
-                        self.ui_meshes.push((cmd_params, start_index + cmd_params.idx_offset as u64, count as u64));
-                    },
-                    _ => {},
+                if let imgui::DrawCmd::Elements { count, cmd_params } = cmd {
+                    self.ui_meshes.push((
+                        cmd_params,
+                        start_index + cmd_params.idx_offset as u64,
+                        count as u64,
+                    ));
                 }
             }
         }

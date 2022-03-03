@@ -73,8 +73,8 @@ impl Window {
     fn new(winit_window: winit::window::Window) -> Self {
         Self {
             winit_window,
-            capture_cursor: true,
-            focused: true, // in the beginning, the windows is always focused
+            capture_cursor: false,
+            focused: true, // in the beginning, the window is always focused
             mode: WindowMode::Windowed,
         }
     }
@@ -160,18 +160,28 @@ pub fn start(engine_init: EngineInit) -> ! {
         engine.input.borrow_mut().update(&event, &engine);
 
         match &event {
-            Event::WindowEvent { event: wnd_event, .. } => {
+            Event::WindowEvent {
+                event: wnd_event, ..
+            } => {
                 match wnd_event {
                     winit::event::WindowEvent::MouseInput { .. }
                     | winit::event::WindowEvent::MouseWheel { .. }
                     | winit::event::WindowEvent::CursorMoved { .. }
                     | winit::event::WindowEvent::KeyboardInput { .. } => {
                         if !engine.input.borrow().get_cursor_captured() {
-                            engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
+                            engine.imgui_platform.handle_event(
+                                engine.imgui.io_mut(),
+                                &engine.window.winit_window,
+                                &event,
+                            );
                         }
                     }
                     _ => {
-                        engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
+                        engine.imgui_platform.handle_event(
+                            engine.imgui.io_mut(),
+                            &engine.window.winit_window,
+                            &event,
+                        );
                     }
                 }
 
@@ -197,14 +207,21 @@ pub fn start(engine_init: EngineInit) -> ! {
                 last_time = now;
 
                 engine.imgui.io_mut().update_delta_time(delta);
-                engine.imgui_platform.prepare_frame(engine.imgui.io_mut(), &engine.window.winit_window);
+                engine
+                    .imgui_platform
+                    .prepare_frame(engine.imgui.io_mut(), &engine.window.winit_window)
+                    .expect("imgui_platform error");
 
                 engine.gameloop.update(&engine.scene, delta.as_secs_f32());
                 engine.render();
                 engine.input.borrow_mut().rollover_state();
             }
             _ => {
-                engine.imgui_platform.handle_event(engine.imgui.io_mut(), &engine.window.winit_window, &event);
+                engine.imgui_platform.handle_event(
+                    engine.imgui.io_mut(),
+                    &engine.window.winit_window,
+                    &event,
+                );
             }
         }
     });

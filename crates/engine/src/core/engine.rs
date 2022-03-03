@@ -8,7 +8,9 @@ use std::{
 use ash::vk;
 
 use gfx_maths::{Quaternion, Vec3};
-use imgui::{Condition, TreeNodeFlags};
+use imgui::{
+    Condition, Direction, FontConfig, FontSource, StyleColor, StyleVar, TreeNodeFlags, WindowFlags,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -39,7 +41,14 @@ pub struct EngineInit {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct EngineConfig {
+    pub(crate) ui: Option<UiConfig>,
     pub(crate) renderer: Option<vulkan::RendererConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
+pub(crate) struct UiConfig {
+    pub(crate) scene_graph_visible: Option<bool>,
+    pub(crate) inspector_visible: Option<bool>,
 }
 
 pub(crate) fn read_config() -> EngineConfig {
@@ -72,10 +81,85 @@ impl EngineInit {
 
         let mut imgui = imgui::Context::create();
         let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        imgui_platform.attach_window(imgui.io_mut(), &window.winit_window, imgui_winit_support::HiDpiMode::Default);
+        imgui_platform.attach_window(
+            imgui.io_mut(),
+            &window.winit_window,
+            imgui_winit_support::HiDpiMode::Default,
+        );
+
+        let font_data = std::fs::read("assets/fonts/Roboto/Roboto-Regular.ttf").unwrap();
+        let font_data_bold = std::fs::read("assets/fonts/Roboto/Roboto-Bold.ttf").unwrap();
+
+        imgui.fonts().clear();
+        let font_normal = imgui.fonts().add_font(&[FontSource::TtfData {
+            data: &font_data,
+            size_pixels: 14.0,
+            config: Some(FontConfig {
+                name: Some("Default".to_string()),
+                ..Default::default()
+            }),
+        }]);
+        let font_bold = imgui.fonts().add_font(&[FontSource::TtfData {
+            data: &font_data_bold,
+            size_pixels: 14.0,
+            config: Some(FontConfig {
+                name: Some("Bold".to_string()),
+                ..Default::default()
+            }),
+        }]);
+        let font_heading = imgui.fonts().add_font(&[FontSource::TtfData {
+            data: &font_data_bold,
+            size_pixels: 16.0,
+            config: Some(FontConfig {
+                name: Some("Heading".to_string()),
+                ..Default::default()
+            }),
+        }]);
 
         imgui.fonts().build_rgba32_texture();
+        imgui.fonts().clear_input_data();
+
         imgui.io_mut().config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
+        imgui.style_mut().frame_rounding = 0.0;
+        imgui.style_mut().popup_rounding = 0.0;
+        imgui.style_mut().scrollbar_rounding = 0.0;
+        imgui.style_mut().tab_rounding = 0.0;
+        imgui.style_mut().window_rounding = 0.0;
+        imgui.style_mut().window_border_size = 0.0;
+        imgui.style_mut().popup_border_size = 0.0;
+        imgui.style_mut().tab_rounding = 3.0;
+        imgui.style_mut().window_menu_button_position = Direction::None;
+
+        imgui.style_mut().colors[StyleColor::WindowBg as usize] = [0.06, 0.06, 0.06, 1.00];
+        imgui.style_mut().colors[StyleColor::PopupBg as usize] = [0.08, 0.08, 0.08, 1.00];
+        imgui.style_mut().colors[StyleColor::FrameBg as usize] = [0.15, 0.15, 0.15, 0.54];
+        imgui.style_mut().colors[StyleColor::FrameBgHovered as usize] = [0.24, 0.24, 0.24, 0.40];
+        imgui.style_mut().colors[StyleColor::FrameBgActive as usize] = [0.35, 0.35, 0.35, 0.67];
+        imgui.style_mut().colors[StyleColor::TitleBgActive as usize] = [0.04, 0.04, 0.04, 1.00];
+        imgui.style_mut().colors[StyleColor::TitleBgCollapsed as usize] = [0.04, 0.04, 0.04, 1.00];
+        imgui.style_mut().colors[StyleColor::MenuBarBg as usize] = [0.04, 0.04, 0.04, 1.00];
+        imgui.style_mut().colors[StyleColor::CheckMark as usize] = [1.00, 1.00, 1.00, 1.00];
+        imgui.style_mut().colors[StyleColor::Header as usize] = [0.00, 0.00, 0.00, 0.30];
+        imgui.style_mut().colors[StyleColor::HeaderHovered as usize] = [0.15, 0.15, 0.15, 0.80];
+        imgui.style_mut().colors[StyleColor::HeaderActive as usize] = [0.27, 0.27, 0.27, 1.00];
+        imgui.style_mut().colors[StyleColor::Tab as usize] = [0.15, 0.15, 0.15, 0.86];
+        imgui.style_mut().colors[StyleColor::TabHovered as usize] = [0.27, 0.27, 0.27, 0.80];
+        imgui.style_mut().colors[StyleColor::TabActive as usize] = [0.35, 0.35, 0.35, 1.00];
+        imgui.style_mut().colors[StyleColor::TabUnfocused as usize] = [0.15, 0.15, 0.15, 0.97];
+        imgui.style_mut().colors[StyleColor::TabUnfocusedActive as usize] =
+            [0.35, 0.35, 0.35, 1.00];
+        imgui.style_mut().colors[StyleColor::SliderGrab as usize] = [0.81, 0.33, 0.00, 1.00];
+        imgui.style_mut().colors[StyleColor::SliderGrabActive as usize] = [1.00, 0.41, 0.00, 1.00];
+        imgui.style_mut().colors[StyleColor::Button as usize] = [0.15, 0.15, 0.15, 0.40];
+        imgui.style_mut().colors[StyleColor::ButtonHovered as usize] = [0.27, 0.27, 0.27, 1.00];
+        imgui.style_mut().colors[StyleColor::ButtonActive as usize] = [0.35, 0.35, 0.35, 1.00];
+        imgui.style_mut().colors[StyleColor::SeparatorHovered as usize] = [0.81, 0.33, 0.00, 1.00];
+        imgui.style_mut().colors[StyleColor::SeparatorActive as usize] = [1.00, 0.41, 0.00, 1.00];
+        imgui.style_mut().colors[StyleColor::ResizeGrip as usize] = [0.82, 0.34, 0.00, 0.35];
+        imgui.style_mut().colors[StyleColor::ResizeGripHovered as usize] = [0.93, 0.38, 0.00, 0.35];
+        imgui.style_mut().colors[StyleColor::ResizeGripActive as usize] = [1.00, 0.41, 0.00, 0.35];
+        imgui.style_mut().colors[StyleColor::DockingPreview as usize] = [1.00, 0.41, 0.00, 0.70];
+        imgui.style_mut().colors[StyleColor::TextSelectedBg as usize] = [1.00, 0.44, 0.00, 0.35];
 
         Ok(Self {
             eventloop,
@@ -86,19 +170,19 @@ impl EngineInit {
                 scene,
                 vulkan_manager,
                 window,
-                imgui, 
-                imgui_platform, 
+                imgui,
+                imgui_platform,
 
-                ui: EngineUi { 
-                    ui_vertex_count: 0, 
-                    ui_index_count: 0, 
-                    ui_mesh_count: 0, 
+                ui: EngineUi {
+                    ui_vertex_count: 0,
+                    ui_index_count: 0,
+                    ui_mesh_count: 0,
                     #[cfg(feature = "profiler")]
                     profiler_visible: false,
-                    scene_graph_visible: false,
-                    inspector_visible: false,
                     selected_entity: None,
-                    selected_factory: 0,
+                    font_normal,
+                    font_bold,
+                    font_heading,
                 },
 
                 frame_time_info: FrameTimeInfo {
@@ -147,6 +231,7 @@ pub struct Engine {
     pub scene: Rc<Scene>,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
+
     pub(crate) imgui: imgui::Context,
     pub(crate) imgui_platform: imgui_winit_support::WinitPlatform,
 
@@ -182,11 +267,14 @@ pub(crate) struct EngineUi {
 
     #[cfg(feature = "profiler")]
     profiler_visible: bool,
-    scene_graph_visible: bool,
-    inspector_visible: bool,
 
     selected_entity: Option<Rc<Entity>>,
-    selected_factory: usize,
+
+    #[allow(unused)]
+    font_normal: imgui::FontId,
+    #[allow(unused)]
+    font_bold: imgui::FontId,
+    font_heading: imgui::FontId,
 }
 
 impl Engine {
@@ -207,57 +295,64 @@ impl Engine {
     fn render_inspector(
         ui: &imgui::Ui,
         selected_entity: &mut Option<Rc<Entity>>,
-        selected_factory: &mut usize,
         factories: &[(String, ComponentFactoryFn)],
+        heading_font: imgui::FontId,
     ) {
-        ui.window("Inspector")
-            .build(|| {
-                if let Some(entity) = selected_entity {
-                    ui.text(format!("Entity {} ({})", entity.id, &entity.name));
+        ui.window("Inspector").build(|| {
+            if let Some(entity) = selected_entity {
+                let font = ui.push_font(heading_font);
+                ui.text(format!("Entity {} ({})", entity.id, &entity.name));
+                font.pop();
 
-                    let mut transform = entity.transform.borrow_mut();
+                let mut transform = entity.transform.borrow_mut();
 
-                    let mut pos = [transform.position.x, transform.position.y, transform.position.z];
-                    if ui.input_float3("Position", &mut pos).build() {
-                        transform.position = Vec3::new(pos[0], pos[1], pos[2]);
-                    }   
-
-                    let euler = transform.rotation.to_euler_angles_zyx();
-                    let mut rot = [euler.x, euler.y, euler.z];
-                    if ui.input_float3("Rotation", &mut rot).build() {
-                        transform.rotation = Quaternion::from_euler_angles_zyx(&Vec3::new(rot[0], rot[1], rot[2]));
-                    }
-
-                    let mut scale = [transform.scale.x, transform.scale.y, transform.scale.z];
-                    if ui.input_float3("Scale", &mut scale).build() {
-                        transform.scale = Vec3::new(scale[0], scale[1], scale[2]);
-                    }
-
-                    ui.separator();
-
-                    ui.text("Components");
-
-                    for comp in &*entity.components.borrow() {
-                        Self::render_component(ui, &**comp);
-                    }
-
-                    if ui.button("Add Component") {
-                        ui.open_popup("Add Component");
-                    }
-
-                    ui.popup("Add Component", || {
-                        for (name, factory) in factories {
-                            if ui.button(name) {
-                                entity.new_component_with_factory(factory);
-                                ui.close_current_popup();
-                            }
-                        }
-                    });
-                    
-                } else {
-                    ui.text("Inspector");
+                let mut pos = [
+                    transform.position.x,
+                    transform.position.y,
+                    transform.position.z,
+                ];
+                if ui.input_float3("Position", &mut pos).build() {
+                    transform.position = Vec3::new(pos[0], pos[1], pos[2]);
                 }
-            });
+
+                let euler = transform.rotation.to_euler_angles_zyx();
+                let mut rot = [euler.x, euler.y, euler.z];
+                if ui.input_float3("Rotation", &mut rot).build() {
+                    transform.rotation =
+                        Quaternion::from_euler_angles_zyx(&Vec3::new(rot[0], rot[1], rot[2]));
+                }
+
+                let mut scale = [transform.scale.x, transform.scale.y, transform.scale.z];
+                if ui.input_float3("Scale", &mut scale).build() {
+                    transform.scale = Vec3::new(scale[0], scale[1], scale[2]);
+                }
+
+                ui.separator();
+
+                ui.text("Components");
+
+                for comp in &*entity.components.borrow() {
+                    Self::render_component(ui, &**comp);
+                }
+
+                if ui.button_with_size("Add Component", [-1.0, 0.0]) {
+                    ui.open_popup("Add Component");
+                }
+
+                ui.popup("Add Component", || {
+                    for (name, factory) in factories {
+                        if ui.selectable(name) {
+                            entity.new_component_with_factory(factory);
+                            ui.close_current_popup();
+                        }
+                    }
+                });
+            } else {
+                let font = ui.push_font(heading_font);
+                ui.text("Inspector");
+                font.pop();
+            }
+        });
     }
 
     fn render_entity(
@@ -265,20 +360,28 @@ impl Engine {
         entity: &Rc<Entity>,
         selected_entity: &mut Option<Rc<Entity>>,
     ) {
-        let node = ui.tree_node_config(format!("{} - (ID {})", entity.name, entity.id))
+        let mut open_popup = false;
+
+        let node = ui
+            .tree_node_config(format!("{} - (ID {})", entity.name, entity.id))
+            .leaf(entity.children.borrow().is_empty())
             .open_on_arrow(true)
-            .selected(selected_entity.as_ref().map_or(false, |se| se.id == entity.id))
+            .selected(
+                selected_entity
+                    .as_ref()
+                    .map_or(false, |se| se.id == entity.id),
+            )
             .push();
 
         if ui.is_item_clicked() && !ui.is_item_toggled_open() {
             *selected_entity = Some(entity.clone());
         }
-        
-        if let Some(node) = node {
-            if ui.button("Add child") {
-                entity.add_new_child("New Entity".to_string());
-            }
 
+        if ui.is_item_clicked_with_button(imgui::MouseButton::Right) {
+            open_popup = true;
+        }
+
+        if let Some(node) = node {
             let children = entity.children.borrow();
             for child in &*children {
                 Self::render_entity(ui, child, selected_entity);
@@ -286,6 +389,19 @@ impl Engine {
 
             node.pop();
         }
+
+        let popup_id = ui.push_id_ptr(&*entity);
+        if open_popup {
+            ui.open_popup("entity-right-click-popup");
+        }
+
+        ui.popup("entity-right-click-popup", || {
+            if ui.selectable("Add Child") {
+                entity.add_new_child("New Entity".to_owned());
+                ui.close_current_popup();
+            }
+        });
+        popup_id.pop();
     }
 
     pub(crate) fn render(&mut self) {
@@ -314,17 +430,23 @@ impl Engine {
         }
 
         if frame_time_info.frame_time_last_sample.elapsed().as_millis() >= 100 {
-            frame_time_info.frame_time_history.push(frame_time_info.frame_time_max);
+            frame_time_info
+                .frame_time_history
+                .push(frame_time_info.frame_time_max);
             if frame_time_info.frame_time_history.len() > 10 * 10 {
                 frame_time_info.frame_time_history.remove(0);
             }
 
-            frame_time_info.render_time_history.push(frame_time_info.render_time_max);
+            frame_time_info
+                .render_time_history
+                .push(frame_time_info.render_time_max);
             if frame_time_info.render_time_history.len() > 10 * 10 {
                 frame_time_info.render_time_history.remove(0);
             }
 
-            frame_time_info.ui_time_history.push(frame_time_info.ui_time_max + frame_time_info.render_time_max);
+            frame_time_info
+                .ui_time_history
+                .push(frame_time_info.ui_time_max + frame_time_info.render_time_max);
             if frame_time_info.ui_time_history.len() > 10 * 10 {
                 frame_time_info.ui_time_history.remove(0);
             }
@@ -339,91 +461,158 @@ impl Engine {
         frame_time
     }
 
-    fn render_debug_tools_window(ui: &imgui::Ui, engine_ui: &mut EngineUi, frame_time_info: &FrameTimeInfo, frame_time: f32, vulkan_manager: &mut VulkanManager) {
+    fn render_debug_tools_window(
+        ui: &imgui::Ui,
+        engine_ui: &mut EngineUi,
+        frame_time_info: &FrameTimeInfo,
+        frame_time: f32,
+        vulkan_manager: &mut VulkanManager,
+        config: &mut EngineConfig,
+    ) {
         profile_function!();
 
-        ui.window("Debug Tools")
-            .build(|| {
-                ui.text("Frame timing");
+        ui.window("Debug Tools").build(|| {
+            ui.text("Frame timing");
 
-                let fps_color = match frame_time_info.fps {
-                    0..=29 => [1.0, 0.0, 0.0, 1.0],
-                    30..=59 => [1.0, 1.0, 0.0, 1.0],
-                    _ => [1.0, 1.0, 1.0, 1.0],
-                };
+            let fps_color = match frame_time_info.fps {
+                0..=29 => [1.0, 0.0, 0.0, 1.0],
+                30..=59 => [1.0, 1.0, 0.0, 1.0],
+                _ => [1.0, 1.0, 1.0, 1.0],
+            };
 
-                ui.text_colored(fps_color, format!("FPS: {}", frame_time_info.fps));
-                ui.text_colored(fps_color, format!("Frame time: {:.3} ms", frame_time));
+            ui.text_colored(fps_color, format!("FPS: {}", frame_time_info.fps));
+            ui.text_colored(fps_color, format!("Frame time: {:.3} ms", frame_time));
 
-                ui.plot_lines("Frame time Graph", &frame_time_info.frame_time_history)
-                    .build();
+            ui.plot_lines("Frame time Graph", &frame_time_info.frame_time_history)
+                .graph_size([ui.content_region_avail()[0], 100.0])
+                .build();
 
-                #[cfg(feature = "profiler")]
-                if ui.button("Profiler") {
-                    engine_ui.profiler_visible = true;
-                    puffin::set_scopes_on(true);
-                }
+            #[cfg(feature = "profiler")]
+            if ui.button("Profiler") {
+                engine_ui.profiler_visible = true;
+                puffin::set_scopes_on(true);
+            }
 
-                if let Some((budget, heap_count)) = vulkan_manager.get_budget() {
-                    ui.separator();
-                    ui.text("Memory usage");
-
-                    for (i, (available, used)) in budget.heap_budget[..heap_count]
-                        .iter()
-                        .zip(&budget.heap_usage[..heap_count])
-                        .enumerate()
-                    {
-                        let portion = *used as f32 / *available as f32;
-
-                        let budget_mb = (*available as f32) / 1024.0 / 1024.0;
-                        let used_mb = (*used as f32) / 1024.0 / 1024.0;
-
-                        imgui::ProgressBar::new(portion)
-                            .overlay_text(format!("Heap {}: {:.3} MB/{:.3} MB ({:.2}%)", i, used_mb, budget_mb, portion * 100.0))
-                            .build(ui);
-                    }
-                }
-
+            if let Some((budget, heap_count)) = vulkan_manager.get_budget() {
                 ui.separator();
+                ui.text("Memory usage");
 
-                ui.text("Debugging");
+                for (i, (available, used)) in budget.heap_budget[..heap_count]
+                    .iter()
+                    .zip(&budget.heap_usage[..heap_count])
+                    .enumerate()
+                {
+                    let portion = *used as f32 / *available as f32;
 
-                ui.checkbox("Wireframe", &mut vulkan_manager.enable_wireframe);
-                ui.checkbox("Show scene graph", &mut engine_ui.scene_graph_visible);
+                    let budget_mb = (*available as f32) / 1024.0 / 1024.0;
+                    let used_mb = (*used as f32) / 1024.0 / 1024.0;
 
-                ui.collapsing_header("UI Debugging", imgui::TreeNodeFlags::FRAMED);
+                    imgui::ProgressBar::new(portion)
+                        .overlay_text(format!(
+                            "Heap {}: {:.3} MB/{:.3} MB ({:.2}%)",
+                            i,
+                            used_mb,
+                            budget_mb,
+                            portion * 100.0
+                        ))
+                        .build(ui);
+                }
+            }
+
+            ui.separator();
+
+            ui.text("Debugging");
+
+            ui.checkbox("Wireframe", &mut vulkan_manager.enable_wireframe);
+
+            if ui.collapsing_header("UI Debugging", imgui::TreeNodeFlags::FRAMED) {
                 ui.checkbox("UI Triangles", &mut vulkan_manager.enable_ui_wireframe);
                 ui.text(format!("Vertices: {}", engine_ui.ui_vertex_count));
-                ui.text(format!("Indices: {} ({} triangles)", engine_ui.ui_index_count, engine_ui.ui_index_count / 3));
-                ui.text(format!("Draw calls: {}", engine_ui.ui_mesh_count));
-
-                ui.separator();
-
-                ui.text("GPU Override");
-                ui.text(format!("Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
-                    unsafe {
-                        CStr::from_ptr(
-                            vulkan_manager
-                                .physical_device_properties
-                                .device_name
-                                .as_ptr(),
-                        )
-                    }
-                    .to_str()
-                    .unwrap(),
-                    vulkan_manager.physical_device_properties.vendor_id,
-                    vulkan_manager.physical_device_properties.device_id,
-                    vk::api_version_major(
-                        vulkan_manager.physical_device_properties.api_version
-                    ),
-                    vk::api_version_minor(
-                        vulkan_manager.physical_device_properties.api_version
-                    ),
-                    vk::api_version_patch(
-                        vulkan_manager.physical_device_properties.api_version
-                    ),
+                ui.text(format!(
+                    "Indices: {} ({} triangles)",
+                    engine_ui.ui_index_count,
+                    engine_ui.ui_index_count / 3
                 ));
-            });
+                ui.text(format!("Draw calls: {}", engine_ui.ui_mesh_count));
+            }
+
+            ui.separator();
+
+            ui.text("GPU Override");
+            ui.text(format!(
+                "Current device: {} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                unsafe {
+                    CStr::from_ptr(
+                        vulkan_manager
+                            .physical_device_properties
+                            .device_name
+                            .as_ptr(),
+                    )
+                }
+                .to_str()
+                .unwrap(),
+                vulkan_manager.physical_device_properties.vendor_id,
+                vulkan_manager.physical_device_properties.device_id,
+                vk::api_version_major(vulkan_manager.physical_device_properties.api_version),
+                vk::api_version_minor(vulkan_manager.physical_device_properties.api_version),
+                vk::api_version_patch(vulkan_manager.physical_device_properties.api_version),
+            ));
+
+            let cfg = config.renderer.unwrap_or_default();
+            let dev_override = cfg.gpu_vendor_id.zip(cfg.gpu_device_id);
+
+            if ui
+                .selectable_config("Default Device")
+                .selected(dev_override.is_none())
+                .build()
+            {
+                log::info!("Clearing GPU override");
+                config.renderer = None;
+                write_config(config);
+
+                let args = std::env::args().collect::<Vec<_>>();
+                std::process::Command::new(&args[0])
+                    .args(args)
+                    .spawn()
+                    .unwrap();
+                std::process::exit(0);
+            }
+
+            for (_, props, _) in &vulkan_manager.supported_devices {
+                let selected = dev_override.map_or(false, |(vendor, dev)| {
+                    vendor == props.vendor_id && dev == props.device_id
+                });
+                if ui
+                    .selectable_config(format!(
+                        "{} ({:08X}:{:08X}) Vulkan {}.{}.{}",
+                        unsafe { CStr::from_ptr(props.device_name.as_ptr()) }
+                            .to_str()
+                            .unwrap(),
+                        props.vendor_id,
+                        props.device_id,
+                        vk::api_version_major(props.api_version),
+                        vk::api_version_minor(props.api_version),
+                        vk::api_version_patch(props.api_version),
+                    ))
+                    .selected(selected)
+                    .build()
+                {
+                    log::info!("Setting GPU override");
+                    config.renderer = Some(RendererConfig {
+                        gpu_vendor_id: Some(props.vendor_id),
+                        gpu_device_id: Some(props.device_id),
+                    });
+                    write_config(config);
+
+                    let args = std::env::args().collect::<Vec<_>>();
+                    std::process::Command::new(&args[0])
+                        .args(args)
+                        .spawn()
+                        .unwrap();
+                    std::process::exit(0);
+                }
+            }
+        });
     }
 
     fn render_scene_graph(ui: &imgui::Ui, scene: &Scene, selected_entity: &mut Option<Rc<Entity>>) {
@@ -431,10 +620,9 @@ impl Engine {
 
         let root_entity = scene.root_entity.borrow();
 
-        ui.window("Scene graph")
-            .build(|| {
-                Self::render_entity(ui, &root_entity, selected_entity);
-            });
+        ui.window("Scene graph").build(|| {
+            Self::render_entity(ui, &root_entity, selected_entity);
+        });
     }
 
     fn render_debug_ui(&mut self, frame_time: f32) {
@@ -445,41 +633,111 @@ impl Engine {
         let ui = self.imgui.new_frame();
 
         {
-            ui.main_menu_bar(|| {
-                ui.menu("View", || {
-                    ui.menu_item_config("Scene Graph").build_with_ref(&mut self.ui.scene_graph_visible);
-                    ui.menu_item_config("Inspector").build_with_ref(&mut self.ui.inspector_visible);
-                });
-            });
-
-            let wnd = ui.window("Root Window")
-                .position([0.0, 20.0], Condition::Always)
-                .size([ui.io().display_size[0], ui.io().display_size[1] - 2.0], Condition::Always)
+            let padding = ui.push_style_var(StyleVar::WindowPadding([0.0, 0.0]));
+            let border_size = ui.push_style_var(StyleVar::WindowBorderSize(0.0));
+            let wnd = ui
+                .window("Root Window")
+                .position([0.0, 0.0], Condition::Always)
+                .size(ui.io().display_size, Condition::Always)
+                .flags(WindowFlags::NO_DOCKING)
+                .menu_bar(true)
                 .no_decoration()
                 .movable(false)
                 .bring_to_front_on_focus(false)
                 .nav_focus(false)
                 .draw_background(false)
                 .begin();
+            border_size.pop();
+            padding.pop();
             if let Some(wnd) = wnd {
+                ui.menu_bar(|| {
+                    ui.menu("View", || {
+                        if ui
+                            .menu_item_config("Scene Graph")
+                            .selected(
+                                self.config
+                                    .ui
+                                    .unwrap_or_default()
+                                    .scene_graph_visible
+                                    .unwrap_or_default(),
+                            )
+                            .build()
+                        {
+                            let mut cfg = self.config.ui.unwrap_or_default();
+                            cfg.scene_graph_visible =
+                                Some(!cfg.scene_graph_visible.unwrap_or_default());
+                            self.config.ui = Some(cfg);
+                            write_config(&self.config);
+                        }
+                        if ui
+                            .menu_item_config("Inspector")
+                            .selected(
+                                self.config
+                                    .ui
+                                    .unwrap_or_default()
+                                    .inspector_visible
+                                    .unwrap_or_default(),
+                            )
+                            .build()
+                        {
+                            let mut cfg = self.config.ui.unwrap_or_default();
+                            cfg.inspector_visible =
+                                Some(!cfg.inspector_visible.unwrap_or_default());
+                            self.config.ui = Some(cfg);
+                            write_config(&self.config);
+                        }
+                    });
+                });
+
                 unsafe {
                     let name = CString::new("Root Docking Space").unwrap();
                     let id = imgui_sys::igGetIDStr(name.as_ptr());
-                    imgui_sys::igDockSpace(id, imgui_sys::ImVec2 { x: 0.0, y: 0.0 }, imgui_sys::ImGuiDockNodeFlags_PassthruCentralNode as i32, std::ptr::null());
+                    imgui_sys::igDockSpace(
+                        id,
+                        imgui_sys::ImVec2 { x: 0.0, y: 0.0 },
+                        imgui_sys::ImGuiDockNodeFlags_PassthruCentralNode as i32,
+                        std::ptr::null(),
+                    );
                 }
 
-                Self::render_debug_tools_window(ui, &mut self.ui, &self.frame_time_info, frame_time, &mut self.vulkan_manager);
+                ui.window("Style Editor").build(|| {
+                    ui.show_default_style_editor();
+                });
 
-                if self.ui.scene_graph_visible {
-                    Self::render_scene_graph(&ui, &self.scene, &mut self.ui.selected_entity);
+                let mut opened = true;
+                ui.show_demo_window(&mut opened);
+
+                Self::render_debug_tools_window(
+                    ui,
+                    &mut self.ui,
+                    &self.frame_time_info,
+                    frame_time,
+                    &mut self.vulkan_manager,
+                    &mut self.config,
+                );
+
+                if self
+                    .config
+                    .ui
+                    .unwrap_or_default()
+                    .scene_graph_visible
+                    .unwrap_or_default()
+                {
+                    Self::render_scene_graph(ui, &self.scene, &mut self.ui.selected_entity);
                 }
 
-                if self.ui.inspector_visible {
+                if self
+                    .config
+                    .ui
+                    .unwrap_or_default()
+                    .inspector_visible
+                    .unwrap_or_default()
+                {
                     Self::render_inspector(
-                        &ui,
+                        ui,
                         &mut self.ui.selected_entity,
-                        &mut self.ui.selected_factory,
                         &self.component_factories,
+                        self.ui.font_heading,
                     );
                 }
 
@@ -493,7 +751,8 @@ impl Engine {
             }
         }
 
-        self.imgui_platform.prepare_render(&ui, &self.window.winit_window);
+        self.imgui_platform
+            .prepare_render(ui, &self.window.winit_window);
 
         let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
         self.frame_time_info.last_ui_time = ui_time;

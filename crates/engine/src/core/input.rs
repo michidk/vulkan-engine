@@ -55,7 +55,7 @@ impl Input {
             state: InputState::default(),
             state_prev: InputState::default(),
             events_during_unfocus: false,
-            cursor_captured: true,
+            cursor_captured: false,
         }
     }
 

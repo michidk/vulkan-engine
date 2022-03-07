@@ -101,6 +101,7 @@ pub struct VulkanManager {
     ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_display_rect: (f32, f32, f32, f32),
+    ui_scale: (f32, f32),
     ui_meshes: Vec<(imgui::DrawCmdParams, u64, u64)>,
 
     ext_memory_budget_supported: bool,
@@ -397,6 +398,7 @@ impl VulkanManager {
             ui_vertex_buffers,
             ui_index_buffers,
             ui_display_rect: (0.0, 0.0, 0.0, 0.0),
+            ui_scale: (0.0, 0.0),
             ui_meshes: Vec::new(),
 
             ext_memory_budget_supported,
@@ -1002,12 +1004,12 @@ impl VulkanManager {
                     0,
                     &[vk::Rect2D {
                         offset: vk::Offset2D {
-                            x: params.clip_rect[0] as i32,
-                            y: params.clip_rect[1] as i32,
+                            x: (params.clip_rect[0] * self.ui_scale.0) as i32,
+                            y: (params.clip_rect[1] * self.ui_scale.1) as i32,
                         },
                         extent: vk::Extent2D {
-                            width: (params.clip_rect[2] - params.clip_rect[0]) as u32,
-                            height: (params.clip_rect[3] - params.clip_rect[1]) as u32,
+                            width: ((params.clip_rect[2] - params.clip_rect[0]) * self.ui_scale.0) as u32,
+                            height: ((params.clip_rect[3] - params.clip_rect[1]) * self.ui_scale.1) as u32,
                         },
                     }],
                 );
@@ -1276,6 +1278,7 @@ impl VulkanManager {
 
         self.ui_meshes.clear();
         self.ui_display_rect = (draw_data.display_pos[0], draw_data.display_pos[1], draw_data.display_pos[0] + draw_data.display_size[0], draw_data.display_pos[1] + draw_data.display_size[1]);
+        self.ui_scale = (draw_data.framebuffer_scale[0], draw_data.framebuffer_scale[1]);
 
         for m in draw_data.draw_lists() {
             let vertex_offset = vertex_buffer.len();

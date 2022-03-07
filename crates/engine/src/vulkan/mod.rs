@@ -100,6 +100,7 @@ pub struct VulkanManager {
 
     ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
+    ui_display_rect: (f32, f32, f32, f32),
     ui_meshes: Vec<(imgui::DrawCmdParams, u64, u64)>,
 
     ext_memory_budget_supported: bool,
@@ -395,6 +396,7 @@ impl VulkanManager {
 
             ui_vertex_buffers,
             ui_index_buffers,
+            ui_display_rect: (0.0, 0.0, 0.0, 0.0),
             ui_meshes: Vec::new(),
 
             ext_memory_budget_supported,
@@ -965,10 +967,10 @@ impl VulkanManager {
             );
 
             let proj_matrix = Mat4::orthographic_vulkan(
-                0.0,
-                self.swapchain.extent.width as f32,
-                self.swapchain.extent.height as f32,
-                0.0,
+                self.ui_display_rect.0,
+                self.ui_display_rect.2,
+                self.ui_display_rect.3,
+                self.ui_display_rect.1,
                 -1.0,
                 1.0,
             );
@@ -1273,6 +1275,7 @@ impl VulkanManager {
         let mut index_buffer = Vec::with_capacity(draw_data.total_idx_count as usize);
 
         self.ui_meshes.clear();
+        self.ui_display_rect = (draw_data.display_pos[0], draw_data.display_pos[1], draw_data.display_pos[0] + draw_data.display_size[0], draw_data.display_pos[1] + draw_data.display_size[1]);
 
         for m in draw_data.draw_lists() {
             let vertex_offset = vertex_buffer.len();

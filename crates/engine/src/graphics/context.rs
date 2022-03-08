@@ -6,6 +6,7 @@ use crate::{AppInfo, ENGINE_NAME, ENGINE_VERSION};
 
 use super::error::{GraphicsError, GraphicsResult};
 
+pub(crate) const MAX_FRAMES_IN_FLIGHT: usize = 3;
 
 pub(crate) struct Context {
     pub(crate) entry: ash::Entry,
@@ -18,8 +19,16 @@ pub(crate) struct Context {
     pub(crate) physical_device: vk::PhysicalDevice,
     graphics_queue: QueueInfo,
     transfer_queue: Option<QueueInfo>,
+
+    current_frame: usize,
+
+    graphics_command_pool: vk::CommandPool,
+    graphics_command_buffers: Vec<vk::CommandBuffer>,
+    transfer_command_pool: Option<vk::CommandPool>,
+    transfer_command_buffers: Option<Vec<vk::CommandBuffer>>,
 }
 
+#[derive(Debug, Clone, Copy)]
 struct QueueInfo {
     family_index: u32,
     index: u32,
@@ -44,6 +53,38 @@ impl Context {
         let khr_surface = khr::Surface::new(&entry, &instance);
         let khr_swapchain = khr::Swapchain::new(&instance, &device);
 
+        let (graphics_command_pool, graphics_command_buffers) = {
+            let info = vk::CommandPoolCreateInfo::builder()
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER | vk::CommandPoolCreateFlags::TRANSIENT)
+                .queue_family_index(graphics_queue.family_index);
+            let pool = unsafe {device.create_command_pool(&info, None)?};
+
+            let info = vk::CommandBufferAllocateInfo::builder()
+                .command_pool(pool)
+                .level(vk::CommandBufferLevel::PRIMARY)
+                .command_buffer_count(MAX_FRAMES_IN_FLIGHT as u32);
+            let buffers = unsafe{device.allocate_command_buffers(&info)?};
+
+            (pool, buffers)
+        };
+
+        let (transfer_command_pool, transfer_command_buffers) = if let Some(transfer_queue) = transfer_queue {
+            let info = vk::CommandPoolCreateInfo::builder()
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER | vk::CommandPoolCreateFlags::TRANSIENT)
+                .queue_family_index(transfer_queue.family_index);
+            let pool = unsafe {device.create_command_pool(&info, None)?};
+
+            let info = vk::CommandBufferAllocateInfo::builder()
+                .command_pool(pool)
+                .level(vk::CommandBufferLevel::PRIMARY)
+                .command_buffer_count(MAX_FRAMES_IN_FLIGHT as u32);
+            let buffers = unsafe{device.allocate_command_buffers(&info)?};
+
+            (Some(pool), Some(buffers))
+        } else {
+            (None, None)
+        };
+
         Ok(Self {
             entry,
             instance,
@@ -53,6 +94,13 @@ impl Context {
             physical_device: physical_device.physical_device,
             graphics_queue,
             transfer_queue,
+
+            current_frame: 0,
+
+            graphics_command_pool,
+            graphics_command_buffers,
+            transfer_command_pool,
+            transfer_command_buffers,
         })
     }
 
@@ -61,11 +109,65 @@ impl Context {
             self.device.device_wait_idle().expect("Failed to wait_idle()");
         }
     }
+
+    pub(crate) fn new_frame(&mut self) -> GraphicsResult<()> {
+        self.current_frame += 1;
+        self.current_frame %= MAX_FRAMES_IN_FLIGHT;
+
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        unsafe {
+            self.device.begin_command_buffer(self.graphics_command_buffers[self.current_frame], &begin_info)?;
+        }
+
+        if let Some(buffers) = &self.transfer_command_buffers {
+            let begin_info = vk::CommandBufferBeginInfo::builder()
+                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            unsafe {
+                self.device.begin_command_buffer(buffers[self.current_frame], &begin_info)?;
+            }
+        }
+
+        Ok(())
+    }
+    pub(crate) fn end_frame(&mut self) -> GraphicsResult<()> {
+        unsafe {
+            self.device.end_command_buffer(self.graphics_command_buffers[self.current_frame])?;
+        }
+
+        if let Some(buffers) = &self.transfer_command_buffers {
+            unsafe {
+                self.device.end_command_buffer(buffers[self.current_frame])?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn submit(&mut self) -> GraphicsResult<()> {
+        
+    }
+
+    pub(crate) fn graphics_command_buffer(&self) -> vk::CommandBuffer {
+        self.graphics_command_buffers[self.current_frame]
+    }
+    pub(crate) fn transfer_command_buffer(&self) -> Option<vk::CommandBuffer> {
+        if let Some(buffers) = &self.transfer_command_buffers {
+            Some(buffers[self.current_frame])
+        } else {
+            None
+        }
+    }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
+            self.device.destroy_command_pool(self.graphics_command_pool, None);
+            if let Some(transfer_command_pool) = self.transfer_command_pool {
+                self.device.destroy_command_pool(transfer_command_pool, None);
+            }
+
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);
         }

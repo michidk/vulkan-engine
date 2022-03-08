@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
 use env_logger::Env;
+use winit::event::WindowEvent;
 
-use crate::{version::Version, graphics::{context::Context, renderer::{deferred::DeferredRenderer, Renderer}}};
+use crate::{version::Version, graphics::{context::Context, renderer::{deferred::DeferredRenderer, Renderer}, window::Window}};
 
 
 pub struct AppConfig {
@@ -39,9 +40,23 @@ pub fn run(app_config: AppConfig) -> ! {
     let context = Rc::new(Context::new(&app_config.app_info).expect("Failed to create Graphics Context"));
     let renderer = DeferredRenderer::create(Rc::clone(&context)).expect("Failed to create Renderer");
 
-    context.device_wait_idle();
-    drop(renderer);
-    drop(context);
+    let event_loop = winit::event_loop::EventLoop::new();
+    let main_window = Window::new(800, 600, app_config.app_info.app_name, true, true, Rc::clone(&context), &event_loop).expect("Failed to create main window");
 
-    panic!("Nothing");
+    event_loop.run(move |event, window_target, control_flow| {
+        *control_flow = winit::event_loop::ControlFlow::Poll;
+
+        match event {
+            winit::event::Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+                *control_flow = winit::event_loop::ControlFlow::Exit;
+            },
+            winit::event::Event::MainEventsCleared => {
+                
+            },
+            winit::event::Event::LoopDestroyed => {
+                context.device_wait_idle();
+            },
+            _ => {},
+        }
+    });
 }

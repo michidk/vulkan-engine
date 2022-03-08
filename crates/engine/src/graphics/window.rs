@@ -43,10 +43,6 @@ impl Window {
         })
     }
 
-    pub(crate) fn set_visible(&self, visible: bool) {
-        self.winit_window.set_visible(visible);
-    }
-
     pub(crate) fn recreate_swapchain(&mut self) -> GraphicsResult<()> {
         for view in &self.swapchain.views {
             unsafe{self.context.device.destroy_image_view(*view, None)};
@@ -76,12 +72,9 @@ impl Window {
         let formats = unsafe{context.khr_surface.get_physical_device_surface_formats(context.physical_device, surface)?};
         let present_modes = unsafe{context.khr_surface.get_physical_device_surface_present_modes(context.physical_device, surface)?};
 
-        if !formats.contains(&vk::SurfaceFormatKHR {
-            format: vk::Format::R8G8B8A8_SRGB,
-            color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-        }) {
-            return Err(GraphicsError::WindowCreationFailed);
-        }
+        let format = formats.iter().find(|fmt| fmt.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR && fmt.format == vk::Format::R8G8B8A8_SRGB)
+            .or_else(|| formats.iter().find(|fmt| fmt.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR && fmt.format == vk::Format::B8G8R8A8_SRGB))
+            .ok_or(GraphicsError::WindowCreationFailed)?;
 
         let present_mode = if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
             vk::PresentModeKHR::MAILBOX
@@ -105,11 +98,11 @@ impl Window {
         let info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surface)
             .min_image_count(image_count)
-            .image_format(vk::Format::R8G8B8A8_SRGB)
-            .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
+            .image_format(format.format)
+            .image_color_space(format.color_space)
             .image_extent(extent)
             .image_array_layers(1)
-            .image_usage(vk::ImageUsageFlags::TRANSFER_DST)
+            .image_usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::COLOR_ATTACHMENT)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(caps.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
@@ -126,7 +119,7 @@ impl Window {
             let view_info = vk::ImageViewCreateInfo::builder()
                 .image(*img)
                 .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::R8G8B8A8_SRGB)
+                .format(format.format)
                 .components(vk::ComponentMapping {
                     r: vk::ComponentSwizzle::IDENTITY,
                     g: vk::ComponentSwizzle::IDENTITY,
@@ -147,7 +140,7 @@ impl Window {
             handle: swapchain,
             images,
             views,
-            format: vk::Format::R8G8B8A8_SRGB,
+            format: format.format,
             size: extent,
         })
     }

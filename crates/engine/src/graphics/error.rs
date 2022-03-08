@@ -11,6 +11,10 @@ pub(crate) enum GraphicsError {
     NoDevice,
     #[error("Vulkan API Error: {0}")]
     Vk(#[from] ash::vk::Result),
+    #[error("Window creation failed")]
+    WindowCreationFailed,
+    #[error("Window is minimized")]
+    WindowMinimized,
 }
 
 pub(crate) type GraphicsResult<T> = ::std::result::Result<T, GraphicsError>;

@@ -1,6 +1,8 @@
+use std::rc::Rc;
+
 use env_logger::Env;
 
-use crate::{version::Version, graphics::context::Context};
+use crate::{version::Version, graphics::{context::Context, renderer::{deferred::DeferredRenderer, Renderer}}};
 
 
 pub struct AppConfig {
@@ -34,7 +36,12 @@ pub fn run(app_config: AppConfig) -> ! {
     let level = "warn";
     env_logger::init_from_env(Env::default().default_filter_or(level));
 
-    let context = Context::new(&app_config.app_info).expect("Failed to create Graphics Context");
+    let context = Rc::new(Context::new(&app_config.app_info).expect("Failed to create Graphics Context"));
+    let renderer = DeferredRenderer::create(Rc::clone(&context)).expect("Failed to create Renderer");
 
-    loop {}
+    context.device_wait_idle();
+    drop(renderer);
+    drop(context);
+
+    panic!("Nothing");
 }

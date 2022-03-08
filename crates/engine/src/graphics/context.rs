@@ -8,11 +8,14 @@ use super::error::{GraphicsError, GraphicsResult};
 
 
 pub(crate) struct Context {
-    entry: ash::Entry,
-    instance: ash::Instance,
-    device: ash::Device,
+    pub(crate) entry: ash::Entry,
+    pub(crate) instance: ash::Instance,
+    pub(crate) device: ash::Device,
 
-    physical_device: vk::PhysicalDevice,
+    pub(crate) khr_surface: khr::Surface,
+    pub(crate) khr_swapchain: khr::Swapchain,
+
+    pub(crate) physical_device: vk::PhysicalDevice,
     graphics_queue: QueueInfo,
     transfer_queue: Option<QueueInfo>,
 }
@@ -38,22 +41,31 @@ impl Context {
 
         let (device, graphics_queue, transfer_queue) = Self::create_device(&instance, physical_device)?;
 
+        let khr_surface = khr::Surface::new(&entry, &instance);
+        let khr_swapchain = khr::Swapchain::new(&instance, &device);
+
         Ok(Self {
             entry,
             instance,
             device,
+            khr_surface,
+            khr_swapchain,
             physical_device: physical_device.physical_device,
             graphics_queue,
             transfer_queue,
         })
+    }
+
+    pub(crate) fn device_wait_idle(&self) {
+        unsafe {
+            self.device.device_wait_idle().expect("Failed to wait_idle()");
+        }
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            self.device.device_wait_idle().expect("vkDeviceWaitIdle()");
-
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);
         }

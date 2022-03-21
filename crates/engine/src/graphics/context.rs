@@ -1,4 +1,4 @@
-use std::{ffi::{CStr, CString}, cell::RefCell};
+use std::{ffi::{CStr, CString}, cell::RefCell, mem::ManuallyDrop};
 
 use ash::{vk, extensions::khr};
 
@@ -21,7 +21,7 @@ pub(crate) struct Context {
     pub(crate) frame_counter: usize,
     pub(crate) max_frames_in_flight: usize,
 
-    allocator: RefCell<gpu_allocator::vulkan::Allocator>,
+    allocator: ManuallyDrop<RefCell<gpu_allocator::vulkan::Allocator>>,
 
     command_pool: vk::CommandPool,
     command_buffers: Vec<vk::CommandBuffer>,
@@ -54,7 +54,7 @@ impl Context {
         let khr_surface = khr::Surface::new(&entry, &instance);
         let khr_swapchain = khr::Swapchain::new(&instance, &device);
 
-        let allocator = RefCell::new(gpu_allocator::vulkan::Allocator::new(&gpu_allocator::vulkan::AllocatorCreateDesc {
+        let allocator = ManuallyDrop::new(RefCell::new(gpu_allocator::vulkan::Allocator::new(&gpu_allocator::vulkan::AllocatorCreateDesc {
             instance: instance.clone(),
             device: device.clone(),
             physical_device: physical_device.physical_device,
@@ -67,7 +67,7 @@ impl Context {
                 log_stack_traces: false, 
             },
             buffer_device_address: false,
-        })?);
+        })?));
 
         let command_pool = {
             let info = vk::CommandPoolCreateInfo::builder()
@@ -183,7 +183,6 @@ impl Context {
             match res {
                 Ok((i, suboptimal)) => {
                     if suboptimal {
-                        log::warn!("Acquire is suboptimal");
                         should_resize = true;
                     }
 
@@ -191,10 +190,8 @@ impl Context {
                     break;
                 },
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                    log::warn!("Resizing in acquire loop");
                     self.device_wait_idle();
                     window.recreate_swapchain()?;
-                    log::warn!("Swapchain resized to {}x{}", window.swapchain.size.width, window.swapchain.size.height);
                     renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
                 },
                 Err(e) => return Err(GraphicsError::Vk(e)),
@@ -343,23 +340,18 @@ impl Context {
         match res {
             Ok(suboptimal) => {
                 if suboptimal {
-                    log::warn!("Present is suboptimal");
                     should_resize = true;
                 }
             },
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                log::warn!("Present is out of date");
                 should_resize = true;
             },
             Err(e) => return Err(GraphicsError::Vk(e)),
         }
 
         if should_resize {
-            log::warn!("Resizing because of suboptimal");
-
             self.device_wait_idle();
             window.recreate_swapchain()?;
-            log::warn!("Swapchain resized to {}x{}", window.swapchain.size.width, window.swapchain.size.height);
             renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
         }
 
@@ -370,6 +362,8 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
+            ManuallyDrop::drop(&mut self.allocator);
+
             for fence in &self.fences {
                 self.device.destroy_fence(*fence, None);
             }

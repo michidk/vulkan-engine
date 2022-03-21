@@ -36,7 +36,7 @@ impl Window {
 
         let surface = unsafe{ash_window::create_surface(&context.entry, &context.instance, &winit_window, None)?};
 
-        let swapchain = Self::create_swapchain(&context, surface, vk::SwapchainKHR::null())?;
+        let swapchain = Self::create_swapchain(&context, surface)?;
 
         let mut acquire_semaphores = Vec::with_capacity(context.max_frames_in_flight);
         for _ in 0..context.max_frames_in_flight {
@@ -66,8 +66,7 @@ impl Window {
             unsafe{self.context.device.destroy_image_view(*view, None)};
         }
         unsafe{self.context.khr_swapchain.destroy_swapchain(self.swapchain.handle, None);}
-
-        self.swapchain = Self::create_swapchain(&self.context, self.surface, self.swapchain.handle)?;
+        self.swapchain = Self::create_swapchain(&self.context, self.surface)?;
 
         Ok(())
     }
@@ -93,7 +92,7 @@ impl Drop for Window {
 }
 
 impl Window {
-    fn create_swapchain(context: &Context, surface: vk::SurfaceKHR, old_swapchain: vk::SwapchainKHR) -> GraphicsResult<Swapchain> {
+    fn create_swapchain(context: &Context, surface: vk::SurfaceKHR) -> GraphicsResult<Swapchain> {
         let caps = unsafe{context.khr_surface.get_physical_device_surface_capabilities(context.physical_device, surface)?};
         let formats = unsafe{context.khr_surface.get_physical_device_surface_formats(context.physical_device, surface)?};
         let present_modes = unsafe{context.khr_surface.get_physical_device_surface_present_modes(context.physical_device, surface)?};
@@ -133,8 +132,7 @@ impl Window {
             .pre_transform(caps.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode)
-            .clipped(true)
-            .old_swapchain(old_swapchain);
+            .clipped(true);
         
         let swapchain = unsafe{context.khr_swapchain.create_swapchain(&info, None)?};
 

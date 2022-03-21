@@ -1,12 +1,10 @@
-use std::ffi::{CStr, CString};
+use std::{ffi::{CStr, CString}, cell::RefCell};
 
 use ash::{vk, extensions::khr};
 
 use crate::{AppInfo, ENGINE_NAME, ENGINE_VERSION};
 
-use super::error::{GraphicsError, GraphicsResult};
-
-pub(crate) const MAX_FRAMES_IN_FLIGHT: usize = 3;
+use super::{error::{GraphicsError, GraphicsResult}, renderer::Renderer, window::Window};
 
 pub(crate) struct Context {
     pub(crate) entry: ash::Entry,
@@ -17,19 +15,22 @@ pub(crate) struct Context {
     pub(crate) khr_swapchain: khr::Swapchain,
 
     pub(crate) physical_device: vk::PhysicalDevice,
-    graphics_queue: QueueInfo,
-    transfer_queue: Option<QueueInfo>,
+    pub(crate) graphics_queue: QueueInfo,
+    pub(crate) transfer_queue: Option<QueueInfo>,
 
-    current_frame: usize,
+    pub(crate) frame_counter: usize,
+    pub(crate) max_frames_in_flight: usize,
 
-    graphics_command_pool: vk::CommandPool,
-    graphics_command_buffers: Vec<vk::CommandBuffer>,
-    transfer_command_pool: Option<vk::CommandPool>,
-    transfer_command_buffers: Option<Vec<vk::CommandBuffer>>,
+    allocator: RefCell<gpu_allocator::vulkan::Allocator>,
+
+    command_pool: vk::CommandPool,
+    command_buffers: Vec<vk::CommandBuffer>,
+
+    fences: Vec<vk::Fence>,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct QueueInfo {
+pub(crate) struct QueueInfo {
     family_index: u32,
     index: u32,
     queue: vk::Queue,
@@ -53,37 +54,46 @@ impl Context {
         let khr_surface = khr::Surface::new(&entry, &instance);
         let khr_swapchain = khr::Swapchain::new(&instance, &device);
 
-        let (graphics_command_pool, graphics_command_buffers) = {
+        let allocator = RefCell::new(gpu_allocator::vulkan::Allocator::new(&gpu_allocator::vulkan::AllocatorCreateDesc {
+            instance: instance.clone(),
+            device: device.clone(),
+            physical_device: physical_device.physical_device,
+            debug_settings: gpu_allocator::AllocatorDebugSettings { 
+                log_memory_information: true, 
+                log_leaks_on_shutdown: false, 
+                store_stack_traces: false, 
+                log_allocations: false, 
+                log_frees: false, 
+                log_stack_traces: false, 
+            },
+            buffer_device_address: false,
+        })?);
+
+        let command_pool = {
             let info = vk::CommandPoolCreateInfo::builder()
-                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER | vk::CommandPoolCreateFlags::TRANSIENT)
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
                 .queue_family_index(graphics_queue.family_index);
-            let pool = unsafe {device.create_command_pool(&info, None)?};
-
-            let info = vk::CommandBufferAllocateInfo::builder()
-                .command_pool(pool)
+            unsafe {
+                device.create_command_pool(&info, None)?
+            }
+        };
+        let command_buffers = {
+            let alloc_info = vk::CommandBufferAllocateInfo::builder()
+                .command_pool(command_pool)
                 .level(vk::CommandBufferLevel::PRIMARY)
-                .command_buffer_count(MAX_FRAMES_IN_FLIGHT as u32);
-            let buffers = unsafe{device.allocate_command_buffers(&info)?};
-
-            (pool, buffers)
+                .command_buffer_count(3);
+            unsafe {
+                device.allocate_command_buffers(&alloc_info)?
+            }
         };
 
-        let (transfer_command_pool, transfer_command_buffers) = if let Some(transfer_queue) = transfer_queue {
-            let info = vk::CommandPoolCreateInfo::builder()
-                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER | vk::CommandPoolCreateFlags::TRANSIENT)
-                .queue_family_index(transfer_queue.family_index);
-            let pool = unsafe {device.create_command_pool(&info, None)?};
-
-            let info = vk::CommandBufferAllocateInfo::builder()
-                .command_pool(pool)
-                .level(vk::CommandBufferLevel::PRIMARY)
-                .command_buffer_count(MAX_FRAMES_IN_FLIGHT as u32);
-            let buffers = unsafe{device.allocate_command_buffers(&info)?};
-
-            (Some(pool), Some(buffers))
-        } else {
-            (None, None)
-        };
+        let mut fences = Vec::with_capacity(3);
+        for _ in 0..3 {
+            let info = vk::FenceCreateInfo::builder()
+                .flags(vk::FenceCreateFlags::SIGNALED);
+            let fence = unsafe{device.create_fence(&info, None)?};
+            fences.push(fence);
+        }
 
         Ok(Self {
             entry,
@@ -94,13 +104,16 @@ impl Context {
             physical_device: physical_device.physical_device,
             graphics_queue,
             transfer_queue,
+            
+            frame_counter: 0,
+            max_frames_in_flight: 3,
 
-            current_frame: 0,
+            allocator,
 
-            graphics_command_pool,
-            graphics_command_buffers,
-            transfer_command_pool,
-            transfer_command_buffers,
+            command_pool,
+            command_buffers,
+
+            fences,
         })
     }
 
@@ -110,63 +123,258 @@ impl Context {
         }
     }
 
-    pub(crate) fn new_frame(&mut self) -> GraphicsResult<()> {
-        self.current_frame += 1;
-        self.current_frame %= MAX_FRAMES_IN_FLIGHT;
+    pub(crate) fn create_image(&self, width: u32, height: u32, format: vk::Format, usage: vk::ImageUsageFlags, debug_name: &str) -> GraphicsResult<(gpu_allocator::vulkan::Allocation, vk::Image)> {
+        let view_formats = [format];
+        let mut format_list = vk::ImageFormatListCreateInfo::builder()
+            .view_formats(&view_formats);
+        
+        let image_info = vk::ImageCreateInfo::builder()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            })
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .push_next(&mut format_list);
+        let image = unsafe{self.device.create_image(&image_info, None)?};
+        let requirements = unsafe{self.device.get_image_memory_requirements(image)};
+        
+        let alloc_info = gpu_allocator::vulkan::AllocationCreateDesc {
+            name: debug_name,
+            requirements,
+            location: gpu_allocator::MemoryLocation::GpuOnly,
+            linear: false,
+        };
+        let alloc = self.allocator.borrow_mut().allocate(&alloc_info)?;
+
+        unsafe {
+            self.device.bind_image_memory(image, alloc.memory(), alloc.offset())?;
+        }
+
+        Ok((alloc, image))
+    }
+
+    pub(crate) fn destroy_image(&self, alloc: gpu_allocator::vulkan::Allocation, image: vk::Image) {
+        self.allocator.borrow_mut().free(alloc).expect("Failed to free image allocation");
+        unsafe {
+            self.device.destroy_image(image, None);
+        }
+    }
+
+    pub(crate) fn render_frame<R: Renderer>(&self, renderer: &mut R, window: &mut Window) -> GraphicsResult<()> {
+        unsafe {
+            self.device.wait_for_fences(&[self.fences[self.frame_counter % self.max_frames_in_flight]], true, u64::MAX)?;
+            self.device.reset_fences(&[self.fences[self.frame_counter % self.max_frames_in_flight]])?;
+        }
+
+        let mut should_resize = false;
+
+        let image_index;
+        loop {
+            let res = unsafe{self.khr_swapchain.acquire_next_image(window.swapchain.handle, u64::MAX, window.acquire_semaphores[self.frame_counter % self.max_frames_in_flight], vk::Fence::null())};
+            match res {
+                Ok((i, suboptimal)) => {
+                    if suboptimal {
+                        log::warn!("Acquire is suboptimal");
+                        should_resize = true;
+                    }
+
+                    image_index = i;
+                    break;
+                },
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    log::warn!("Resizing in acquire loop");
+                    self.device_wait_idle();
+                    window.recreate_swapchain()?;
+                    log::warn!("Swapchain resized to {}x{}", window.swapchain.size.width, window.swapchain.size.height);
+                    renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
+                },
+                Err(e) => return Err(GraphicsError::Vk(e)),
+            }
+        }
+
+        let command_buffer = self.command_buffers[self.frame_counter % self.max_frames_in_flight];
 
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         unsafe {
-            self.device.begin_command_buffer(self.graphics_command_buffers[self.current_frame], &begin_info)?;
+            self.device.begin_command_buffer(command_buffer, &begin_info)?;
         }
 
-        if let Some(buffers) = &self.transfer_command_buffers {
-            let begin_info = vk::CommandBufferBeginInfo::builder()
-                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            unsafe {
-                self.device.begin_command_buffer(buffers[self.current_frame], &begin_info)?;
-            }
-        }
+        let render_image = renderer.render_frame(command_buffer)?;
+        let (render_width, render_height) = renderer.get_size();
 
-        Ok(())
-    }
-    pub(crate) fn end_frame(&mut self) -> GraphicsResult<()> {
         unsafe {
-            self.device.end_command_buffer(self.graphics_command_buffers[self.current_frame])?;
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[
+                    vk::ImageMemoryBarrier::builder()
+                        .src_access_mask(vk::AccessFlags::empty())
+                        .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                        .old_layout(vk::ImageLayout::UNDEFINED)
+                        .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                        .src_queue_family_index(0)
+                        .dst_queue_family_index(0)
+                        .image(window.swapchain.images[image_index as usize])
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        })
+                        .build(),
+                ]
+            );
+
+            self.device.cmd_blit_image(
+                command_buffer,
+                render_image,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                window.swapchain.images[image_index as usize],
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &[
+                    vk::ImageBlit {
+                        src_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        src_offsets: [
+                            vk::Offset3D {
+                                x: 0,
+                                y: 0,
+                                z: 0,
+                            },
+                            vk::Offset3D {
+                                x: render_width as i32,
+                                y: render_height as i32,
+                                z: 1,
+                            },
+                        ],
+                        dst_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        dst_offsets: [
+                            vk::Offset3D {
+                                x: 0,
+                                y: 0,
+                                z: 0,
+                            },
+                            vk::Offset3D {
+                                x: window.swapchain.size.width as i32 - 20,
+                                y: window.swapchain.size.height as i32 - 20,
+                                z: 1,
+                            },
+                        ],
+                    }
+                ],
+                vk::Filter::LINEAR,
+            );
+
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[
+                    vk::ImageMemoryBarrier::builder()
+                        .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                        .dst_access_mask(vk::AccessFlags::empty())
+                        .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                        .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                        .src_queue_family_index(0)
+                        .dst_queue_family_index(0)
+                        .image(window.swapchain.images[image_index as usize])
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        })
+                        .build(),
+                ]
+            );
+
+            self.device.end_command_buffer(command_buffer)?;
         }
 
-        if let Some(buffers) = &self.transfer_command_buffers {
-            unsafe {
-                self.device.end_command_buffer(buffers[self.current_frame])?;
-            }
+        let wait_semaphores = [window.acquire_semaphores[self.frame_counter % self.max_frames_in_flight]];
+        let wait_stages = [vk::PipelineStageFlags::TRANSFER];
+        let signal_semaphores = [window.render_semaphores[self.frame_counter % self.max_frames_in_flight]];
+        let command_buffers = [command_buffer];
+        let submits = vk::SubmitInfo::builder()
+            .wait_semaphores(&wait_semaphores)
+            .wait_dst_stage_mask(&wait_stages)
+            .command_buffers(&command_buffers)
+            .signal_semaphores(&signal_semaphores);
+        let res = unsafe {
+            self.device.queue_submit(self.graphics_queue.queue, &[submits.build()], self.fences[self.frame_counter % self.max_frames_in_flight])?;
+
+            let swapchains = [window.swapchain.handle];
+            let indices = [image_index];
+            let present_info = vk::PresentInfoKHR::builder()
+                .wait_semaphores(&signal_semaphores)
+                .swapchains(&swapchains)
+                .image_indices(&indices);
+
+            self.khr_swapchain.queue_present(self.graphics_queue.queue, &present_info)
+        };
+        match res {
+            Ok(suboptimal) => {
+                if suboptimal {
+                    log::warn!("Present is suboptimal");
+                    should_resize = true;
+                }
+            },
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                log::warn!("Present is out of date");
+                should_resize = true;
+            },
+            Err(e) => return Err(GraphicsError::Vk(e)),
+        }
+
+        if should_resize {
+            log::warn!("Resizing because of suboptimal");
+
+            self.device_wait_idle();
+            window.recreate_swapchain()?;
+            log::warn!("Swapchain resized to {}x{}", window.swapchain.size.width, window.swapchain.size.height);
+            renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
         }
 
         Ok(())
-    }
-
-    pub(crate) fn submit(&mut self) -> GraphicsResult<()> {
-        
-    }
-
-    pub(crate) fn graphics_command_buffer(&self) -> vk::CommandBuffer {
-        self.graphics_command_buffers[self.current_frame]
-    }
-    pub(crate) fn transfer_command_buffer(&self) -> Option<vk::CommandBuffer> {
-        if let Some(buffers) = &self.transfer_command_buffers {
-            Some(buffers[self.current_frame])
-        } else {
-            None
-        }
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_command_pool(self.graphics_command_pool, None);
-            if let Some(transfer_command_pool) = self.transfer_command_pool {
-                self.device.destroy_command_pool(transfer_command_pool, None);
+            for fence in &self.fences {
+                self.device.destroy_fence(*fence, None);
             }
+
+            self.device.destroy_command_pool(self.command_pool, None);
 
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);

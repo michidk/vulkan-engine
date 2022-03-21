@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/engine",
+    "crates/editor",
     "crates/ve_asset",
     "crates/ve_format",
     "crates/ve_shader_reflect",

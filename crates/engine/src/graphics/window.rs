@@ -9,15 +9,18 @@ pub(crate) struct Window {
     context: Rc<Context>,
     winit_window: winit::window::Window,
     surface: vk::SurfaceKHR,
-    swapchain: Swapchain,
+    pub(crate) swapchain: Swapchain,
+
+    pub(crate) acquire_semaphores: Vec<vk::Semaphore>,
+    pub(crate) render_semaphores: Vec<vk::Semaphore>,
 }
 
 pub(crate) struct Swapchain {
-    handle: vk::SwapchainKHR,
-    images: Vec<vk::Image>,
-    views: Vec<vk::ImageView>,
-    format: vk::Format,
-    size: vk::Extent2D,
+    pub(crate) handle: vk::SwapchainKHR,
+    pub(crate) images: Vec<vk::Image>,
+    pub(crate) views: Vec<vk::ImageView>,
+    pub(crate) format: vk::Format,
+    pub(crate) size: vk::Extent2D,
 }
 
 impl Window {
@@ -35,11 +38,26 @@ impl Window {
 
         let swapchain = Self::create_swapchain(&context, surface, vk::SwapchainKHR::null())?;
 
+        let mut acquire_semaphores = Vec::with_capacity(context.max_frames_in_flight);
+        for _ in 0..context.max_frames_in_flight {
+            let sem = unsafe{context.device.create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)?};
+            acquire_semaphores.push(sem);
+        }
+
+        let mut render_semaphores = Vec::with_capacity(context.max_frames_in_flight);
+        for _ in 0..context.max_frames_in_flight {
+            let sem = unsafe{context.device.create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)?};
+            render_semaphores.push(sem);
+        }
+
         Ok(Self {
             context,
             winit_window,
             surface,
             swapchain,
+
+            acquire_semaphores,
+            render_semaphores,
         })
     }
 
@@ -47,6 +65,7 @@ impl Window {
         for view in &self.swapchain.views {
             unsafe{self.context.device.destroy_image_view(*view, None)};
         }
+        unsafe{self.context.khr_swapchain.destroy_swapchain(self.swapchain.handle, None);}
 
         self.swapchain = Self::create_swapchain(&self.context, self.surface, self.swapchain.handle)?;
 
@@ -57,6 +76,13 @@ impl Window {
 impl Drop for Window {
     fn drop(&mut self) {
         unsafe {
+            for sem in &self.acquire_semaphores {
+                self.context.device.destroy_semaphore(*sem, None);
+            }
+            for sem in &self.render_semaphores {
+                self.context.device.destroy_semaphore(*sem, None);
+            }
+
             for view in &self.swapchain.views {
                 self.context.device.destroy_image_view(*view, None);
             }

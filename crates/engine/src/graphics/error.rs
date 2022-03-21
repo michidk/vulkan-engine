@@ -11,6 +11,8 @@ pub(crate) enum GraphicsError {
     NoDevice,
     #[error("Vulkan API Error: {0}")]
     Vk(#[from] ash::vk::Result),
+    #[error("Gpu Allocation failed: {0}")]
+    GpuAlloc(#[from] gpu_allocator::AllocationError),
     #[error("Window creation failed")]
     WindowCreationFailed,
     #[error("Window is minimized")]

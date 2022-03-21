@@ -1,6 +1,6 @@
 use ash::vk;
 
-use super::error::GraphicsResult;
+use crate::graphics::error::GraphicsResult;
 
 pub(crate) fn deferred_frame_data(device: &ash::Device) -> GraphicsResult<vk::DescriptorSetLayout> {
     let bindings = [

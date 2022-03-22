@@ -6,7 +6,7 @@ use super::{context::Context, error::GraphicsResult};
 
 pub(crate) mod deferred;
 
-pub(crate) trait Renderer {
+pub(crate) trait SceneRenderer {
     fn create(context: Rc<Context>) -> GraphicsResult<Self> where Self: Sized;
 
     fn render_frame(&mut self, command_buffer: vk::CommandBuffer) -> GraphicsResult<vk::Image>;

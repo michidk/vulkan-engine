@@ -3,7 +3,7 @@ use std::rc::Rc;
 use env_logger::Env;
 use winit::event::WindowEvent;
 
-use crate::{version::Version, graphics::{context::Context, renderer::{deferred::DeferredRenderer, Renderer}, window::Window}};
+use crate::{version::Version, graphics::{context::Context, scene_renderer::{deferred::DeferredSceneRenderer, SceneRenderer}, window::Window}};
 
 pub struct AppConfig {
     pub app_info: AppInfo,
@@ -37,7 +37,7 @@ pub fn run(app_config: AppConfig) -> ! {
     env_logger::init_from_env(Env::default().default_filter_or(level));
 
     let context = Rc::new(Context::new(&app_config.app_info).expect("Failed to create Graphics Context"));
-    let mut renderer = DeferredRenderer::create(Rc::clone(&context)).expect("Failed to create Renderer");
+    let mut renderer = DeferredSceneRenderer::create(Rc::clone(&context)).expect("Failed to create Renderer");
 
     let event_loop = winit::event_loop::EventLoop::new();
     let mut main_window = Window::new(800, 600, app_config.app_info.app_name, true, true, Rc::clone(&context), &event_loop).expect("Failed to create main window");

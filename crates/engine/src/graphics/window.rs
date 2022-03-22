@@ -15,6 +15,7 @@ pub(crate) struct Window {
     pub(crate) render_semaphores: Vec<vk::Semaphore>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct Swapchain {
     pub(crate) handle: vk::SwapchainKHR,
     pub(crate) images: Vec<vk::Image>,
@@ -36,7 +37,7 @@ impl Window {
 
         let surface = unsafe{ash_window::create_surface(&context.entry, &context.instance, &winit_window, None)?};
 
-        let swapchain = Self::create_swapchain(&context, surface)?;
+        let swapchain = Self::create_swapchain(&context, surface, vk::SwapchainKHR::null())?;
 
         let mut acquire_semaphores = Vec::with_capacity(context.max_frames_in_flight);
         for _ in 0..context.max_frames_in_flight {
@@ -62,11 +63,17 @@ impl Window {
     }
 
     pub(crate) fn recreate_swapchain(&mut self) -> GraphicsResult<()> {
-        for view in &self.swapchain.views {
-            unsafe{self.context.device.destroy_image_view(*view, None)};
-        }
-        unsafe{self.context.khr_swapchain.destroy_swapchain(self.swapchain.handle, None);}
-        self.swapchain = Self::create_swapchain(&self.context, self.surface)?;
+        let new_swapchain = Self::create_swapchain(&self.context, self.surface, self.swapchain.handle)?;
+        let old_swapchain = std::mem::replace(&mut self.swapchain, new_swapchain);
+
+        let context = Rc::clone(&self.context);
+
+        self.context.run_deferred(self.context.max_frames_in_flight, move || {
+            for view in &old_swapchain.views {
+                unsafe{context.device.destroy_image_view(*view, None)};
+            }
+            unsafe{context.khr_swapchain.destroy_swapchain(old_swapchain.handle, None);}
+        });
 
         Ok(())
     }
@@ -92,7 +99,7 @@ impl Drop for Window {
 }
 
 impl Window {
-    fn create_swapchain(context: &Context, surface: vk::SurfaceKHR) -> GraphicsResult<Swapchain> {
+    fn create_swapchain(context: &Context, surface: vk::SurfaceKHR, old_swapchain: vk::SwapchainKHR) -> GraphicsResult<Swapchain> {
         let caps = unsafe{context.khr_surface.get_physical_device_surface_capabilities(context.physical_device, surface)?};
         let formats = unsafe{context.khr_surface.get_physical_device_surface_formats(context.physical_device, surface)?};
         let present_modes = unsafe{context.khr_surface.get_physical_device_surface_present_modes(context.physical_device, surface)?};
@@ -132,7 +139,8 @@ impl Window {
             .pre_transform(caps.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode)
-            .clipped(true);
+            .clipped(true)
+            .old_swapchain(old_swapchain);
         
         let swapchain = unsafe{context.khr_swapchain.create_swapchain(&info, None)?};
 

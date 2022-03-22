@@ -1,10 +1,10 @@
-use std::{ffi::{CStr, CString}, cell::RefCell, mem::ManuallyDrop};
+use std::{ffi::{CStr, CString}, cell::{RefCell, Cell}, mem::ManuallyDrop};
 
 use ash::{vk, extensions::khr};
 
 use crate::{AppInfo, ENGINE_NAME, ENGINE_VERSION};
 
-use super::{error::{GraphicsError, GraphicsResult}, renderer::Renderer, window::Window};
+use super::{error::{GraphicsError, GraphicsResult}, scene_renderer::SceneRenderer, window::Window};
 
 pub(crate) struct Context {
     pub(crate) entry: ash::Entry,
@@ -18,7 +18,7 @@ pub(crate) struct Context {
     pub(crate) graphics_queue: QueueInfo,
     pub(crate) transfer_queue: Option<QueueInfo>,
 
-    pub(crate) frame_counter: usize,
+    pub(crate) frame_counter: Cell<usize>,
     pub(crate) max_frames_in_flight: usize,
 
     allocator: ManuallyDrop<RefCell<gpu_allocator::vulkan::Allocator>>,
@@ -27,6 +27,8 @@ pub(crate) struct Context {
     command_buffers: Vec<vk::CommandBuffer>,
 
     fences: Vec<vk::Fence>,
+
+    deferred_queue: RefCell<Vec<(usize, Box<dyn FnMut()>)>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -105,7 +107,7 @@ impl Context {
             graphics_queue,
             transfer_queue,
             
-            frame_counter: 0,
+            frame_counter: Cell::new(0),
             max_frames_in_flight: 3,
 
             allocator,
@@ -114,7 +116,13 @@ impl Context {
             command_buffers,
 
             fences,
+
+            deferred_queue: RefCell::new(Vec::new()),
         })
+    }
+
+    pub(crate) fn run_deferred(&self, num_frames: usize, func: impl FnMut() + 'static) {
+        self.deferred_queue.borrow_mut().push((self.frame_counter.get() + num_frames, Box::new(func)));
     }
 
     pub(crate) fn device_wait_idle(&self) {
@@ -169,17 +177,27 @@ impl Context {
         }
     }
 
-    pub(crate) fn render_frame<R: Renderer>(&self, renderer: &mut R, window: &mut Window) -> GraphicsResult<()> {
+    pub(crate) fn render_frame<R: SceneRenderer>(&self, renderer: &mut R, window: &mut Window) -> GraphicsResult<()> {
         unsafe {
-            self.device.wait_for_fences(&[self.fences[self.frame_counter % self.max_frames_in_flight]], true, u64::MAX)?;
-            self.device.reset_fences(&[self.fences[self.frame_counter % self.max_frames_in_flight]])?;
+            self.device.wait_for_fences(&[self.fences[self.frame_counter.get() % self.max_frames_in_flight]], true, u64::MAX)?;
+            self.device.reset_fences(&[self.fences[self.frame_counter.get() % self.max_frames_in_flight]])?;
+        }
+
+        {
+            let mut queue = self.deferred_queue.borrow_mut();
+            for (run_frame, task) in queue.iter_mut() {
+                if *run_frame <= self.frame_counter.get() {
+                    task();
+                }
+            }
+            queue.retain(|(run_frame, _)| *run_frame > self.frame_counter.get());
         }
 
         let mut should_resize = false;
 
         let image_index;
         loop {
-            let res = unsafe{self.khr_swapchain.acquire_next_image(window.swapchain.handle, u64::MAX, window.acquire_semaphores[self.frame_counter % self.max_frames_in_flight], vk::Fence::null())};
+            let res = unsafe{self.khr_swapchain.acquire_next_image(window.swapchain.handle, u64::MAX, window.acquire_semaphores[self.frame_counter.get() % self.max_frames_in_flight], vk::Fence::null())};
             match res {
                 Ok((i, suboptimal)) => {
                     if suboptimal {
@@ -190,7 +208,6 @@ impl Context {
                     break;
                 },
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                    self.device_wait_idle();
                     window.recreate_swapchain()?;
                     renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
                 },
@@ -198,7 +215,7 @@ impl Context {
             }
         }
 
-        let command_buffer = self.command_buffers[self.frame_counter % self.max_frames_in_flight];
+        let command_buffer = self.command_buffers[self.frame_counter.get() % self.max_frames_in_flight];
 
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -316,9 +333,9 @@ impl Context {
             self.device.end_command_buffer(command_buffer)?;
         }
 
-        let wait_semaphores = [window.acquire_semaphores[self.frame_counter % self.max_frames_in_flight]];
+        let wait_semaphores = [window.acquire_semaphores[self.frame_counter.get() % self.max_frames_in_flight]];
         let wait_stages = [vk::PipelineStageFlags::TRANSFER];
-        let signal_semaphores = [window.render_semaphores[self.frame_counter % self.max_frames_in_flight]];
+        let signal_semaphores = [window.render_semaphores[self.frame_counter.get() % self.max_frames_in_flight]];
         let command_buffers = [command_buffer];
         let submits = vk::SubmitInfo::builder()
             .wait_semaphores(&wait_semaphores)
@@ -326,7 +343,7 @@ impl Context {
             .command_buffers(&command_buffers)
             .signal_semaphores(&signal_semaphores);
         let res = unsafe {
-            self.device.queue_submit(self.graphics_queue.queue, &[submits.build()], self.fences[self.frame_counter % self.max_frames_in_flight])?;
+            self.device.queue_submit(self.graphics_queue.queue, &[submits.build()], self.fences[self.frame_counter.get() % self.max_frames_in_flight])?;
 
             let swapchains = [window.swapchain.handle];
             let indices = [image_index];
@@ -350,10 +367,12 @@ impl Context {
         }
 
         if should_resize {
-            self.device_wait_idle();
             window.recreate_swapchain()?;
             renderer.set_size((window.swapchain.size.width, window.swapchain.size.height))?;
         }
+
+        let frame_counter = self.frame_counter.get() + 1;
+        self.frame_counter.set(frame_counter);
 
         Ok(())
     }
@@ -361,6 +380,10 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
+        for (_, func) in self.deferred_queue.borrow_mut().iter_mut() {
+            func();
+        }
+
         unsafe {
             ManuallyDrop::drop(&mut self.allocator);
 

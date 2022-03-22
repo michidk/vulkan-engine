@@ -4,12 +4,13 @@ use ash::vk;
 
 use crate::graphics::{context::Context, error::GraphicsResult};
 
-use super::Renderer;
+use super::SceneRenderer;
 
 mod desc_layouts;
 mod renderpasses;
 
-pub(crate) struct DeferredRenderer {
+#[derive(Clone)]
+pub(crate) struct DeferredSceneRenderer {
     context: Rc<Context>,
 
     // DescriptorSetLayouts
@@ -39,7 +40,7 @@ pub(crate) struct DeferredRenderer {
     height: u32,
 }
 
-impl Renderer for DeferredRenderer {
+impl SceneRenderer for DeferredSceneRenderer {
     fn create(context: Rc<Context>) -> GraphicsResult<Self> where Self: Sized {
         let desc_layout_frame_data = desc_layouts::deferred_frame_data(&context.device)?;
 
@@ -130,7 +131,7 @@ impl Renderer for DeferredRenderer {
     }
 
     fn set_size(&mut self, size: (u32, u32)) -> GraphicsResult<()> {
-        self.destroy_framebuffer();
+        self.destroy_framebuffer_deferred();
         self.create_framebuffer(size.0, size.1)?;
 
         Ok(())
@@ -141,73 +142,17 @@ impl Renderer for DeferredRenderer {
     }
 }
 
-impl DeferredRenderer {
+impl DeferredSceneRenderer {
     fn create_framebuffer(&mut self, width: u32, height: u32) -> GraphicsResult<()> {
         let (g0_alloc, g0_image) = self.context.create_image(width, height, vk::Format::R16G16B16A16_SFLOAT, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, "deferred g0 image")?;
         let (g1_alloc, g1_image) = self.context.create_image(width, height, vk::Format::R16G16B16A16_SFLOAT, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, "deferred g1 image")?;
         let (depth_alloc, depth_image) = self.context.create_image(width, height, vk::Format::D24_UNORM_S8_UINT, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::INPUT_ATTACHMENT, "deferred depth/stencil image")?;
         let (output_alloc, output_image) = self.context.create_image(width, height, vk::Format::R16G16B16A16_SFLOAT, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC, "deferred output image")?;
 
-        let g0_view = unsafe {
-            let info = vk::ImageViewCreateInfo::builder()
-                .image(g0_image)
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::R16G16B16A16_SFLOAT)
-                .components(vk::ComponentMapping::default())
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
-            self.context.device.create_image_view(&info, None)?
-        };
-        let g1_view = unsafe {
-            let info = vk::ImageViewCreateInfo::builder()
-                .image(g1_image)
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::R16G16B16A16_SFLOAT)
-                .components(vk::ComponentMapping::default())
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
-            self.context.device.create_image_view(&info, None)?
-        };
-        let depth_view = unsafe {
-            let info = vk::ImageViewCreateInfo::builder()
-                .image(depth_image)
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::D24_UNORM_S8_UINT)
-                .components(vk::ComponentMapping::default())
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
-            self.context.device.create_image_view(&info, None)?
-        };
-        let output_view = unsafe {
-            let info = vk::ImageViewCreateInfo::builder()
-                .image(output_image)
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .format(vk::Format::R16G16B16A16_SFLOAT)
-                .components(vk::ComponentMapping::default())
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
-            self.context.device.create_image_view(&info, None)?
-        };
+        let g0_view = Self::create_view(&self.context.device, g0_image, vk::Format::R16G16B16A16_SFLOAT, vk::ImageAspectFlags::COLOR)?;
+        let g1_view = Self::create_view(&self.context.device, g1_image, vk::Format::R16G16B16A16_SFLOAT, vk::ImageAspectFlags::COLOR)?;
+        let depth_view = Self::create_view(&self.context.device, depth_image, vk::Format::D24_UNORM_S8_UINT, vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL)?;
+        let output_view = Self::create_view(&self.context.device, output_image, vk::Format::R16G16B16A16_SFLOAT, vk::ImageAspectFlags::COLOR)?;
 
         let framebuffer = unsafe {
             let mut info = vk::FramebufferCreateInfo::builder()
@@ -282,6 +227,24 @@ impl DeferredRenderer {
         Ok(())
     }
 
+    fn create_view(device: &ash::Device, image: vk::Image, format: vk::Format, aspects: vk::ImageAspectFlags) -> GraphicsResult<vk::ImageView> {
+        let info = vk::ImageViewCreateInfo::builder()
+            .image(image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(format)
+            .components(vk::ComponentMapping::default())
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: aspects,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+        unsafe {
+            Ok(device.create_image_view(&info, None)?)
+        }
+    }
+
     fn destroy_framebuffer(&mut self) {
         unsafe {
             self.context.device.destroy_framebuffer(self.framebuffer, None);
@@ -297,9 +260,42 @@ impl DeferredRenderer {
         self.context.destroy_image(self.depth_alloc.clone(), self.depth_image);
         self.context.destroy_image(self.output_alloc.clone(), self.output_image);
     }
+
+    fn destroy_framebuffer_deferred(&self) {
+        let context = Rc::clone(&self.context);
+        let framebuffer = self.framebuffer;
+        let g0_view = self.g0_view;
+        let g1_view = self.g1_view;
+        let depth_view = self.depth_view;
+        let output_view = self.output_view;
+        let g0_alloc = self.g0_alloc.clone();
+        let g1_alloc = self.g1_alloc.clone();
+        let depth_alloc = self.depth_alloc.clone();
+        let output_alloc = self.output_alloc.clone();
+        let g0_image = self.g0_image;
+        let g1_image = self.g1_image;
+        let depth_image = self.depth_image;
+        let output_image = self.output_image;
+
+        self.context.run_deferred(self.context.max_frames_in_flight, move || {
+            unsafe {
+                context.device.destroy_framebuffer(framebuffer, None);
+    
+                context.device.destroy_image_view(g0_view, None);
+                context.device.destroy_image_view(g1_view, None);
+                context.device.destroy_image_view(depth_view, None);
+                context.device.destroy_image_view(output_view, None);
+            }
+    
+            context.destroy_image(g0_alloc.clone(), g0_image);
+            context.destroy_image(g1_alloc.clone(), g1_image);
+            context.destroy_image(depth_alloc.clone(), depth_image);
+            context.destroy_image(output_alloc.clone(), output_image);
+        });
+    }
 }
 
-impl Drop for DeferredRenderer {
+impl Drop for DeferredSceneRenderer {
     fn drop(&mut self) {
         self.destroy_framebuffer();
 

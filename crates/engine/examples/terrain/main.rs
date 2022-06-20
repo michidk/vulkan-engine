@@ -1,20 +1,21 @@
-use std::rc::Rc;
+use std::{rc::{Rc, Weak}, cell::Cell};
 
+use egui::Slider;
 /// Renders a terrain example
 use gfx_maths::*;
 use noise::{NoiseFn, OpenSimplex};
 use ve_format::mesh::{Face, MeshData, Submesh, Vertex};
 use vulkan_engine::{
-    core::engine::Engine,
+    core::{engine::Engine, input::Input},
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
-            light_component::LightComponent, renderer::RendererComponent,
+            light_component::LightComponent, renderer::RendererComponent, Component,
         },
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
-        transform::Transform,
+        transform::Transform, entity::Entity,
     },
 };
 use vulkan_engine::{
@@ -151,7 +152,7 @@ fn setup(engine: &mut Engine) {
     main_cam.new_component::<CameraComponent>();
     main_cam.new_component::<DebugMovementComponent>();
 
-    scene
+    let sun = scene
         .new_entity_with_transform(
             "Sun".to_string(),
             Transform {
@@ -159,8 +160,9 @@ fn setup(engine: &mut Engine) {
                 rotation: Quaternion::from_euler_angles_zyx(&Vec3::new(-153.0, 0.0, 0.0)),
                 scale: Vec3::one(),
             },
-        )
-        .new_component::<LightComponent>()
+        );
+
+    sun.new_component::<LightComponent>()
         .light
         .set(
             DirectionalLight {
@@ -169,6 +171,8 @@ fn setup(engine: &mut Engine) {
             }
             .into(),
         );
+
+    sun.new_component::<ChangeTimeOfDayComponent>();
 
     scene
         .new_entity_with_transform(
@@ -190,4 +194,49 @@ fn setup(engine: &mut Engine) {
         );
 
     scene.load();
+}
+
+#[derive(Debug)]
+struct ChangeTimeOfDayComponent {
+    entity: Weak<Entity>,
+    rotation_speed: Cell<f32>,
+}
+
+impl Component for ChangeTimeOfDayComponent {
+    fn create(entity: &Rc<Entity>) -> Rc<Self>
+    where
+        Self: Sized,
+    {
+        Rc::new(Self {
+            entity: Rc::downgrade(entity),
+            rotation_speed: Cell::new(120.0),
+        })
+    }
+
+    fn load(&self) {}
+
+    fn start(&self) {}
+
+    fn update(&self, _input: &Input, delta: f32) {
+        if let Some(entity) = self.entity.upgrade() {
+            let mut transform = entity.transform.borrow_mut();
+
+            let mut rotation = transform.rotation;
+            rotation = Quaternion::axis_angle(
+                Vec3::new(0.0, 0.0, 1.0),
+                self.rotation_speed.get().to_radians() * delta,
+            ) * rotation;
+            transform.rotation = rotation;
+        }
+    }
+
+    fn inspector_name(&self) -> &'static str {
+        "TimeOfDayComponent"
+    }
+
+    fn render_inspector(&self, ui: &mut egui::Ui) {
+        let mut rot_speed = self.rotation_speed.get();
+        ui.add(Slider::new(&mut rot_speed, -360.0..=360.0).text("Rotation Speed"));
+        self.rotation_speed.set(rot_speed);
+    }
 }

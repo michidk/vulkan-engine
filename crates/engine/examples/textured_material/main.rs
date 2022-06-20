@@ -1,4 +1,4 @@
-/// A minimal example that just initializes the engine but does not display anything
+/// A minimal example that shows a runtime generated texture.
 use std::rc::Rc;
 
 use gfx_maths::*;

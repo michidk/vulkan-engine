@@ -1,7 +1,6 @@
-use std::{path::Path, rc::Rc};
-
-/// Renders a brdf example
 use gfx_maths::*;
+/// Renders a brdf example
+use std::{path::Path, rc::Rc};
 use vulkan_engine::{
     core::engine::Engine,
     scene::{

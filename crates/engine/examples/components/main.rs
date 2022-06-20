@@ -1,3 +1,4 @@
+/// Showcases the component system
 use std::{
     cell::Cell,
     path::Path,

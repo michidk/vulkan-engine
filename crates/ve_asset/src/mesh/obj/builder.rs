@@ -169,7 +169,7 @@ impl ObjMeshBuilder {
         let position: Vec3 = obj_vert.position.into();
 
         // get color values or default as vec
-        let color: Vec3 = obj_vert.color.unwrap_or_else(|| [0.0, 0.0, 0.0]).into();
+        let color: Vec3 = obj_vert.color.unwrap_or([0.0, 0.0, 0.0]).into();
 
         // get uv values from current face index or default as vec
         let uv: Vec2 = face.face_i[i]
@@ -198,10 +198,9 @@ impl ObjMeshBuilder {
             }
         }
 
-        let vert_idx: usize;
         // create new vertex if not already existing
-        if let Some(potential_vert_idx) = potential_vert_idx {
-            vert_idx = potential_vert_idx;
+        let vert_idx: usize = if let Some(potential_vert_idx) = potential_vert_idx {
+            potential_vert_idx
         } else {
             let vertex = mesh::Vertex {
                 position,
@@ -210,8 +209,8 @@ impl ObjMeshBuilder {
                 normal,
             };
             vertices.push(vertex);
-            vert_idx = vertices.len() - 1;
-        }
+            vertices.len() - 1
+        };
 
         vert_idx
     }

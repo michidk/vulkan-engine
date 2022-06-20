@@ -8,6 +8,7 @@ use vulkan_engine::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
             light_component::LightComponent, renderer::RendererComponent,
+            rotation_component::RotationComponent,
         },
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
@@ -113,43 +114,24 @@ fn setup(engine: &mut Engine) {
         }
     }
 
-    scene
-        .new_entity_with_transform(
-            "DirLight1".to_string(),
-            Transform {
-                position: Vec3::zero(),
-                rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), -90.0f32.to_radians()),
-                scale: Vec3::one(),
-            },
-        )
-        .new_component::<LightComponent>()
-        .light
-        .set(
-            DirectionalLight {
-                direction: Vec4::zero(),
-                illuminance: Vec4::new(10.1, 10.1, 10.1, 0.0),
-            }
-            .into(),
-        );
+    let sun = scene.new_entity_with_transform(
+        "Sun".to_string(),
+        Transform {
+            position: Vec3::zero(),
+            rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), -90.0f32.to_radians()),
+            scale: Vec3::one(),
+        },
+    );
 
-    scene
-        .new_entity_with_transform(
-            "DirLight2".to_string(),
-            Transform {
-                position: Vec3::zero(),
-                rotation: Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), 90.0f32.to_radians()),
-                scale: Vec3::one(),
-            },
-        )
-        .new_component::<LightComponent>()
-        .light
-        .set(
-            DirectionalLight {
-                direction: Vec4::zero(),
-                illuminance: Vec4::new(1.6, 1.6, 1.6, 0.0),
-            }
-            .into(),
-        );
+    sun.new_component::<LightComponent>().light.set(
+        DirectionalLight {
+            direction: Vec4::zero(),
+            illuminance: Vec4::new(239.0, 245.0, 218.0, 0.0) / 50.0,
+        }
+        .into(),
+    );
+
+    sun.new_component::<RotationComponent>();
 
     scene
         .new_entity_with_transform(
@@ -189,9 +171,9 @@ fn setup(engine: &mut Engine) {
         );
     scene
         .new_entity_with_transform(
-            "PointLight White 3".to_string(),
+            "PointLight Cyan 3".to_string(),
             Transform {
-                position: Vec3::new(0.1, -3.0, -3.0),
+                position: Vec3::new(0.0, 0.0, 8.0),
                 rotation: Quaternion::identity(),
                 scale: Vec3::one(),
             },
@@ -201,44 +183,7 @@ fn setup(engine: &mut Engine) {
         .set(
             PointLight {
                 position: Vec4::zero(),
-                luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-            }
-            .into(),
-        );
-    scene
-        .new_entity_with_transform(
-            "PointLight White 4".to_string(),
-            Transform {
-                position: Vec3::new(0.1, -3.0, -3.0),
-                rotation: Quaternion::identity(),
-                scale: Vec3::one(),
-            },
-        )
-        .new_component::<LightComponent>()
-        .light
-        .set(
-            PointLight {
-                position: Vec4::zero(),
-                luminous_flux: Vec4::new(100.0, 100.0, 100.0, 0.0),
-            }
-            .into(),
-        );
-
-    scene
-        .new_entity_with_transform(
-            "PointLight Red".to_string(),
-            Transform {
-                position: Vec3::new(0.0, 0.0, -3.0),
-                rotation: Quaternion::identity(),
-                scale: Vec3::one(),
-            },
-        )
-        .new_component::<LightComponent>()
-        .light
-        .set(
-            PointLight {
-                position: Vec4::zero(),
-                luminous_flux: Vec4::new(100.0, 0.0, 0.0, 0.0),
+                luminous_flux: Vec4::new(0.0, 160.0, 145.0, 0.0) * 2.0,
             }
             .into(),
         );

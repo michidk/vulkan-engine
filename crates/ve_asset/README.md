@@ -26,9 +26,9 @@ Currently, this utility supports the following file formats:
 
 ## Meta
 
-Formats like `.obj` have to be parsed with different settings, e.g., depending on the software it was made with. These settings can be set in `.toml` files that are named the same as the corresponding file. These metadata can also be set for a whole folder in a `<file_extension>.toml` file.
+Formats like `.obj` have to be parsed with different settings, e.g., depending on the software it was made with. These settings can be set in `.toml` files that are named the same as the corresponding file. This metadata can also be set for a whole folder in a `<file_extension>.toml` file.
 
-E.g. the meta-file for the `.obj` file type, looks like this:
+The meta-file for the `.obj` file type looks like this:
 
 ```toml
 calculate_normals = false

@@ -11,10 +11,12 @@ The goal is to build a somewhat usable game engine and a demo using it. While we
 ## Features
 
 Currently implemented features are:
-- Scene comprised of Entities and Components
-- Debug UI Layer with Frame stats, Scene Graph, Component Inspectors and Profiler
-- BRDF shading
-- Deferred rendering
+
+- A scene graph with entities and components
+- Vulkan rendering
+- BRDF shading and lighting
+- Deferred rendering and post-processing effects
+- Debug UI Layer with frame stats, scene graph and component inspectors
 - `.obj` parser
 - Runs on both Linux and Windows
 
@@ -22,21 +24,23 @@ Currently implemented features are:
 
 BRDF testing:
 
-![brdf testing](./.github/images/examples/brdf.png)
+![brdf testing](/.github/images/examples/brdf.png)
 
 Debug UI:
 
-![debug ui](./.github/images/examples/debug-ui.png)
+![debug ui](/.github/images/examples/debug-ui.png)
+
+Custom meshes:
+![custom meshes](/.github/images/examples/suzanne.png)
 
 ## Workspace
 
 | Folder | Description | Readme |
 | ---- | ----------- | - |
-| [crates/engine](crates/engine) | Main engine library | This one |
-| [crates/ve_asset](crates/ve_asset) | Utility that converts files into our custom format | [here](./crates/ve_asset/README.md) |
-| [crates/ve_format](crates/ve_format) | Stores some shared structs | [here](./crates/ve_format/README.md) |
-| [crates/ve_shader_reflect](crates/ve_shader_reflect) | Retrieves metadata from compiled shaders to feed into the material pipeline | [here](./crates/ve_shader_reflect/README.md) |
-
+| [crates/engine](/crates/engine) | Main engine library | This one |
+| [crates/ve_asset](/crates/ve_asset) | Utility that converts files into our custom format | [here](./crates/ve_asset/README.md) |
+| [crates/ve_format](/crates/ve_format) | Stores some shared structs | [here](./crates/ve_format/README.md) |
+| [crates/ve_shader_reflect](/crates/ve_shader_reflect) | Retrieves metadata from compiled shaders to feed into the material pipeline | [here](/crates/ve_shader_reflect/README.md) |
 
 
 ## Examples
@@ -44,11 +48,11 @@ Debug UI:
 Examples are in the [crates/engine/examples](crates/engine/examples) folder. They can be run with `cargo +nightly run --example <name>`.
 | Name | Description |
 | ---- | ----------- |
-| minimal | Displays a triangle using vertex colors |
-| brdf | Renders a couple of spheres using physically-based rendering |
-| mesh | Loads and renders a custom mesh |
-| textured_material | Creates a texture at runtime and renders it onto a quad |
-| components | Shows off the engine's component system |
+| [minimal](/crates/engine/examples/minimal/) | Displays a triangle using vertex colors |
+| [brdf](/crates/engine/examples/brdf/) | Renders a couple of spheres using physically-based rendering |
+| [mesh](/crates/engine/examples/mesh/) | Loads and renders a custom mesh |
+| [textured_material](/crates/engine/examples/textured_material/) | Creates a texture at runtime and renders it onto a quad |
+| [components](/crates/engine/examples/components/) | Shows off the engine's component system |
 
 ## Building
 

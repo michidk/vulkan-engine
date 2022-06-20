@@ -1,19 +1,15 @@
-use std::{
-    cell::Cell,
-    path::Path,
-    rc::{Rc, Weak},
-};
+use std::{path::Path, rc::Rc};
 
 /// Renders a brdf example
 use gfx_maths::*;
 use vulkan_engine::{
-    core::{engine::Engine, input::Input},
+    core::engine::Engine,
     scene::{
         component::{
             camera_component::CameraComponent, debug_movement_component::DebugMovementComponent,
-            light_component::LightComponent, renderer::RendererComponent, Component,
+            light_component::LightComponent, renderer::RendererComponent,
+            rotation_component::RotationComponent,
         },
-        entity::Entity,
         light::{DirectionalLight, PointLight},
         material::MaterialPipeline,
         model::Model,
@@ -192,43 +188,4 @@ fn setup(engine: &mut Engine) {
         );
 
     scene.load();
-}
-
-#[derive(Debug)]
-struct RotationComponent {
-    entity: Weak<Entity>,
-    rotation_speed: Cell<f32>,
-}
-
-impl Component for RotationComponent {
-    fn create(entity: &Rc<Entity>) -> Rc<Self>
-    where
-        Self: Sized,
-    {
-        Rc::new(Self {
-            entity: Rc::downgrade(entity),
-            rotation_speed: Cell::new(30.0),
-        })
-    }
-
-    fn load(&self) {}
-
-    fn start(&self) {}
-
-    fn update(&self, _: &Input, delta: f32) {
-        if let Some(entity) = self.entity.upgrade() {
-            let mut transform = entity.transform.borrow_mut();
-
-            let mut rotation = transform.rotation;
-            rotation = Quaternion::axis_angle(
-                Vec3::new(0.0, 0.0, 1.0),
-                self.rotation_speed.get().to_radians() * delta,
-            ) * rotation;
-            transform.rotation = rotation;
-        }
-    }
-
-    fn inspector_name(&self) -> &'static str {
-        "TimeOfDayComponent"
-    }
 }

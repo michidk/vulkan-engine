@@ -2,6 +2,7 @@ pub mod camera_component;
 pub mod debug_movement_component;
 pub mod light_component;
 pub mod renderer;
+pub mod rotation_component;
 
 use std::{fmt::Debug, rc::Rc};
 

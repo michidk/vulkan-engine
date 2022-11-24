@@ -1,16 +1,21 @@
 //! This module contains the main [`Renderer`] code.
-//! 
+//!
 //! See the [`Renderer`] docs.
 
-use std::ffi::{c_void, CStr, CString};
+use std::{
+    ffi::{c_void, CStr, CString},
+    fmt::Debug,
+};
 
 use ash::{extensions::khr, vk};
 use raw_window_handle::RawDisplayHandle;
 
 use crate::{error::CreationError, version::Version};
 
+const MAX_FRAMES_IN_FLIGHT: usize = 3;
+
 /// Holds information passed directly to the Vulkan API.
-/// 
+///
 /// This is in practice probably used for game-specific driver optimizations.
 pub struct AppInfo<'a> {
     /// The name of the application
@@ -32,8 +37,26 @@ pub struct Renderer {
 
     pub(crate) graphics_queue: vk::Queue,
     pub(crate) transfer_queue: Option<vk::Queue>,
+
+    pub(crate) command_pools: Vec<vk::CommandPool>,
 }
 
+impl Debug for Renderer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Renderer")
+            .field("device", &"...")
+            .field("instance", &"...")
+            .field("entry", &"...")
+            .field("khr_surface", &"...")
+            .field("khr_swapchain", &"...")
+            .field("device_info", &self.device_info)
+            .field("graphics_queue", &self.graphics_queue)
+            .field("transfer_queue", &self.transfer_queue)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct DeviceInfo {
     pub(crate) physical_device: vk::PhysicalDevice,
 
@@ -46,7 +69,7 @@ const ENGINE_VERSION: Version = Version::new(0, 1, 0);
 
 impl Renderer {
     /// Initializes a new [`Renderer`].
-    /// 
+    ///
     /// # Errors
     /// - [`CreationError::LoadingError`] when ash initialization fails
     /// - [`CreationError::UnsupportedInstanceVersion`] when the driver does not support Vulkan 1.2 instances
@@ -57,10 +80,13 @@ impl Renderer {
         app_info: &AppInfo,
         display_handle: RawDisplayHandle,
     ) -> Result<Self, CreationError> {
+        log::info!("Initializing Vulkan");
         let entry = unsafe { ash::Entry::load()? };
 
         let instance_version = Self::get_instance_version(&entry)?;
+        log::info!("Vulkan instance version: {}", instance_version);
         if !instance_version.compatible_with(Version::VK12) {
+            log::error!("Vulkan instance version is not compatible with Vulkan 1.2");
             return Err(CreationError::UnsupportedInstanceVersion(instance_version));
         }
 
@@ -68,11 +94,25 @@ impl Renderer {
 
         let (device, device_info) = Self::create_device(&entry, &instance, display_handle)?;
 
-        let graphics_queue = unsafe { device.get_device_queue(device_info.graphics_queue_family, 0) };
-        let transfer_queue = unsafe { device_info.transfer_queue_family.map(|tf| device.get_device_queue(tf, 0)) };
+        let graphics_queue =
+            unsafe { device.get_device_queue(device_info.graphics_queue_family, 0) };
+        let transfer_queue = unsafe {
+            device_info
+                .transfer_queue_family
+                .map(|tf| device.get_device_queue(tf, 0))
+        };
 
         let khr_surface = khr::Surface::new(&entry, &instance);
         let khr_swapchain = khr::Swapchain::new(&instance, &device);
+
+        let mut command_pools = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+        for _ in 0..MAX_FRAMES_IN_FLIGHT {
+            let create_info = vk::CommandPoolCreateInfo::builder()
+                .queue_family_index(device_info.graphics_queue_family);
+            unsafe {
+                command_pools.push(device.create_command_pool(&create_info, None)?);
+            }
+        }
 
         Ok(Self {
             device,
@@ -85,6 +125,8 @@ impl Renderer {
 
             graphics_queue,
             transfer_queue,
+
+            command_pools,
         })
     }
 
@@ -98,6 +140,7 @@ impl Renderer {
         display_handle: RawDisplayHandle,
     ) -> Result<Vec<*const i8>, CreationError> {
         let required_extensions = ash_window::enumerate_required_extensions(display_handle)?;
+        log::debug!("Required instance extensions are: {:#?}", required_extensions.iter().map(|ptr| unsafe{ CStr::from_ptr(*ptr).to_str().unwrap() } ).collect::<Vec<_>>());
 
         let extensions = entry.enumerate_instance_extension_properties(None)?;
 
@@ -109,6 +152,7 @@ impl Renderer {
                 .iter()
                 .any(|e| unsafe { CStr::from_ptr(e.extension_name.as_ptr()) } == req_name)
             {
+                log::error!("Required instance extension {} is not supported", req_name.to_str().unwrap());
                 return Err(CreationError::MissingInstanceExtension(
                     req_name
                         .to_str()
@@ -122,6 +166,7 @@ impl Renderer {
 
         // Check for optional extensions goes here
 
+        log::info!("Enabling instance extensions: {:#?}", res.iter().map(|ptr| unsafe{ CStr::from_ptr(*ptr).to_str().unwrap() }).collect::<Vec<_>>());
         Ok(res)
     }
 
@@ -154,9 +199,14 @@ impl Renderer {
     ) -> Result<bool, vk::Result> {
         let props = unsafe { instance.get_physical_device_properties(device) };
 
+        let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()).to_str().unwrap() };
+        log::info!("Checking device {}", device_name);
+
         // Check that the device supports VK 1.2
         let version = Version::from_vk_version(props.api_version);
+        log::info!("Device Vulkan version: {}", version);
         if !version.compatible_with(Version::VK12) {
+            log::info!("Device does not support Vulkan 1.2");
             return Ok(false);
         }
 
@@ -166,6 +216,7 @@ impl Renderer {
         if !extensions.iter().any(
             |ext| unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) } == khr::Swapchain::name(),
         ) {
+            log::info!("Device does not support VK_KHR_swapchain");
             return Ok(false);
         }
 
@@ -177,6 +228,7 @@ impl Renderer {
         }
 
         if features12.imageless_framebuffer != vk::TRUE {
+            log::info!("Device does not support imagelessFramebuffer");
             return Ok(false);
         }
 
@@ -264,7 +316,11 @@ impl Renderer {
                 break;
             }
         }
-        let Some(gfx_family) = gfx_family else { return Ok((None, None)); };
+        let Some(gfx_family) = gfx_family else { 
+            log::info!("Device has no graphics queue");
+            return Ok((None, None)); 
+        };
+        log::info!("Device has graphics family: {}", gfx_family);
 
         let transfer_family = queues.iter().enumerate().find_map(|(index, qf)| {
             if index != gfx_family as usize
@@ -273,6 +329,7 @@ impl Renderer {
                     .intersects(vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE)
                 && qf.queue_flags.contains(vk::QueueFlags::TRANSFER)
             {
+                log::info!("Device has async transfer queue family: {}", index);
                 Some(index as u32)
             } else {
                 None
@@ -348,5 +405,11 @@ impl Renderer {
 
             Ok((device, device_info))
         }
+    }
+}
+
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        log::info!("Destroying renderer");
     }
 }

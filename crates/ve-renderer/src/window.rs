@@ -10,9 +10,11 @@ use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use crate::{error::WindowCreationError, renderer::Renderer};
 
 /// Contains a [`winit::window::Window`] and all Vulkan objects required for rendering to it.
+#[derive(Debug)]
 pub struct Window {
     renderer: Rc<Renderer>,
-    window: winit::window::Window,
+    /// The [`winit Window`](winit::window::Window) passed into [`Window::new()`]
+    pub window: winit::window::Window,
 
     surface: vk::SurfaceKHR,
     swapchain: vk::SwapchainKHR,
@@ -20,7 +22,7 @@ pub struct Window {
 
 impl Window {
     /// Creates a new [`Window`] object.
-    /// 
+    ///
     /// # Errors
     /// - [`WindowCreationError::Vk`] if a Vulkan API call returns an unexpected error
     pub fn new(
@@ -42,6 +44,7 @@ impl Window {
         renderer: &Renderer,
         window: &winit::window::Window,
     ) -> Result<vk::SurfaceKHR, vk::Result> {
+        log::debug!("Creating vk::SurfaceKHR with ash_window");
         let surface = unsafe {
             ash_window::create_surface(
                 &renderer.entry,
@@ -59,6 +62,8 @@ impl Window {
         surface: vk::SurfaceKHR,
         window: &winit::window::Window,
     ) -> Result<vk::SwapchainKHR, vk::Result> {
+        log::debug!("Creating vk::SwapchainKHR");
+
         let caps;
         let formats;
         let present_modes;
@@ -85,6 +90,7 @@ impl Window {
         if caps.max_image_count > 0 {
             image_count = u32::min(caps.max_image_count, image_count);
         }
+        log::debug!("Using {} images", image_count);
 
         let format = formats
             .iter()
@@ -98,6 +104,7 @@ impl Window {
                     .first()
                     .expect("vkGetPhysicalDeviceSurfaceFormatsKHR() returned 0 formats")
             });
+        log::debug!("Using format {:?}", format);
 
         let extent = if caps.current_extent.width == u32::MAX {
             let window_size = window.inner_size();
@@ -108,6 +115,7 @@ impl Window {
         } else {
             caps.current_extent
         };
+        log::debug!("Using size {:?}", extent);
 
         let present_mode = if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
             vk::PresentModeKHR::MAILBOX
@@ -116,6 +124,7 @@ impl Window {
         } else {
             vk::PresentModeKHR::FIFO
         };
+        log::debug!("Using present mode {:?}", present_mode);
 
         let create_info = vk::SwapchainCreateInfoKHR::builder()
             .surface(surface)
@@ -131,7 +140,11 @@ impl Window {
             .present_mode(present_mode)
             .clipped(true);
 
-        let swapchain = unsafe { renderer.khr_swapchain.create_swapchain(&create_info, None)? };
+        let swapchain = unsafe {
+            renderer
+                .khr_swapchain
+                .create_swapchain(&create_info, None)?
+        };
         Ok(swapchain)
     }
 }
@@ -139,8 +152,14 @@ impl Window {
 impl Drop for Window {
     fn drop(&mut self) {
         unsafe {
-            self.renderer.khr_swapchain.destroy_swapchain(self.swapchain, None);
-            self.renderer.khr_surface.destroy_surface(self.surface, None);
+            log::debug!("Destroying swapchain");
+            self.renderer
+                .khr_swapchain
+                .destroy_swapchain(self.swapchain, None);
+            log::debug!("Destroying surface");
+            self.renderer
+                .khr_surface
+                .destroy_surface(self.surface, None);
         }
     }
 }

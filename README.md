@@ -1,6 +1,6 @@
 # Vulkan Engine
 
-[![Continuous integration](https://img.shields.io/github/workflow/status/michidk/vulkan-engine/Continuous%20Integration?style=for-the-badge&label=CI)](https://github.com/michidk/vulkan-engine/actions)
+[![Continuous integration](https://img.shields.io/github/actions/workflow/status/michidk/vulkan-engine/ci.yaml?label=CI&style=for-the-badge)](https://github.com/michidk/vulkan-engine/actions)
 
 This repository contains a playground project by [Jonas](https://github.com/Shemnei), [Robin](https://github.com/Rob2309), and [Michael](https://github.com/michidk) to learn the Vulkan graphics API. It uses the [Rust language](https://www.rust-lang.org/) and the [Ash](https://github.com/MaikKlein/ash) Vulkan wrapper.
 

@@ -13,7 +13,7 @@ pub fn file_name(path: &Path) -> Result<&str> {
 }
 
 pub fn combine_path(directory: &Path, file_name: &str, extension: &str) -> Result<PathBuf> {
-    Ok(directory.join(format!("{}.{}", file_name, extension)))
+    Ok(directory.join(format!("{file_name}.{extension}")))
 }
 
 pub fn write_file(target: PathBuf, data: Vec<u8>) -> Result<File> {

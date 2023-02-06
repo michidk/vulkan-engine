@@ -1208,8 +1208,8 @@ impl VulkanManager {
         self.swapchain.recreate(
             &self.device,
             self.physical_device,
-            &*self.allocator,
-            &*self.surface,
+            &self.allocator,
+            &self.surface,
             self.renderpass,
             self.renderpass_pp,
         )?;
@@ -1274,7 +1274,7 @@ impl VulkanManager {
                     &pixels,
                     TextureFilterMode::Linear,
                     (*self.allocator).clone(),
-                    &mut (*self.uploader),
+                    &mut self.uploader,
                     self.device.clone(),
                 )
                 .unwrap(),

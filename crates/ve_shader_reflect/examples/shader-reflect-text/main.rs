@@ -56,8 +56,8 @@ fn print_block_layout(layout: &BlockLayout) {
         match member.kind {
             BlockMemberType::Unsupported => print!("<unsupported> "),
             BlockMemberType::Float => print!("float "),
-            BlockMemberType::FloatVector(dim) => print!("vec{} ", dim),
-            BlockMemberType::FloatMatrix(dim) => print!("mat{} ", dim),
+            BlockMemberType::FloatVector(dim) => print!("vec{dim} "),
+            BlockMemberType::FloatMatrix(dim) => print!("mat{dim} "),
         }
 
         println!("{}; // Size={}", member.name, member.size);

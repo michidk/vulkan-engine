@@ -27,7 +27,7 @@ impl ShaderKind {
 pub fn load(name: &str, kind: ShaderKind, code_ref: &mut Vec<u32>) -> vk::ShaderModuleCreateInfo {
     let folder = Path::new(FOLDER);
     let filename = format!("{}-{}.spv", name, kind.extension());
-    let file = folder.join(&filename);
+    let file = folder.join(filename);
 
     get_file_as_bytes(file, code_ref);
 

@@ -44,7 +44,7 @@ impl Scene {
     }
 
     pub fn new_entity(self: &Rc<Self>, name: String) -> Rc<Entity> {
-        Entity::new(self, &*self.root_entity.borrow(), name)
+        Entity::new(self, &self.root_entity.borrow(), name)
     }
 
     pub fn new_entity_with_transform(
@@ -52,7 +52,7 @@ impl Scene {
         name: String,
         transform: Transform,
     ) -> Rc<Entity> {
-        Entity::new_with_transform(self, &*self.root_entity.borrow(), name, transform)
+        Entity::new_with_transform(self, &self.root_entity.borrow(), name, transform)
     }
 
     pub fn load(&self) {

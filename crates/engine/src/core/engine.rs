@@ -426,7 +426,7 @@ impl Engine {
                     _ => Color32::WHITE,
                 };
                 ui.colored_label(fps_color, format!("FPS: {}", self.fps));
-                ui.colored_label(fps_color, format!("Frame time: {:.3} ms", frame_time));
+                ui.colored_label(fps_color, format!("Frame time: {frame_time:.3} ms"));
 
                 Plot::new("Frame time Graph")
                     .height(70.0)

@@ -179,7 +179,7 @@ fn reflect_shader_bindings(module: &Module) -> Result<Vec<SetBinding>> {
                 SetBindingData::UniformBuffer {
                     layout: BlockLayout {
                         members,
-                        block_name: name.clone().unwrap_or_else(|| "".to_string()),
+                        block_name: name.clone().unwrap_or_default(),
                         total_size,
                     },
                 }

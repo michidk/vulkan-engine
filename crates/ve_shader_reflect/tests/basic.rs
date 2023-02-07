@@ -8,7 +8,7 @@ pub fn test_gpass_simple() {
     let root = env!("CARGO_MANIFEST_DIR");
 
     {
-        let vert_spv = fs::read(format!("{}/tests/shaders/gpass_simple_vert.spv", root)).unwrap();
+        let vert_spv = fs::read(format!("{root}/tests/shaders/gpass_simple_vert.spv")).unwrap();
         let info_vert = reflect_shader(unsafe {
             slice::from_raw_parts(vert_spv.as_ptr() as *const u32, vert_spv.len() / 4)
         })
@@ -54,7 +54,7 @@ pub fn test_gpass_simple() {
     }
 
     {
-        let frag_spv = fs::read(format!("{}/tests/shaders/gpass_simple_frag.spv", root)).unwrap();
+        let frag_spv = fs::read(format!("{root}/tests/shaders/gpass_simple_frag.spv")).unwrap();
         let info_frag = reflect_shader(unsafe {
             slice::from_raw_parts(frag_spv.as_ptr() as *const u32, frag_spv.len() / 4)
         })

@@ -84,7 +84,7 @@ fn prepare(args: CliArgs) -> Result<()> {
         // creating the output folder of the input file in the same structure
         let local_output_folder = output.parent().unwrap_or(output_path);
         if !local_output_folder.exists() {
-            fs::create_dir_all(&local_output_folder)
+            fs::create_dir_all(local_output_folder)
                 .map_err(CliError::ErrorCreatingOutputStructure)?;
         }
 

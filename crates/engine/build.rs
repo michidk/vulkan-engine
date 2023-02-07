@@ -47,14 +47,14 @@ fn compile_shader(
     let output = Command::new("glslc")
         .arg("--target-env=vulkan1.2")
         .arg("-fauto-combined-image-sampler")
-        .arg(format!("-fshader-stage={}", shader_type))
-        .arg(format!("-fentry-point={}", shader_type))
+        .arg(format!("-fshader-stage={shader_type}"))
+        .arg(format!("-fentry-point={shader_type}"))
         .arg(&source_path.display().to_string())
         .arg(format!("-o{}", output_path.to_string_lossy()))
         .output()
         .expect("failed to compile shaders using glslc");
 
-    println!("Shader Compiler Output: {:#?}", output);
+    println!("Shader Compiler Output: {output:#?}");
     assert!(output.status.success());
 
     output

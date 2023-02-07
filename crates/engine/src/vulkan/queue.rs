@@ -126,7 +126,7 @@ pub fn init_device_and_queues(
         unsafe { instance.create_device(physical_device, &device_create_info, None) }?;
 
     let graphics_queue =
-        unsafe { logical_device.get_device_queue(queue_families.graphics_q_index as u32, 0) };
+        unsafe { logical_device.get_device_queue(queue_families.graphics_q_index, 0) };
 
     Ok((logical_device, Queues { graphics_queue }))
 }

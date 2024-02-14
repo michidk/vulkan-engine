@@ -479,8 +479,8 @@ impl Drop for Material {
                     self.pipeline.device.destroy_buffer(*buffer, None);
                 }
             }
-            for a in &self.allocations {
-                self.pipeline.allocator.free(a.clone());
+            for a in self.allocations.drain(..) {
+                self.pipeline.allocator.free(a);
             }
         }
     }

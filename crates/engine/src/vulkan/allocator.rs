@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 
 use ash::vk;
-use gpu_allocator::{vulkan::AllocationCreateDesc, AllocatorDebugSettings};
+use gpu_allocator::{
+    vulkan::{AllocationCreateDesc, AllocationScheme},
+    AllocationSizes, AllocatorDebugSettings,
+};
 
 use super::error::GraphicsResult;
 
@@ -32,6 +35,7 @@ impl Allocator {
                     log_stack_traces: false,
                 },
                 buffer_device_address: false,
+                allocation_sizes: AllocationSizes::default(),
             })
             .unwrap();
 
@@ -61,6 +65,7 @@ impl Allocator {
             requirements,
             location,
             linear: true,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe {
@@ -111,6 +116,7 @@ impl Allocator {
             requirements,
             location,
             linear: false,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe {

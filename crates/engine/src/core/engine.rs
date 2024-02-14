@@ -7,10 +7,10 @@ use std::{
 
 use ash::vk;
 use egui::{
-    plot::{Legend, Line, Plot, Value, Values},
-    CollapsingHeader, Color32, ComboBox, CtxRef, DragValue, ProgressBar, RichText, ScrollArea,
-    SidePanel,
+    epaint::Primitive, CollapsingHeader, Color32, ComboBox, Context, DragValue, FontDefinitions,
+    ProgressBar, RichText, ScrollArea, SidePanel, TexturesDelta, ViewportId,
 };
+use egui_plot::{Legend, Line, Plot};
 use gfx_maths::Quaternion;
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +65,7 @@ impl EngineInit {
         let config = read_config();
 
         let scene = Scene::new();
-        let eventloop = winit::event_loop::EventLoop::new();
+        let eventloop = winit::event_loop::EventLoop::new()?;
         let window = info.window_info.build(&eventloop)?;
 
         let vulkan_manager =
@@ -73,8 +73,16 @@ impl EngineInit {
         let input = Rc::new(RefCell::new(Input::new()));
         let gameloop = GameLoop::new(input.clone());
 
-        let gui_context = egui::CtxRef::default();
-        let gui_state = egui_winit::State::new(&window.winit_window);
+        let gui_context = egui::Context::default();
+        gui_context.set_fonts(FontDefinitions::default());
+
+        let gui_state = egui_winit::State::new(
+            gui_context.clone(),
+            ViewportId::ROOT,
+            &eventloop,
+            None,
+            None,
+        );
 
         Ok(Self {
             eventloop,
@@ -118,7 +126,7 @@ impl EngineInit {
         })
     }
 
-    pub fn start(mut self) -> ! {
+    pub fn start(mut self) {
         self.engine
             .register_component::<RendererComponent>("RendererComponent".to_string());
         self.engine
@@ -141,7 +149,7 @@ pub struct Engine {
     pub scene: Rc<Scene>,
     pub vulkan_manager: VulkanManager,
     pub window: Window,
-    pub gui_context: egui::CtxRef,
+    pub gui_context: egui::Context,
     pub gui_state: egui_winit::State,
 
     fps_time: Instant,
@@ -154,9 +162,9 @@ pub struct Engine {
     ui_time_max: f32,
     last_render_time: f32,
     last_ui_time: f32,
-    frame_time_history: Vec<Value>,
-    render_time_history: Vec<Value>,
-    ui_time_history: Vec<Value>,
+    frame_time_history: Vec<[f64; 2]>,
+    render_time_history: Vec<[f64; 2]>,
+    ui_time_history: Vec<[f64; 2]>,
 
     ui_vertex_count: u32,
     ui_index_count: u32,
@@ -189,7 +197,7 @@ impl Engine {
     }
 
     fn render_inspector(
-        ctx: &CtxRef,
+        ctx: &Context,
         selected_entity: &mut Option<Rc<Entity>>,
         selected_factory: &mut usize,
         factories: &[(String, ComponentFactoryFn)],
@@ -309,9 +317,9 @@ impl Engine {
 
         let frame_time = self.update_frame_stats();
 
-        let gui_meshes = self.render_debug_ui(frame_time);
+        let (gui_meshes, textures_delta) = self.render_debug_ui(frame_time);
 
-        self.render_3d(gui_meshes);
+        self.render_3d(gui_meshes, &textures_delta);
     }
 
     fn update_frame_stats(&mut self) -> f32 {
@@ -335,41 +343,41 @@ impl Engine {
             let plot_x = self
                 .frame_time_history
                 .last()
-                .map(|v| v.x + 0.1)
+                .map(|v| v[0] + 0.1)
                 .unwrap_or(0.0);
 
-            self.frame_time_history.push(Value::new(
+            self.frame_time_history.push([
                 plot_x,
                 if plot_x == 0.0 {
                     0.0
                 } else {
-                    self.frame_time_max
+                    self.frame_time_max as f64
                 },
-            ));
+            ]);
             if self.frame_time_history.len() > 10 * 10 {
                 self.frame_time_history.remove(0);
             }
 
-            self.render_time_history.push(Value::new(
+            self.render_time_history.push([
                 plot_x,
                 if plot_x == 0.0 {
                     0.0
                 } else {
-                    self.render_time_max
+                    self.render_time_max as f64
                 },
-            ));
+            ]);
             if self.render_time_history.len() > 10 * 10 {
                 self.render_time_history.remove(0);
             }
 
-            self.ui_time_history.push(Value::new(
+            self.ui_time_history.push([
                 plot_x,
                 if plot_x == 0.0 {
                     0.0
                 } else {
-                    self.ui_time_max + self.render_time_max
+                    (self.ui_time_max + self.render_time_max) as f64
                 },
-            ));
+            ]);
             if self.ui_time_history.len() > 10 * 10 {
                 self.ui_time_history.remove(0);
             }
@@ -384,7 +392,11 @@ impl Engine {
         frame_time
     }
 
-    fn render_3d(&mut self, gui_meshes: Vec<egui::ClippedMesh>) {
+    fn render_3d(
+        &mut self,
+        gui_meshes: Vec<egui::ClippedPrimitive>,
+        textures_delta: &TexturesDelta,
+    ) {
         profile_function!();
 
         let render_start_time = Instant::now();
@@ -395,7 +407,7 @@ impl Engine {
             // prepare for render
             let image_index = vk.next_frame();
             vk.wait_for_fence();
-            vk.upload_ui_data(self.gui_context.clone(), gui_meshes);
+            vk.upload_ui_data(gui_meshes, textures_delta);
             vk.wait_for_uploads();
 
             vk.update_commandbuffer(image_index as usize, Rc::clone(&self.scene))
@@ -410,7 +422,7 @@ impl Engine {
         self.last_render_time = render_time;
     }
 
-    fn render_debug_tools_window(&mut self, ctx: &egui::CtxRef, frame_time: f32) {
+    fn render_debug_tools_window(&mut self, ctx: &egui::Context, frame_time: f32) {
         profile_function!();
 
         egui::Window::new("Debug Tools")
@@ -433,22 +445,22 @@ impl Engine {
                     .include_y(0.0)
                     .legend(Legend::default())
                     .show(ui, |ui| {
-                        let line = Line::new(Values::from_values(self.frame_time_history.clone()))
+                        let line = Line::new(self.frame_time_history.clone())
                             .name("Frame")
                             .fill(0.0)
-                            .highlight();
+                            .highlight(true);
                         ui.line(line);
 
-                        let line = Line::new(Values::from_values(self.render_time_history.clone()))
+                        let line = Line::new(self.render_time_history.clone())
                             .name("Render")
                             .fill(0.0)
-                            .highlight();
+                            .highlight(true);
                         ui.line(line);
 
-                        let line = Line::new(Values::from_values(self.ui_time_history.clone()))
+                        let line = Line::new(self.ui_time_history.clone())
                             .name("UI")
                             .fill(0.0)
-                            .highlight();
+                            .highlight(true);
                         ui.line(line);
                     });
 
@@ -600,7 +612,7 @@ impl Engine {
             });
     }
 
-    fn render_scene_graph(&mut self, ctx: &egui::CtxRef) {
+    fn render_scene_graph(&mut self, ctx: &egui::Context) {
         profile_function!();
 
         let root_entity = self.scene.root_entity.borrow();
@@ -616,15 +628,15 @@ impl Engine {
         }
     }
 
-    fn render_debug_ui(&mut self, frame_time: f32) -> Vec<egui::ClippedMesh> {
+    fn render_debug_ui(&mut self, frame_time: f32) -> (Vec<egui::ClippedPrimitive>, TexturesDelta) {
         profile_function!();
 
         let ui_start_time = Instant::now();
 
-        let mut gui_context = self.gui_context.clone();
+        let gui_context = self.gui_context.clone();
 
         let gui_input = self.gui_state.take_egui_input(&self.window.winit_window);
-        let (output, shapes) = gui_context.run(gui_input, |ctx| {
+        let full_output = gui_context.run(gui_input, |ctx| {
             self.render_debug_tools_window(ctx, frame_time);
 
             self.render_scene_graph(ctx);
@@ -653,18 +665,43 @@ impl Engine {
         {
             profile_scope!("Ui tesselation");
             self.gui_state
-                .handle_output(&self.window.winit_window, &self.gui_context, output);
-            gui_meshes = self.gui_context.tessellate(shapes);
+                .handle_platform_output(&self.window.winit_window, full_output.platform_output);
+            gui_meshes = self
+                .gui_context
+                .tessellate(full_output.shapes, full_output.pixels_per_point);
 
-            self.ui_vertex_count = gui_meshes.iter().map(|m| m.1.vertices.len() as u32).sum();
-            self.ui_index_count = gui_meshes.iter().map(|m| m.1.indices.len() as u32).sum();
-            self.ui_mesh_count = gui_meshes.len() as u32;
+            self.ui_vertex_count = gui_meshes
+                .iter()
+                .map(|m| {
+                    if let Primitive::Mesh(m) = &m.primitive {
+                        m.vertices.len() as u32
+                    } else {
+                        0
+                    }
+                })
+                .sum();
+            self.ui_index_count = gui_meshes
+                .iter()
+                .map(|m| {
+                    if let Primitive::Mesh(m) = &m.primitive {
+                        m.indices.len() as u32
+                    } else {
+                        0
+                    }
+                })
+                .sum();
+            self.ui_mesh_count = gui_meshes
+                .iter()
+                .filter(|m| matches!(&m.primitive, Primitive::Mesh(_)))
+                .count() as u32;
         }
+
+        log::trace!("UI mesh count: {}", self.ui_mesh_count);
 
         let ui_time = ui_start_time.elapsed().as_secs_f32() * 1000.0;
         self.last_ui_time = ui_time;
 
-        gui_meshes
+        (gui_meshes, full_output.textures_delta)
     }
 }
 

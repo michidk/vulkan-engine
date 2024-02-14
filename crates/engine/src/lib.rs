@@ -28,7 +28,7 @@ pub fn run_engine<Init: FnOnce(&mut core::engine::Engine)>(
     height: u32,
     app_name: &'static str,
     init_func: Init,
-) -> ! {
+) {
     #[cfg(debug_assertions)]
     let level = "debug";
     #[cfg(not(debug_assertions))]

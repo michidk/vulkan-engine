@@ -5,7 +5,7 @@ use std::{
 
 use egui::{Slider, TextEdit};
 use gfx_maths::{Quaternion, Vec3};
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 
 use crate::scene::entity::Entity;
 
@@ -56,22 +56,22 @@ impl Component for DebugMovementComponent {
             * Quaternion::axis_angle(Vec3::new(1.0, 0.0, 0.0), rot_x);
 
         let mut movement = Vec3::zero();
-        if input.get_button_down(VirtualKeyCode::W) {
+        if input.get_button_down(KeyCode::KeyW) {
             movement += Vec3::new(0.0, 0.0, 1.0);
         }
-        if input.get_button_down(VirtualKeyCode::A) {
+        if input.get_button_down(KeyCode::KeyA) {
             movement += Vec3::new(-1.0, 0.0, 0.0);
         }
-        if input.get_button_down(VirtualKeyCode::S) {
+        if input.get_button_down(KeyCode::KeyS) {
             movement += Vec3::new(0.0, 0.0, -1.0);
         }
-        if input.get_button_down(VirtualKeyCode::D) {
+        if input.get_button_down(KeyCode::KeyD) {
             movement += Vec3::new(1.0, 0.0, 0.0);
         }
-        if input.get_button_down(VirtualKeyCode::Space) {
+        if input.get_button_down(KeyCode::Space) {
             movement += Vec3::new(0.0, 1.0, 0.0);
         }
-        if input.get_button_down(VirtualKeyCode::LControl) {
+        if input.get_button_down(KeyCode::ControlLeft) {
             movement += Vec3::new(0.0, -1.0, 0.0);
         }
         if movement.sqr_magnitude() > 0.0 {

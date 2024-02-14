@@ -121,6 +121,7 @@ impl Drop for Texture2D {
             self.device.destroy_sampler(self.sampler, None);
             self.device.destroy_image_view(self.view, None);
         }
-        self.allocator.destroy_image(self.image, self.alloc.clone());
+        self.allocator
+            .destroy_image(self.image, std::mem::take(&mut self.alloc));
     }
 }

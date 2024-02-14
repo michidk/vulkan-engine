@@ -298,16 +298,22 @@ impl SwapchainWrapper {
 
         logical_device.destroy_image_view(self.depth_imageview, None);
         logical_device.destroy_image_view(self.depth_imageview_depth_only, None);
-        allocator.destroy_image(self.depth_image, self.depth_image_alloc.clone());
+        allocator.destroy_image(
+            self.depth_image,
+            std::mem::take(&mut self.depth_image_alloc),
+        );
 
         logical_device.destroy_image_view(self.g0_imageview, None);
-        allocator.destroy_image(self.g0_image, self.g0_image_alloc.clone());
+        allocator.destroy_image(self.g0_image, std::mem::take(&mut self.g0_image_alloc));
 
         logical_device.destroy_image_view(self.g1_imageview, None);
-        allocator.destroy_image(self.g1_image, self.g1_image_alloc.clone());
+        allocator.destroy_image(self.g1_image, std::mem::take(&mut self.g1_image_alloc));
 
         logical_device.destroy_image_view(self.resolve_imageview, None);
-        allocator.destroy_image(self.resolve_image, self.resolve_image_alloc.clone());
+        allocator.destroy_image(
+            self.resolve_image,
+            std::mem::take(&mut self.resolve_image_alloc),
+        );
 
         for iv in &self.imageviews {
             logical_device.destroy_image_view(*iv, None);
@@ -332,16 +338,22 @@ impl SwapchainWrapper {
 
             device.destroy_image_view(self.depth_imageview, None);
             device.destroy_image_view(self.depth_imageview_depth_only, None);
-            allocator.destroy_image(self.depth_image, self.depth_image_alloc.clone());
+            allocator.destroy_image(
+                self.depth_image,
+                std::mem::take(&mut self.depth_image_alloc),
+            );
 
             device.destroy_image_view(self.g0_imageview, None);
-            allocator.destroy_image(self.g0_image, self.g0_image_alloc.clone());
+            allocator.destroy_image(self.g0_image, std::mem::take(&mut self.g0_image_alloc));
 
             device.destroy_image_view(self.g1_imageview, None);
-            allocator.destroy_image(self.g1_image, self.g1_image_alloc.clone());
+            allocator.destroy_image(self.g1_image, std::mem::take(&mut self.g1_image_alloc));
 
             device.destroy_image_view(self.resolve_imageview, None);
-            allocator.destroy_image(self.resolve_image, self.resolve_image_alloc.clone());
+            allocator.destroy_image(
+                self.resolve_image,
+                std::mem::take(&mut self.resolve_image_alloc),
+            );
 
             for iv in &self.imageviews {
                 device.destroy_image_view(*iv, None);

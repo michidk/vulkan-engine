@@ -16,9 +16,10 @@ pub(crate) mod uploader;
 use std::{ffi::CString, mem::size_of, ptr::null, rc::Rc, slice};
 
 use ash::vk::{self, Handle};
-use egui::ClippedMesh;
+use egui::{epaint::Primitive, ClippedPrimitive, ImageData, TexturesDelta};
 use gfx_maths::Mat4;
 use gpu_allocator::MemoryLocation;
+use raw_window_handle::HasRawDisplayHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -96,8 +97,9 @@ pub struct VulkanManager {
     pipeline_ui: vk::Pipeline,
     pipeline_ui_wireframe: vk::Pipeline,
 
-    ui_texture_version: u64,
     ui_texture: Option<Rc<Texture2D>>,
+    ui_texture_pixels: Vec<u8>,
+    ui_texture_size: (usize, usize),
 
     ui_vertex_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
     ui_index_buffers: Vec<(vk::Buffer, gpu_allocator::vulkan::Allocation, u64)>,
@@ -391,8 +393,9 @@ impl VulkanManager {
             pipeline_ui,
             pipeline_ui_wireframe,
 
-            ui_texture_version: u64::MAX,
             ui_texture: None,
+            ui_texture_pixels: Vec::new(),
+            ui_texture_size: (0, 0),
 
             ui_vertex_buffers,
             ui_index_buffers,
@@ -445,15 +448,12 @@ impl VulkanManager {
             .engine_version(vk::make_api_version(0, 0, 1, 0))
             .api_version(vk::API_VERSION_1_2);
 
-        let surface_extensions = ash_window::enumerate_required_extensions(window).unwrap();
-        let extension_names_raw = surface_extensions
-            .iter()
-            .map(|ext| ext.as_ptr())
-            .collect::<Vec<_>>();
+        let surface_extensions =
+            ash_window::enumerate_required_extensions(window.raw_display_handle()).unwrap();
 
         let instance_create_info = vk::InstanceCreateInfo::builder()
             .application_info(&app_info)
-            .enabled_extension_names(&extension_names_raw);
+            .enabled_extension_names(surface_extensions);
 
         Ok(unsafe { entry.create_instance(&instance_create_info, None) }?)
     }
@@ -1242,76 +1242,132 @@ impl VulkanManager {
 
     pub(crate) fn upload_ui_data(
         &mut self,
-        gui_context: egui::CtxRef,
-        gui_meshes: Vec<ClippedMesh>,
+        gui_meshes: Vec<ClippedPrimitive>,
+        textures_delta: &TexturesDelta,
     ) {
         profile_function!();
+        for (_, delta) in &textures_delta.set {
+            if let ImageData::Font(font_data) = &delta.image {
+                if let Some(pos) = delta.pos {
+                    log::trace!(
+                        "UI font texture region {}.{} - {}.{} changed",
+                        pos[0],
+                        pos[1],
+                        pos[0] + font_data.width(),
+                        pos[1] + font_data.height()
+                    );
 
-        let font_image = gui_context.font_image();
-        if font_image.version != self.ui_texture_version {
-            log::trace!(
-                "UI font texture changed to {}x{}",
-                font_image.width,
-                font_image.height
-            );
+                    let new_pixels = font_data.srgba_pixels(None).collect::<Vec<_>>();
+                    for x in 0..font_data.width() {
+                        for y in 0..font_data.height() {
+                            let dest_x = x + pos[0];
+                            let dest_y = y + pos[1];
 
-            self.ui_texture_version = font_image.version;
+                            self.ui_texture_pixels
+                                [(dest_x + dest_y * self.ui_texture_size.0) * 4] =
+                                new_pixels[x + y * font_data.width()].r();
+                            self.ui_texture_pixels
+                                [(dest_x + dest_y * self.ui_texture_size.0) * 4 + 1] =
+                                new_pixels[x + y * font_data.width()].g();
+                            self.ui_texture_pixels
+                                [(dest_x + dest_y * self.ui_texture_size.0) * 4 + 2] =
+                                new_pixels[x + y * font_data.width()].b();
+                            self.ui_texture_pixels
+                                [(dest_x + dest_y * self.ui_texture_size.0) * 4 + 3] =
+                                new_pixels[x + y * font_data.width()].a();
+                        }
+                    }
+                } else {
+                    log::trace!(
+                        "UI font texture changed size to {}x{}",
+                        font_data.width(),
+                        font_data.height(),
+                    );
 
-            let num_pixels = font_image.width * font_image.height;
-            let mut pixels = vec![0; num_pixels * 4];
-            for i in 0..num_pixels {
-                let alpha = font_image.pixels[i];
-                pixels[i * 4] = 0xFFu8;
-                pixels[i * 4 + 1] = 0xFFu8;
-                pixels[i * 4 + 2] = 0xFFu8;
-                pixels[i * 4 + 3] = alpha;
+                    self.ui_texture_size = (font_data.width(), font_data.height());
+                    self.ui_texture_pixels
+                        .resize(self.ui_texture_size.0 * self.ui_texture_size.1 * 4, 0);
+                    let new_pixels = font_data.srgba_pixels(None).collect::<Vec<_>>();
+
+                    for x in 0..self.ui_texture_size.0 {
+                        for y in 0..self.ui_texture_size.1 {
+                            self.ui_texture_pixels[(x + y * self.ui_texture_size.0) * 4] =
+                                new_pixels[x + y * font_data.width()].r();
+                            self.ui_texture_pixels[(x + y * self.ui_texture_size.0) * 4 + 1] =
+                                new_pixels[x + y * font_data.width()].g();
+                            self.ui_texture_pixels[(x + y * self.ui_texture_size.0) * 4 + 2] =
+                                new_pixels[x + y * font_data.width()].b();
+                            self.ui_texture_pixels[(x + y * self.ui_texture_size.0) * 4 + 3] =
+                                new_pixels[x + y * font_data.width()].a();
+                        }
+                    }
+                }
+
+                self.ui_texture = Some(
+                    Texture2D::new(
+                        self.ui_texture_size.0 as u32,
+                        self.ui_texture_size.1 as u32,
+                        &self.ui_texture_pixels,
+                        TextureFilterMode::Linear,
+                        (*self.allocator).clone(),
+                        &mut self.uploader,
+                        self.device.clone(),
+                    )
+                    .unwrap(),
+                );
             }
-
-            self.ui_texture = Some(
-                Texture2D::new(
-                    font_image.width as u32,
-                    font_image.height as u32,
-                    &pixels,
-                    TextureFilterMode::Linear,
-                    (*self.allocator).clone(),
-                    &mut self.uploader,
-                    self.device.clone(),
-                )
-                .unwrap(),
-            );
         }
 
         self.ui_meshes.clear();
 
-        let num_vertices: u64 = gui_meshes.iter().map(|m| m.1.vertices.len()).sum::<usize>() as u64;
+        let num_vertices: u64 = gui_meshes
+            .iter()
+            .map(|m| {
+                if let Primitive::Mesh(m) = &m.primitive {
+                    m.vertices.len()
+                } else {
+                    0
+                }
+            })
+            .sum::<usize>() as u64;
         let mut vertex_buffer = Vec::with_capacity(num_vertices as usize);
 
-        let num_indices: u64 = gui_meshes.iter().map(|m| m.1.indices.len()).sum::<usize>() as u64;
+        let num_indices: u64 = gui_meshes
+            .iter()
+            .map(|m| {
+                if let Primitive::Mesh(m) = &m.primitive {
+                    m.indices.len()
+                } else {
+                    0
+                }
+            })
+            .sum::<usize>() as u64;
         let mut index_buffer = Vec::with_capacity(num_indices as usize);
 
         for m in gui_meshes {
-            let vertex_offset = vertex_buffer.len();
+            if let Primitive::Mesh(mesh) = m.primitive {
+                let vertex_offset = vertex_buffer.len();
+                let start_index = index_buffer.len() as u64;
 
-            let start_index = index_buffer.len() as u64;
+                for v in mesh.vertices {
+                    vertex_buffer.push(v);
+                }
 
-            for v in m.1.vertices {
-                vertex_buffer.push(v);
+                for i in mesh.indices {
+                    index_buffer.push(i + vertex_offset as u32);
+                }
+
+                let index_count = index_buffer.len() as u64 - start_index;
+                self.ui_meshes.push((m.clip_rect, start_index, index_count));
             }
-
-            for i in m.1.indices {
-                index_buffer.push(i + vertex_offset as u32);
-            }
-
-            let index_count = index_buffer.len() as u64 - start_index;
-
-            self.ui_meshes.push((m.0, start_index, index_count));
         }
 
         {
             let (buffer, alloc, cap) =
                 &mut self.ui_vertex_buffers[self.current_frame_index as usize];
             if *cap < num_vertices {
-                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+                self.allocator
+                    .destroy_buffer(*buffer, std::mem::take(alloc));
 
                 let (new_buffer, new_alloc) = self
                     .allocator
@@ -1334,7 +1390,8 @@ impl VulkanManager {
             let (buffer, alloc, cap) =
                 &mut self.ui_index_buffers[self.current_frame_index as usize];
             if *cap < num_indices {
-                self.allocator.destroy_buffer(*buffer, (*alloc).clone());
+                self.allocator
+                    .destroy_buffer(*buffer, std::mem::take(alloc));
 
                 let (new_buffer, new_alloc) = self
                     .allocator
@@ -1440,11 +1497,13 @@ impl Drop for VulkanManager {
 
             // drop ui_texture
             self.ui_texture = None;
-            for (buffer, alloc, _) in &self.ui_vertex_buffers {
-                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            for (buffer, alloc, _) in &mut self.ui_vertex_buffers {
+                self.allocator
+                    .destroy_buffer(*buffer, std::mem::take(alloc));
             }
-            for (buffer, alloc, _) in &self.ui_index_buffers {
-                self.allocator.destroy_buffer(*buffer, alloc.clone());
+            for (buffer, alloc, _) in &mut self.ui_index_buffers {
+                self.allocator
+                    .destroy_buffer(*buffer, std::mem::take(alloc));
             }
 
             self.lighting_pipelines.clear();

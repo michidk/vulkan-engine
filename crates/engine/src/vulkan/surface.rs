@@ -1,4 +1,5 @@
 use ash::{extensions::khr, vk};
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 pub struct SurfaceWrapper {
     pub surface: vk::SurfaceKHR,
@@ -14,7 +15,16 @@ impl SurfaceWrapper {
         // load the surface
         // handles x11 or whatever OS specific drivers
         // this shit is terrible and nobody wants to do it, so lets use ash-window
-        let surface = unsafe { ash_window::create_surface(entry, instance, window, None).unwrap() };
+        let surface = unsafe {
+            ash_window::create_surface(
+                entry,
+                instance,
+                window.raw_display_handle(),
+                window.raw_window_handle(),
+                None,
+            )
+            .unwrap()
+        };
         let surface_loader = khr::Surface::new(entry, instance);
 
         SurfaceWrapper {

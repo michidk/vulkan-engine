@@ -1,6 +1,9 @@
 use std::usize;
 
-use winit::event::{DeviceEvent, ElementState, Event, MouseScrollDelta, VirtualKeyCode};
+use winit::{
+    event::{DeviceEvent, ElementState, Event, MouseScrollDelta},
+    keyboard::{KeyCode, PhysicalKey},
+};
 
 use super::{
     engine::Engine,
@@ -104,15 +107,8 @@ impl Input {
                 event: DeviceEvent::Key(input),
                 ..
             } => {
-                if let Some(vcc) = input.virtual_keycode {
-                    match input.state {
-                        ElementState::Pressed => {
-                            self.state.key_held[vcc as usize] = true;
-                        }
-                        ElementState::Released => {
-                            self.state.key_held[vcc as usize] = false;
-                        }
-                    }
+                if let PhysicalKey::Code(key) = input.physical_key {
+                    self.state.key_held[key as usize] = input.state == ElementState::Pressed;
                 }
             }
             _ => {}
@@ -121,9 +117,7 @@ impl Input {
 
     // handles built-in key presses
     pub(crate) fn handle_builtin(&mut self, window: &mut Window) {
-        if self.get_button_down(VirtualKeyCode::LAlt)
-            && self.get_button_was_down(VirtualKeyCode::Return)
-        {
+        if self.get_button_down(KeyCode::AltLeft) && self.get_button_was_down(KeyCode::Enter) {
             if window.get_mode() == WindowMode::Windowed {
                 window.set_mode(WindowMode::Exclusive);
             } else {
@@ -131,7 +125,7 @@ impl Input {
             }
         }
 
-        if self.get_button_was_down(VirtualKeyCode::Escape) {
+        if self.get_button_was_down(KeyCode::Escape) {
             self.cursor_captured = !self.cursor_captured;
             window.set_capture_cursor(self.cursor_captured);
         }
@@ -151,17 +145,17 @@ impl Input {
     }
 
     /// Returns whether the button was pressed this frame
-    pub fn get_button_was_down(&self, key: VirtualKeyCode) -> bool {
+    pub fn get_button_was_down(&self, key: KeyCode) -> bool {
         !self.state_prev.key_held[key as usize] && self.state.key_held[key as usize]
     }
 
     /// Returns whether the button is pressed down right now
-    pub fn get_button_down(&self, key: VirtualKeyCode) -> bool {
+    pub fn get_button_down(&self, key: KeyCode) -> bool {
         self.state.key_held[key as usize]
     }
 
     /// Returns whether the button is not pressed right now
-    pub fn get_button_up(&self, key: VirtualKeyCode) -> bool {
+    pub fn get_button_up(&self, key: KeyCode) -> bool {
         !self.get_button_down(key)
     }
 

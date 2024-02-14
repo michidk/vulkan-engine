@@ -60,8 +60,8 @@ impl<T: Sized> PerFrameUniformBuffer<T> {
         })
     }
 
-    pub fn destroy(&self, allocator: &Allocator) {
-        allocator.destroy_buffer(self.buffer, self.allocation.clone());
+    pub fn destroy(&mut self, allocator: &Allocator) {
+        allocator.destroy_buffer(self.buffer, std::mem::take(&mut self.allocation));
     }
 }
 
@@ -123,7 +123,7 @@ impl BufferWrapper {
     }
 
     pub fn fill<T: Sized>(&mut self, allocator: &Allocator, data: &[T]) -> GraphicsResult<()> {
-        let bytes_to_write = (data.len() * std::mem::size_of::<T>()) as u64;
+        let bytes_to_write = std::mem::size_of_val(data) as u64;
         if bytes_to_write > self.capacity {
             log::warn!("Not enough memory allocated in buffer; Resizing");
             self.resize(allocator, bytes_to_write)?;
@@ -142,7 +142,7 @@ impl BufferWrapper {
     }
 
     fn resize(&mut self, allocator: &Allocator, new_capacity: u64) -> GraphicsResult<()> {
-        allocator.destroy_buffer(self.buffer, self.allocation.clone());
+        allocator.destroy_buffer(self.buffer, std::mem::take(&mut self.allocation));
         let new_buffer = BufferWrapper::new(
             allocator,
             new_capacity,
@@ -154,7 +154,7 @@ impl BufferWrapper {
     }
 
     pub fn cleanup(&mut self, allocator: &Allocator) {
-        allocator.destroy_buffer(self.buffer, self.allocation.clone())
+        allocator.destroy_buffer(self.buffer, std::mem::take(&mut self.allocation))
     }
 }
 

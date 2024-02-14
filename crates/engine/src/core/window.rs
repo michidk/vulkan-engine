@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::core::engine::EngineInit;
-use winit::event::Event;
+use winit::{event::Event, event_loop::ControlFlow, window::CursorGrabMode};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Dimensions {
@@ -124,9 +124,17 @@ impl Window {
     // actually perform the capture
     fn actually_capture_cursor(&mut self, capture: bool) {
         self.winit_window.set_cursor_visible(!capture);
-        self.winit_window
-            .set_cursor_grab(capture)
-            .expect("Could not enable cursor grab");
+
+        if capture {
+            self.winit_window
+                .set_cursor_grab(CursorGrabMode::Confined)
+                .or_else(|_| self.winit_window.set_cursor_grab(CursorGrabMode::Locked))
+                .expect("Failed to set cursor grab mode");
+        } else {
+            self.winit_window
+                .set_cursor_grab(CursorGrabMode::None)
+                .expect("Failed to set cursor grab mode");
+        }
     }
 
     // window is started with focused state
@@ -150,57 +158,64 @@ impl Window {
     }
 }
 
-pub fn start(engine_init: EngineInit) -> ! {
+pub fn start(engine_init: EngineInit) {
     let mut last_time = Instant::now();
 
     let mut engine = engine_init.engine;
     engine.window.on_start();
-    engine_init.eventloop.run(move |event, _, controlflow| {
-        *controlflow = winit::event_loop::ControlFlow::Poll;
-        engine.input.borrow_mut().update(&event, &engine);
+    engine_init
+        .eventloop
+        .run(move |event, window_target| {
+            window_target.set_control_flow(ControlFlow::Poll);
+            engine.input.borrow_mut().update(&event, &engine);
 
-        match event {
-            Event::WindowEvent { event, .. } => {
-                match event {
-                    winit::event::WindowEvent::MouseInput { .. }
-                    | winit::event::WindowEvent::MouseWheel { .. }
-                    | winit::event::WindowEvent::CursorMoved { .. }
-                    | winit::event::WindowEvent::KeyboardInput { .. } => {
-                        if !engine.input.borrow().get_cursor_captured() {
-                            engine.gui_state.on_event(&engine.gui_context, &event);
+            match event {
+                Event::WindowEvent { event, .. } => {
+                    match event {
+                        winit::event::WindowEvent::MouseInput { .. }
+                        | winit::event::WindowEvent::MouseWheel { .. }
+                        | winit::event::WindowEvent::CursorMoved { .. }
+                        | winit::event::WindowEvent::KeyboardInput { .. } => {
+                            if !engine.input.borrow().get_cursor_captured() {
+                                _ = engine
+                                    .gui_state
+                                    .on_window_event(&engine.window.winit_window, &event);
+                            }
+                        }
+                        _ => {
+                            _ = engine
+                                .gui_state
+                                .on_window_event(&engine.window.winit_window, &event);
                         }
                     }
-                    _ => {
-                        engine.gui_state.on_event(&engine.gui_context, &event);
+
+                    match event {
+                        winit::event::WindowEvent::CloseRequested => {
+                            window_target.exit();
+                        }
+                        winit::event::WindowEvent::Focused(state) => {
+                            engine.window.on_focus(state);
+                        }
+                        _ => {}
                     }
                 }
+                // render
+                Event::AboutToWait => {
+                    #[cfg(feature = "profiler")]
+                    puffin::GlobalProfiler::lock().new_frame();
 
-                match event {
-                    winit::event::WindowEvent::CloseRequested => {
-                        *controlflow = winit::event_loop::ControlFlow::Exit
-                    }
-                    winit::event::WindowEvent::Focused(state) => {
-                        engine.window.on_focus(state);
-                    }
-                    _ => {}
+                    engine.input.borrow_mut().handle_builtin(&mut engine.window);
+
+                    let now = Instant::now();
+                    let delta = (now - last_time).as_secs_f32();
+                    last_time = now;
+
+                    engine.gameloop.update(&engine.scene, delta);
+                    engine.render();
+                    engine.input.borrow_mut().rollover_state();
                 }
+                _ => {}
             }
-            // render
-            Event::MainEventsCleared => {
-                #[cfg(feature = "profiler")]
-                puffin::GlobalProfiler::lock().new_frame();
-
-                engine.input.borrow_mut().handle_builtin(&mut engine.window);
-
-                let now = Instant::now();
-                let delta = (now - last_time).as_secs_f32();
-                last_time = now;
-
-                engine.gameloop.update(&engine.scene, delta);
-                engine.render();
-                engine.input.borrow_mut().rollover_state();
-            }
-            _ => {}
-        }
-    });
+        })
+        .expect("EventLoop error");
 }

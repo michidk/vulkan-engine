@@ -97,8 +97,9 @@ impl Uploader {
             }
         }
 
-        for buf in &self.staging_buffers {
-            self.allocator.destroy_buffer(buf.buffer, buf.alloc.clone());
+        for buf in &mut self.staging_buffers {
+            self.allocator
+                .destroy_buffer(buf.buffer, std::mem::take(&mut buf.alloc));
         }
 
         unsafe {
@@ -208,7 +209,7 @@ impl Uploader {
             staging_buffer
                 .mapping
                 .offset(staging_buffer.pos as isize)
-                .copy_from_nonoverlapping(pixels.as_ptr() as *const u8, size as usize);
+                .copy_from_nonoverlapping(pixels.as_ptr(), size as usize);
 
             let transition = vk::ImageMemoryBarrier::builder()
                 .src_access_mask(vk::AccessFlags::empty())
@@ -353,9 +354,10 @@ impl Uploader {
         }
 
         // delete staging buffers after not being used for 10 frames
-        self.staging_buffers.retain(|b| {
+        self.staging_buffers.retain_mut(|b| {
             if self.frame_counter - b.last_used_frame >= 10 {
-                self.allocator.destroy_buffer(b.buffer, b.alloc.clone());
+                self.allocator
+                    .destroy_buffer(b.buffer, std::mem::take(&mut b.alloc));
                 log::trace!(
                     "Deleting staging buffer of size {}, offset={}, last used {} frames ago",
                     b.size,

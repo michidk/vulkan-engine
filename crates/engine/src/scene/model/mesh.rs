@@ -16,10 +16,14 @@ pub struct Mesh {
 
 impl Drop for Mesh {
     fn drop(&mut self) {
-        self.allocator
-            .destroy_buffer(self.vertex_buffer, self.vertex_buffer_alloc.clone());
-        self.allocator
-            .destroy_buffer(self.index_buffer, self.index_buffer_alloc.clone());
+        self.allocator.destroy_buffer(
+            self.vertex_buffer,
+            std::mem::take(&mut self.vertex_buffer_alloc),
+        );
+        self.allocator.destroy_buffer(
+            self.index_buffer,
+            std::mem::take(&mut self.index_buffer_alloc),
+        );
     }
 }
 
